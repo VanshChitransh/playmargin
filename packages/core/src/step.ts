@@ -144,10 +144,11 @@ function eats(w: World, tick: number, ev: Ev): void {
       ev.push({ type: "eat", by: e.id, victim: v.id, gained: toUnits(gained) });
     }
   }
-  const eaters = players(w).sort(byMassDesc);
+  // Hot loop (food x blobs every tick): radii once per tick, squared distances, no sqrt.
+  const eaters = players(w).sort(byMassDesc).map((b) => ({ b, r2: radius(b.mass) ** 2 }));
   w.food = w.food.filter((f) => {
-    const e = eaters.find((b) => dist(b, f) < radius(b.mass));
-    if (e) e.mass += f.mass;
+    const e = eaters.find(({ b, r2 }) => (b.x - f.x) ** 2 + (b.y - f.y) ** 2 < r2);
+    if (e) e.b.mass += f.mass;
     return !e;
   });
 }
