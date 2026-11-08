@@ -9,7 +9,7 @@ import { mulBps, mulDiv, toMicro, assertMicro } from "./units";
 function blob(over: Partial<Blob> = {}): Blob {
   return {
     id: "a", kind: "human", label: "a", accountId: null, x: 500, y: 500, dirX: 1, dirY: 0,
-    mass: 80 * MICRO, debt: 0, pips: 3, pipReadyAt: [], boostUntil: 0, repayReadyAt: 0,
+    mass: 80 * MICRO, debt: 0, boostFees: 0, payout: 0, lastInputAt: -1e9, pips: 3, pipReadyAt: [], boostUntil: 0, repayReadyAt: 0,
     shieldUntil: 0, spikeImmuneUntil: 0, redSince: null, lastThreatAt: -1e9, cashout: null,
     state: "alive", lastInput: null, ...over,
   };

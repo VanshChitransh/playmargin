@@ -1,6 +1,7 @@
 // World and blob state, owned by the server and replayed by tests and the Verify page.
 // Every money field is Micro (integer micro-units); positions and speeds are floats.
 // Times are ticks, never wall-clock, so the same seed and inputs replay identically.
+import type { LogEvent } from "./events";
 import type { InputCmd } from "./protocol";
 
 /** Integer micro-units (1 game unit = 1_000_000). Always a safe integer. */
@@ -23,6 +24,10 @@ export interface Blob {
   dirY: number;
   mass: Micro;
   debt: Micro;
+  /** Borrow fees paid on the open loan; added back when sizing BOOST so fees never shrink your limit (RULES worked check: 3 taps of 40). */
+  boostFees: Micro;
+  /** What this blob left with (cash-out or bell); 0 if popped or eaten. */
+  payout: Micro;
   /** Lit BOOST pips; pipReadyAt holds the tick each spent pip relights. */
   pips: number;
   pipReadyAt: number[];
@@ -39,6 +44,8 @@ export interface Blob {
   cashout: { startedAt: number } | null;
   state: "alive" | "cashed" | "popped";
   lastInput: InputCmd | null;
+  /** Tick lastInput arrived; held inputs expire INPUT_EXPIRE_MS later (no stuck BOOST). */
+  lastInputAt: number;
 }
 
 export interface Food {
@@ -73,12 +80,18 @@ export interface Vault {
   interest: Micro;
 }
 
+/** A log event as the engine emits it; the server chains and hashes these (log.ts). */
+export type PendingLog = LogEvent & { tick: number };
+
 export interface World {
+  matchId: string;
   seed: number;
   /** Mulberry32 state, advanced only by core/rng. */
   rngState: number;
   tick: number;
   phase: Phase;
+  /** Tick of GO (match time 0); -1 until the match starts. */
+  goTick: number;
   mode: Mode;
   arena: { w: number; h: number };
   pot: Micro;
@@ -94,6 +107,8 @@ export interface World {
   spikes: Spike[];
   zone: Zone;
   nextId: number;
+  /** Events emitted since the server last drained them into the hash-chained log. */
+  pendingLog: PendingLog[];
 }
 
 /** Who enters a match; mass is derived from the entry, never sent by a client. */
