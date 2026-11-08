@@ -1,0 +1,13 @@
+{
+  "name": "@margin/scripts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "../../node_modules/.bin/tsx deploy.ts",
+    "e2e": "../../node_modules/.bin/tsx e2e.ts",
+    "typecheck": "../../node_modules/.bin/tsc -p ."
+  },
+  "dependencies": {
+    "near-kit": "^0.20.2"
+  }
+}
