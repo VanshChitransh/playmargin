@@ -1,5 +1,5 @@
 // Sandbox integration tests: real wasm (margin + mock USDC) on a local near-sandbox node.
-// One sandbox per test binary run keeps CI under a minute after the first build.
+// Each test starts its own sandbox; wasm builds are cached by cargo after the first one.
 
 use near_api::{AccountId, NearGas, NearToken, NetworkConfig, Signer};
 use near_sdk::serde_json::{Value, json};
@@ -13,6 +13,7 @@ struct Env {
     usdc: AccountId,
     fake: AccountId,
     owner: AccountId,
+    settler: AccountId,
     alice: AccountId,
     bob: AccountId,
 }
@@ -69,7 +70,7 @@ impl Env {
             .await?
             .assert_success();
 
-        let env = Self { _sandbox: sandbox, net, signer, margin, usdc, fake, owner, alice, bob };
+        let env = Self { _sandbox: sandbox, net, signer, margin, usdc, fake, owner, settler, alice, bob };
         for t in [env.usdc.clone(), env.fake.clone()] {
             for who in [env.margin.clone(), env.alice.clone(), env.owner.clone()] {
                 env.call(&env.owner, &t, "mint", json!({"account_id": who, "amount": "10000000"}), 0, true)
@@ -77,6 +78,10 @@ impl Env {
             }
         }
         Ok(env)
+    }
+
+    fn sandbox(&self) -> &near_sandbox::Sandbox {
+        &self._sandbox
     }
 
     async fn call(
@@ -156,5 +161,77 @@ async fn deposits() -> testresult::TestResult<()> {
     e.deposit(&e.usdc, &e.owner, "5000000", r#"{"vault":true}"#).await?;
     let vault = e.view(&e.margin, "vault", json!({})).await?;
     assert_eq!(vault["free"], "5000000");
+    Ok(())
+}
+
+/// Paid match money flow plus every rejection the contract must enforce (DEVELOPMENT.md N3).
+#[tokio::test]
+async fn arena_lifecycle() -> testresult::TestResult<()> {
+    let e = Env::start().await?;
+    let (a, b, s, m) = (e.alice.clone(), e.bob.clone(), e.settler.clone(), e.margin.clone());
+    e.deposit(&e.usdc, &e.owner, "5000000", r#"{"vault":true}"#).await?;
+    e.deposit(&e.usdc, &a, "2000000", "").await?;
+    e.deposit(&e.usdc, &a, "2000000", &json!({"for": b}).to_string()).await?;
+
+    // Enter locks the stake.
+    for p in [&a, &b] {
+        e.call(p, &m, "enter_arena", json!({"stake": "1000000"}), 0, true).await?;
+    }
+    assert_eq!(e.margin_balance(&a).await?, "1000000");
+    e.call(&a, &m, "enter_arena", json!({"stake": "1000000"}), 0, false).await?;
+
+    // Open: budget 1.5 x 2 USDC reserved from the vault.
+    let open = json!({"match_id": "m1", "players": [a, b]});
+    e.call(&a, &m, "open_match", open.clone(), 0, false).await?;
+    e.call(&s, &m, "open_match", open, 0, true).await?;
+    assert_eq!(e.view(&m, "vault", json!({})).await?["locked"], "3000000");
+
+    let settle = |pay_a: &str| {
+        json!({"match_id": "m1", "payouts": [[a, pay_a], [b, "100000"]], "vault_repaid": "3000000",
+               "interest_to_vault": "70000", "reserve": "30000", "seq": 7, "head": "abc"})
+    };
+    e.call(&s, &m, "settle", settle("1800001"), 0, false).await?; // over cap
+    e.call(&a, &m, "settle", settle("1800000"), 0, false).await?; // not the settler
+    e.call(&s, &m, "settle", settle("1800000"), 0, true).await?;
+    e.call(&s, &m, "settle", settle("1800000"), 0, false).await?; // twice
+    assert_eq!(e.margin_balance(&a).await?, "2800000");
+    assert_eq!(e.view(&m, "vault", json!({})).await?["free"], "5070000");
+    assert_eq!(e.view(&m, "match_of", json!({"match_id": "m1"})).await?["head"], "abc");
+
+    // Withdraw: needs 1 yocto; bob is not registered on USDC so the transfer fails and re-credits.
+    e.call(&a, &m, "withdraw", json!({"amount": "800000"}), 0, false).await?;
+    e.call(&a, &m, "withdraw", json!({"amount": "800000"}), 1, true).await?;
+    assert_eq!(e.ft_balance(&e.usdc, &a).await?, "6800000");
+    assert_eq!(e.margin_balance(&a).await?, "2000000");
+    e.call(&b, &m, "withdraw", json!({"amount": "100000"}), 1, true).await?;
+    assert_eq!(e.margin_balance(&b).await?, "1100000");
+
+    // The callback cannot be called from outside.
+    let cb = json!({"account_id": a, "amount": "1000000"});
+    e.call(&a, &m, "on_withdraw", cb, 0, false).await?;
+    assert_eq!(e.margin_balance(&a).await?, "2000000");
+    Ok(())
+}
+
+/// A match the server never settles: players reclaim after the deadline, settle is then refused.
+#[tokio::test]
+async fn reclaim_stuck_match() -> testresult::TestResult<()> {
+    let e = Env::start().await?;
+    let (a, s, m) = (e.alice.clone(), e.settler.clone(), e.margin.clone());
+    e.deposit(&e.usdc, &e.owner, "5000000", r#"{"vault":true}"#).await?;
+    e.deposit(&e.usdc, &a, "1000000", "").await?;
+    e.call(&a, &m, "enter_arena", json!({"stake": "1000000"}), 0, true).await?;
+    e.call(&s, &m, "open_match", json!({"match_id": "m2", "players": [a]}), 0, true).await?;
+
+    e.call(&a, &m, "reclaim", json!({}), 0, false).await?; // before the 15 min deadline
+    // Sandbox blocks are ~100 ms apart, so 12k blocks clears the 15 min deadline.
+    e.sandbox().fast_forward(12_000).await?;
+    e.call(&a, &m, "reclaim", json!({}), 0, true).await?;
+    assert_eq!(e.margin_balance(&a).await?, "1000000");
+    assert_eq!(e.view(&m, "vault", json!({})).await?["free"], "5000000");
+
+    let settle = json!({"match_id": "m2", "payouts": [[a, "2500000"]], "vault_repaid": "0",
+                        "interest_to_vault": "0", "reserve": "0", "seq": 1, "head": "x"});
+    e.call(&s, &m, "settle", settle, 0, false).await?;
     Ok(())
 }
