@@ -10,3 +10,5 @@ export * from "./stubs";
 export * from "./rng";
 export * from "./units";
 export * from "./motion";
+export * from "./food";
+export * from "./economy";

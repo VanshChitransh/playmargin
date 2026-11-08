@@ -23,6 +23,11 @@ export function mulDiv(x: Micro, num: number, den: number): Micro {
   return Math.floor(p / den);
 }
 
+/** ceil(x * num / den): for amounts the house collects, so rounding never favours the payer. */
+export function mulDivUp(x: Micro, num: number, den: number): Micro {
+  return x === 0 ? 0 : Math.floor((mulDiv(x, num, 1) + den - 1) / den);
+}
+
 /** Display units (credits, mass) to Micro. */
 export function toMicro(units: number): Micro {
   return assertMicro(Math.round(units * MICRO), "toMicro");
