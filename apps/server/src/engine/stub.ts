@@ -69,7 +69,7 @@ export function newWorld(seed: number, mode: Mode, players: PlayerSeed[]): World
     mode,
     arena: ARENA,
     pot,
-    vault: { budget: mulBps(pot, LEVERAGE_CAP_BPS - 10_000), lent: 0, repaid: 0, interest: 0 },
+    vault: { budget: mulBps(pot, LEVERAGE_CAP_BPS - 10_000), lent: 0, repaid: 0, interest: 0, badDebt: 0 },
     reserve: 0,
     fees: 0,
     cashedOut: 0,

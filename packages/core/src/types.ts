@@ -78,6 +78,8 @@ export interface Vault {
   lent: Micro;
   repaid: Micro;
   interest: Micro;
+  /** Debt written off when a popped or eaten blob had less mass than debt (the vault's loss). */
+  badDebt: Micro;
 }
 
 /** A log event as the engine emits it; the server chains and hashes these (log.ts). */
