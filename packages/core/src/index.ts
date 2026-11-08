@@ -15,3 +15,4 @@ export * from "./economy";
 export * from "./world";
 export * from "./step";
 export * from "./invariant";
+export * from "./views";
