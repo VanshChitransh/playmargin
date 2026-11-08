@@ -1,0 +1,117 @@
+// World and blob state, owned by the server and replayed by tests and the Verify page.
+// Every money field is Micro (integer micro-units); positions and speeds are floats.
+// Times are ticks, never wall-clock, so the same seed and inputs replay identically.
+import type { InputCmd } from "./protocol";
+
+/** Integer micro-units (1 game unit = 1_000_000). Always a safe integer. */
+export type Micro = number;
+
+export type Phase = "WARMUP" | "COUNTDOWN" | "LIVE" | "ENDED";
+export type Ring = "green" | "yellow" | "red";
+export type BlobKind = "human" | "agent" | "drone";
+export type Mode = "free" | "paid";
+
+export interface Blob {
+  id: string;
+  kind: BlobKind;
+  label: string;
+  /** NEAR account for paid humans and agents; null for guests and drones. */
+  accountId: string | null;
+  x: number;
+  y: number;
+  dirX: number;
+  dirY: number;
+  mass: Micro;
+  debt: Micro;
+  /** Lit BOOST pips; pipReadyAt holds the tick each spent pip relights. */
+  pips: number;
+  pipReadyAt: number[];
+  /** Tick the 1 s BOOST speed burst ends. */
+  boostUntil: number;
+  /** Tick the next REPAY tap is allowed (0.4 s cooldown). */
+  repayReadyAt: number;
+  shieldUntil: number;
+  spikeImmuneUntil: number;
+  /** Tick the blob turned red, for the 300 ms grace before a touch pops it. */
+  redSince: number | null;
+  /** Last tick a bigger blob or drone was in threat range (cash-out no-threat rule). */
+  lastThreatAt: number;
+  cashout: { startedAt: number } | null;
+  state: "alive" | "cashed" | "popped";
+  lastInput: InputCmd | null;
+}
+
+export interface Food {
+  id: number;
+  x: number;
+  y: number;
+  mass: Micro;
+}
+
+export interface Spike {
+  id: number;
+  x: number;
+  y: number;
+  big: boolean;
+  /** Tick the spike reappears after being consumed; null while it is live. */
+  respawnAt: number | null;
+}
+
+export interface Zone {
+  cx: number;
+  cy: number;
+  r: number;
+  /** Radius the zone is shrinking toward. */
+  targetR: number;
+}
+
+export interface Vault {
+  /** (LEVERAGE_CAP - 1) * pot, reserved at match start so every pip always works. */
+  budget: Micro;
+  lent: Micro;
+  repaid: Micro;
+  interest: Micro;
+}
+
+export interface World {
+  seed: number;
+  /** Mulberry32 state, advanced only by core/rng. */
+  rngState: number;
+  tick: number;
+  phase: Phase;
+  mode: Mode;
+  arena: { w: number; h: number };
+  pot: Micro;
+  vault: Vault;
+  reserve: Micro;
+  fees: Micro;
+  /** Paid out to blobs that cashed out, kept for the conservation invariant. */
+  cashedOut: Micro;
+  /** One rate per match, fixed before it starts from vault utilisation. */
+  ratePerMinBps: number;
+  blobs: Map<string, Blob>;
+  food: Food[];
+  spikes: Spike[];
+  zone: Zone;
+  nextId: number;
+}
+
+/** Who enters a match; mass is derived from the entry, never sent by a client. */
+export interface PlayerSeed {
+  id: string;
+  kind: BlobKind;
+  label: string;
+  accountId: string | null;
+}
+
+/** What settle(log) returns; the contract and Verify page check the same numbers. */
+export interface SettleResult {
+  matchId: string;
+  payouts: Array<{ id: string; accountId: string | null; amount: Micro }>;
+  vaultRepaid: Micro;
+  interestToVault: Micro;
+  reserve: Micro;
+  fees: Micro;
+  head: string;
+  seq: number;
+}

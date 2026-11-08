@@ -2,6 +2,7 @@ import * as PIXI from "pixi.js";
 import { Viewport } from "pixi-viewport";
 import { Room, Client, Callbacks } from "@colyseus/sdk";
 import type { State } from "../../server/src/rooms/State";
+import type { InputCmd } from "@margin/core";
 
 // Same host as the page by default, so a phone on the LAN reaches the dev server.
 const ENDPOINT =
