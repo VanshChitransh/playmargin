@@ -1,25 +1,14 @@
-import { Application } from "./Application";
+// Client entry: theme CSS, then the hash router decides which screen owns #app.
+import "./style.css";
+import { startRouter } from "./router";
+import { judge, landing, notFound, room, verify } from "./screens";
+import { play } from "./play";
 
-const app = new Application();
-
-// Initialize the application
-app.init().then(() => {
-    app.interpolation = true;
-    document.body.appendChild(app.canvas);
-});
-
-// allow to resize viewport and renderer
-window.onresize = () => {
-    app.renderer.resize(window.innerWidth, window.innerHeight);
-    app.viewport!.resize(window.innerWidth, window.innerHeight);
-}
-
-// toggle interpolation
-document.addEventListener("click", (e) => {
-    const el = e.target as HTMLElement;
-
-    if (el.id === "interpolation") {
-        app.interpolation = (el as HTMLInputElement).checked;
-
-    }
+startRouter(document.getElementById("app")!, {
+  "/": landing,
+  "/play": play,
+  "/judge": judge,
+  "/verify/:id": verify,
+  "/r/:code": room,
+  "*": notFound,
 });

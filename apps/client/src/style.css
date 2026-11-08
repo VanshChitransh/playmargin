@@ -1,0 +1,70 @@
+/* MARGIN look: "Liquidation Night" (research/margin/gtm/GTM.md section 2).
+   Green/yellow/red are ring states only, gold is money only, cyan is agents only,
+   so a colour on screen always means the same thing. */
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes: false;
+}
+
+@plugin "daisyui/theme" {
+  name: "margin";
+  default: true;
+  color-scheme: dark;
+  --color-base-100: #070a12;
+  --color-base-200: #0d1424;
+  --color-base-300: #1a2742;
+  --color-base-content: #eef2ff;
+  --color-primary: #ff3d5a;
+  --color-primary-content: #070a12;
+  --color-secondary: #3be3ff;
+  --color-secondary-content: #070a12;
+  --color-accent: #f5b83d;
+  --color-accent-content: #070a12;
+  --color-neutral: #0d1424;
+  --color-neutral-content: #8391b3;
+  --color-info: #3be3ff;
+  --color-info-content: #070a12;
+  --color-success: #2ef29a;
+  --color-success-content: #070a12;
+  --color-warning: #ffd84d;
+  --color-warning-content: #070a12;
+  --color-error: #ff3d5a;
+  --color-error-content: #070a12;
+  --radius-selector: 1rem;
+  --radius-field: 0.75rem;
+  --radius-box: 1rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+@theme {
+  --color-ink: #070a12;
+  --color-navy: #0d1424;
+  --color-grid: #1a2742;
+  --color-paper: #eef2ff;
+  --color-muted: #8391b3;
+  --color-safe: #2ef29a;
+  --color-warn: #ffd84d;
+  --color-liq: #ff3d5a;
+  --color-gold: #f5b83d;
+  --color-agent: #3be3ff;
+  --font-display: "Lilita One", system-ui, sans-serif;
+  --font-sans: "Rubik", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+html,
+body {
+  height: 100%;
+  overscroll-behavior: none;
+}
+body {
+  @apply bg-ink text-paper font-sans antialiased;
+}
+/* Numbers never jiggle as they change: every number is mono and tabular. */
+.num {
+  @apply font-mono tabular-nums;
+}
