@@ -7,3 +7,6 @@ export * from "./events";
 export * from "./ports";
 export * from "./abi";
 export * from "./stubs";
+export * from "./rng";
+export * from "./units";
+export * from "./motion";
