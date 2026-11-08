@@ -136,6 +136,7 @@ pub(crate) fn sub(a: u128, b: u128) -> u128 {
 impl Contract {
     #[init]
     pub fn new(owner: AccountId, settler: AccountId, usdc: AccountId) -> Self {
+        require!(owner != env::current_account_id(), "owner must not be the contract account");
         Self {
             owner,
             settler,
@@ -172,6 +173,13 @@ impl Contract {
 
     pub fn anchor_of(&self, room_id: String) -> Option<Anchor> {
         self.anchors.get(&room_id).cloned()
+    }
+
+    /// Owner: hand ownership to another account. The owner must not be the contract account
+    /// itself, because NEP-141 forbids ft_transfer_call to self (the vault could never be funded).
+    pub fn set_owner(&mut self, owner: AccountId) {
+        require!(env::predecessor_account_id() == self.owner, "only the owner");
+        self.owner = owner;
     }
 
     /// Owner: rotate the settler key (a leaked settler key needs no redeploy).

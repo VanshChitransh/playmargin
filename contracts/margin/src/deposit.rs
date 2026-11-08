@@ -101,6 +101,16 @@ mod tests {
     }
 
     #[test]
+    fn new_owner_can_fund_vault_old_cannot() {
+        let mut c = setup();
+        c.set_owner(acc("lp.near"));
+        ctx("usdc.near", 0, 0);
+        let msg = r#"{"vault":true}"#.to_string();
+        assert_eq!(unused(c.ft_on_transfer(acc("owner.near"), U128(1_000_000), msg.clone())), 1_000_000);
+        assert_eq!(unused(c.ft_on_transfer(acc("lp.near"), U128(1_000_000), msg)), 0);
+    }
+
+    #[test]
     #[should_panic(expected = "only the configured USDC")]
     fn wrong_token_panics() {
         let mut c = setup();
