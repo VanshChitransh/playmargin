@@ -1,6 +1,6 @@
 // Garbage and floods must never become movement.
 import { describe, expect, it } from "vitest";
-import { INPUT_MAX_PER_S, RateLimit, parseInput } from "./input";
+import { INPUT_MAX_PER_S, InputQueue, RateLimit, parseInput } from "./input";
 
 const ok = { seq: 1, dirX: 0.6, dirY: -0.8, boost: false, repay: false, cashout: false };
 
@@ -28,5 +28,20 @@ describe("RateLimit", () => {
     for (let i = 0; i < 100; i++) if (rl.allow(5000)) allowed++;
     expect(allowed).toBe(INPUT_MAX_PER_S);
     expect(rl.allow(6000)).toBe(true);
+  });
+});
+
+describe("InputQueue", () => {
+  it("fires a tap once, expires direction after 250 ms, ignores closed players", () => {
+    const q = new InputQueue();
+    q.open("a");
+    q.push("a", { ...ok, boost: true }, 0, 100);
+    q.push("a", { ...ok, boost: false }, 0, 100);
+    expect(q.take(101).get("a")).toMatchObject({ boost: true, dirX: 0.6 });
+    expect(q.take(102).get("a")).toMatchObject({ boost: false, dirX: 0.6 });
+    expect(q.take(100 + 16).get("a")).toMatchObject({ dirX: 0, dirY: 0 });
+    q.close("a");
+    q.push("a", ok, 0, 200);
+    expect(q.take(201).has("a")).toBe(false);
   });
 });

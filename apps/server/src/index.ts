@@ -6,7 +6,7 @@ import basicAuth from "express-basic-auth";
 
 import { MATCH_TICKS, toUnits } from "@margin/core";
 import { MyRoom } from "./rooms/MyRoom";
-import { MatchRoom } from "./rooms/MatchRoom";
+import { MatchRoom, drain } from "./rooms/MatchRoom";
 import { creditsRepo, isGuestKey, topUpDaily } from "./credits";
 import { sharedDb, userForGuestKey } from "./db";
 
@@ -35,4 +35,10 @@ const server = defineServer({
   },
 });
 
-listen(server).then(() => console.log(`Listening on http://localhost:2567 (match = ${MATCH_TICKS} ticks)`));
+// SIGTERM: Colyseus locks every room and waits for them to close; drain also blocks new rooms.
+server.onBeforeShutdown(() => {
+  drain.on = true;
+  console.log("draining: no new matches, LIVE matches finish first");
+});
+
+listen(server).then(() => console.log(`MARGIN server up on :${process.env.PORT ?? 2567} (match = ${MATCH_TICKS} ticks)`));

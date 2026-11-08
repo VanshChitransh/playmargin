@@ -13,7 +13,6 @@ import {
   toUnits,
   type Blob,
   type GameEventMsg,
-  type InputCmd,
   type Phase,
   type World,
 } from "@margin/core";
@@ -21,27 +20,21 @@ import {
 import { ARENA, makeBlob, newWorld, step } from "../engine/stub";
 import { sharedDb } from "../db";
 import { admitFree, chargeEntry, payoutFree } from "./freeMatch";
-import { RateLimit, parseInput } from "./input";
+import { InputQueue } from "./input";
 import { agentFill, parseRoomKey, warmupNext, type RoomKey } from "./lobby";
 import { MatchState, leaderboard, syncBlobs, syncWorld } from "./schema";
 
 const WARMUP_TICKS = sToTicks(R.WARMUP_S);
 const PAID_WAIT_TICKS = sToTicks(R.PAID_WAIT_S);
 const COUNTDOWN_TICKS = sToTicks(R.COUNTDOWN_S);
-const INPUT_EXPIRE_TICKS = sToTicks(R.INPUT_EXPIRE_MS / 1000);
 const LEADERBOARD_EVERY = sToTicks(1 / R.LEADERBOARD_HZ);
 /** Results stay on screen this long before the room closes. */
 const ENDED_HOLD_TICKS = sToTicks(5);
 const DT_S = 1 / R.TICK_HZ;
 const MAX_CATCHUP_TICKS = 10;
 
-interface Pending {
-  cmd: InputCmd;
-  at: number;
-  boost: boolean;
-  repay: boolean;
-  cashout: boolean;
-}
+/** Set when SIGTERM arrives: no new matches start while LIVE ones finish (drain deploys). */
+export const drain = { on: false };
 
 export class MatchRoom extends Room {
   override state = new MatchState();
@@ -56,8 +49,7 @@ export class MatchRoom extends Room {
   private readonly seed = randomInt(2 ** 31);
   private ghosts = new Map<string, Blob>();
   private world: World | null = null;
-  private pending = new Map<string, Pending>();
-  private limits = new Map<string, RateLimit>();
+  private inputs = new InputQueue();
   private lastOwe = new Map<string, number>();
   /** Blob id (= sessionId) to credits user id, humans in free rooms only. */
   private users = new Map<string, string>();
@@ -66,13 +58,14 @@ export class MatchRoom extends Room {
   private owedMs = 0;
 
   override onCreate(opts: unknown): void {
+    if (drain.on) throw new Error("server is restarting, try again in a moment");
     this.key = parseRoomKey(opts);
     if (this.roomName === "private" && !this.key.roomCode) throw new Error("private room needs a 4-letter roomCode");
     if (this.roomName !== "private") this.key.roomCode = null;
     this.state.mode = this.key.mode;
     this.state.arenaW = ARENA.w;
     this.state.arenaH = ARENA.h;
-    this.onMessage("input", (client, msg: unknown) => this.onInput(client, msg));
+    this.onMessage("input", (client, msg: unknown) => this.inputs.push(client.sessionId, msg, Date.now(), this.roomTick));
     this.onMessage("startNow", () => (this.startNow = true));
     // Fixed timestep: timers fire late under load, so run as many ticks as wall time owes
     // (capped, so a long stall can't freeze the loop) and a match is always 90 real seconds.
@@ -97,7 +90,7 @@ export class MatchRoom extends Room {
   override onJoin(client: Client, _opts: unknown, auth?: string | true): void {
     const id = client.sessionId;
     if (typeof auth === "string") this.users.set(id, auth);
-    this.limits.set(id, new RateLimit());
+    this.inputs.open(id);
     const p = { id, kind: "human" as const, label: `Player ${this.ghosts.size + 1}`, accountId: null };
     this.ghosts.set(id, makeBlob(p, Math.random() * ARENA.w, Math.random() * ARENA.h, this.key.mode));
     this.countHeads();
@@ -110,53 +103,37 @@ export class MatchRoom extends Room {
     this.state.agents = all.filter((b) => b.kind === "agent").length;
   }
 
+  /** Dropped mid-match: the blob stays where it is, input zeroed and still poppable, seat held. */
+  override onDrop(client: Client): void {
+    if (!this.world) return; // before GO leaving is free: onLeave runs next
+    this.inputs.close(client.sessionId);
+    const ticksLeft = sToTicks(R.MATCH_S) - this.world.tick + ENDED_HOLD_TICKS;
+    this.allowReconnection(client, Math.max(1, Math.ceil(ticksLeft / R.TICK_HZ)));
+  }
+
+  override onReconnect(client: Client): void {
+    this.inputs.open(client.sessionId);
+    this.lastOwe.delete(client.sessionId);
+  }
+
+  /** Drain: before GO nobody was charged, so close; LIVE rooms play out, settle and close. */
+  override onBeforeShutdown(): void {
+    if (!this.world) void this.disconnect();
+  }
+
   override onLeave(client: Client): void {
     const id = client.sessionId;
-    this.limits.delete(id);
-    this.pending.delete(id);
+    this.inputs.close(id);
     if (!this.world) this.users.delete(id);
     // Before GO leaving is free; after GO the blob stays and stays poppable (S4 adds reconnection).
     this.ghosts.delete(id);
     this.countHeads();
   }
 
-  private onInput(client: Client, msg: unknown): void {
-    if (!this.limits.get(client.sessionId)?.allow(Date.now())) return;
-    const cmd = parseInput(msg);
-    if (!cmd) return;
-    const prev = this.pending.get(client.sessionId);
-    // Taps are edge-triggered: OR them until a tick consumes them, so none is lost between ticks.
-    this.pending.set(client.sessionId, {
-      cmd,
-      at: this.roomTick,
-      boost: cmd.boost || (prev?.boost ?? false),
-      repay: cmd.repay || (prev?.repay ?? false),
-      cashout: cmd.cashout || (prev?.cashout ?? false),
-    });
-  }
-
-  /** This tick's commands: direction expires after INPUT_EXPIRE_MS, taps fire once. */
-  private takeInputs(): Map<string, InputCmd> {
-    const out = new Map<string, InputCmd>();
-    for (const [id, p] of this.pending) {
-      const fresh = this.roomTick - p.at <= INPUT_EXPIRE_TICKS;
-      out.set(id, {
-        seq: p.cmd.seq,
-        dirX: fresh ? p.cmd.dirX : 0,
-        dirY: fresh ? p.cmd.dirY : 0,
-        boost: p.boost,
-        repay: p.repay,
-        cashout: p.cashout,
-      });
-      p.boost = p.repay = p.cashout = false;
-    }
-    return out;
-  }
-
   private tick(): void {
     this.roomTick++;
     this.phaseTick++;
-    const inputs = this.takeInputs();
+    const inputs = this.inputs.take(this.roomTick);
     switch (this.phase) {
       case "WARMUP":
       case "COUNTDOWN":
