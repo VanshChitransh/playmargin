@@ -36,6 +36,10 @@ export class SpikeState extends Schema {
 export class MatchState extends Schema {
   @type("string") mode = "free";
   @type("string") phase = "WARMUP";
+  /** Server tick, monotonic across all phases (60 Hz), for client interpolation. */
+  @type("uint32") tick = 0;
+  @type("uint16") arenaW = 0;
+  @type("uint16") arenaH = 0;
   /** Whole seconds left in the current phase (warm-up, 3-2-1, or the 90 s match). */
   @type("uint8") timeLeftS = 0;
   @type("string") rateTier = "LOW";

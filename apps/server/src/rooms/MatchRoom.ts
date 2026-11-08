@@ -66,6 +66,8 @@ export class MatchRoom extends Room {
     if (this.roomName === "private" && !this.key.roomCode) throw new Error("private room needs a 4-letter roomCode");
     if (this.roomName !== "private") this.key.roomCode = null;
     this.state.mode = this.key.mode;
+    this.state.arenaW = ARENA.w;
+    this.state.arenaH = ARENA.h;
     this.onMessage("input", (client, msg: unknown) => this.onInput(client, msg));
     this.onMessage("startNow", () => (this.startNow = true));
     // Fixed timestep: timers fire late under load, so run as many ticks as wall time owes
@@ -219,6 +221,7 @@ export class MatchRoom extends Room {
       ENDED: 0,
     }[this.phase];
     this.state.timeLeftS = Math.max(0, Math.ceil(left / R.TICK_HZ));
+    this.state.tick = this.roomTick;
     const w = this.world;
     if (!w) {
       syncBlobs(this.state, this.ghosts.values(), 0);
