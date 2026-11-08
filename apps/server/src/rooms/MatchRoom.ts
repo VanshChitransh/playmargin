@@ -31,6 +31,7 @@ const LEADERBOARD_EVERY = sToTicks(1 / R.LEADERBOARD_HZ);
 /** Results stay on screen this long before the room closes. */
 const ENDED_HOLD_TICKS = sToTicks(5);
 const DT_S = 1 / R.TICK_HZ;
+const MAX_CATCHUP_TICKS = 10;
 
 interface Pending {
   cmd: InputCmd;
@@ -58,6 +59,7 @@ export class MatchRoom extends Room {
   private lastOwe = new Map<string, number>();
   private key: RoomKey = { mode: "free", roomCode: null };
   private startNow = false;
+  private owedMs = 0;
 
   override onCreate(opts: unknown): void {
     this.key = parseRoomKey(opts);
@@ -66,7 +68,15 @@ export class MatchRoom extends Room {
     this.state.mode = this.key.mode;
     this.onMessage("input", (client, msg: unknown) => this.onInput(client, msg));
     this.onMessage("startNow", () => (this.startNow = true));
-    this.setSimulationInterval(() => this.tick(), TICK_MS);
+    // Fixed timestep: timers fire late under load, so run as many ticks as wall time owes
+    // (capped, so a long stall can't freeze the loop) and a match is always 90 real seconds.
+    this.setSimulationInterval((dtMs) => {
+      this.owedMs = Math.min(this.owedMs + dtMs, MAX_CATCHUP_TICKS * TICK_MS);
+      while (this.owedMs >= TICK_MS) {
+        this.owedMs -= TICK_MS;
+        this.tick();
+      }
+    }, TICK_MS);
   }
 
   /** filterBy skips options a client leaves out, so re-check mode and code here. */
