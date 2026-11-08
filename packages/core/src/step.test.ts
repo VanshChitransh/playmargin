@@ -50,6 +50,12 @@ describe("step", () => {
     expect(w.pendingLog.at(-1)?.type).toBe("MATCH_END");
   });
 
+  it("a paid Duel (2 humans + a drone) gets the small map", () => {
+    const duel = newWorld(1, "paid", [...seeds(2), { id: "d", kind: "drone", label: "D", accountId: null }]);
+    expect(duel.arena.w).toBe(newWorld(1, "paid", seeds(2)).arena.w);
+    expect(duel.arena.w).toBeLessThan(newWorld(1, "free", seeds(12)).arena.w);
+  });
+
   it("warm-up ghosts move but nothing is charged", () => {
     const w = newWorld(3, "free", seeds(4));
     step(w, new Map([["p0", { seq: 1, dirX: 1, dirY: 0, boost: true, repay: false, cashout: false }]]), 1);
