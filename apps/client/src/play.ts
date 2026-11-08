@@ -1,23 +1,22 @@
-// #/play: mounts the arena. Until U1 lands this is the boilerplate Colyseus demo,
-// kept so "two clients see each other" still works end to end.
+// #/play: mounts the arena renderer. Frames come from the synthetic generator until
+// U2 wires the Colyseus room; open /?fps#/play to see the frame rate.
 import type { Screen } from "./router";
-import { Application } from "./Application";
+import { ArenaRenderer } from "./render/arena";
+import { synthFrame } from "./game/synth";
 
 export const play: Screen = (root) => {
-  const app = new Application();
-  const onResize = (): void => {
-    app.renderer.resize(window.innerWidth, window.innerHeight);
-    app.viewport?.resize(window.innerWidth, window.innerHeight);
-  };
-  void app.init().then(() => {
-    app.interpolation = true;
-    root.appendChild(app.canvas);
-    window.addEventListener("resize", onResize);
+  const arena = new ArenaRenderer();
+  const t0 = performance.now();
+  const showFps = new URLSearchParams(location.search).has("fps");
+  // Pixi init is async: if the player leaves before it resolves, destroy on arrival.
+  let left = false;
+  let mounted = false;
+  void arena.mount(root, (now) => synthFrame((now - t0) / 1000), { fps: showFps }).then(() => {
+    mounted = true;
+    if (left) arena.destroy();
   });
   return () => {
-    window.removeEventListener("resize", onResize);
-    void app.room?.leave();
-    app.interpolation = false;
-    app.destroy(true);
+    left = true;
+    if (mounted) arena.destroy();
   };
 };

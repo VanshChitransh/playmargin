@@ -14,7 +14,6 @@
     "@margin/core": "*",
     "@tailwindcss/vite": "^4.3.5",
     "daisyui": "^5.7.50",
-    "pixi-viewport": "^6.0.3",
     "pixi.js": "^8.14.3",
     "tailwindcss": "^4.3.5"
   }
