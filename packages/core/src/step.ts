@@ -1,0 +1,230 @@
+// One tick of a match, in the fixed order from DEVELOPMENT C3 (RULES + EDGE-CASES).
+// Order matters: damage then keeper check, pops before eats (GR-03), largest eater first (GR-14).
+// `inputs` holds commands that arrived since the last tick; boost/repay/cashout are taps.
+import * as C from "./constants";
+import {
+  accrueInterest, boostTap, cashOut, eat, hitSpike, keeperCheck, liquidate, matchT, outweighs, refillPips,
+  repayTap, ring, zoneTick,
+} from "./economy";
+import { checkInvariant } from "./invariant";
+import { move, radius } from "./motion";
+import type { GameEventMsg, InputCmd } from "./protocol";
+import type { Blob, Micro, World } from "./types";
+import { toUnits } from "./units";
+import { respawnSpikes, SPIKE_RADIUS } from "./world";
+
+const T = C.sToTicks;
+const INPUT_EXPIRE_T = Math.round((C.R.INPUT_EXPIRE_MS * C.R.TICK_HZ) / 1000);
+const RED_GRACE_T = Math.round((C.R.RED_GRACE_MS * C.R.TICK_HZ) / 1000);
+const DT = 1 / C.R.TICK_HZ;
+type Ev = GameEventMsg[];
+
+const live = (w: World): Blob[] => [...w.blobs.values()].filter((b) => b.state === "alive");
+const players = (w: World): Blob[] => live(w).filter((b) => b.kind !== "drone");
+const dist = (a: { x: number; y: number }, b: { x: number; y: number }): number => Math.hypot(a.x - b.x, a.y - b.y);
+const touching = (a: Blob, b: Blob): boolean => dist(a, b) < radius(a.mass) + radius(b.mass);
+const shielded = (b: Blob, tick: number): boolean => tick < b.shieldUntil;
+/** Heaviest first, id as tie-break, so every resolution order is deterministic. */
+const byMassDesc = (a: Blob, b: Blob): number => b.mass - a.mass || (a.id < b.id ? -1 : 1);
+
+function cancelCashout(b: Blob, reason: "contact" | "spike" | "threat", ev: Ev): void {
+  if (!b.cashout) return;
+  b.cashout = null;
+  ev.push({ type: "cashoutCancel", blob: b.id, reason });
+}
+
+function canStartCashout(w: World, b: Blob, tick: number): boolean {
+  const t = matchT(w, tick);
+  return (
+    !b.cashout && b.kind !== "drone" && t >= T(C.R.CASHOUT_OPEN_S) && t < T(C.R.CASHOUT_CLOSE_S) &&
+    ring(b) !== "red" && !shielded(b, tick) && tick - b.lastThreatAt >= T(C.R.CASHOUT_NO_THREAT_S)
+  );
+}
+
+// 1 + 3: store fresh inputs, apply taps, then zero any held input older than 250 ms.
+function applyInputs(w: World, inputs: Map<string, InputCmd>, tick: number, ev: Ev): void {
+  for (const [id, cmd] of inputs) {
+    const b = w.blobs.get(id);
+    if (!b || b.state !== "alive") continue;
+    b.lastInput = cmd;
+    b.lastInputAt = tick;
+    if (w.phase !== "LIVE") continue;
+    if (cmd.boost) {
+      const amt = boostTap(w, b, tick);
+      if (amt > 0) ev.push({ type: "boost", blob: b.id, amount: toUnits(amt) });
+    }
+    if (cmd.repay) {
+      const amt = repayTap(w, b, tick);
+      if (amt > 0) ev.push({ type: "repay", blob: b.id, amount: toUnits(amt) });
+    }
+    if (cmd.cashout && canStartCashout(w, b, tick)) {
+      b.cashout = { startedAt: tick };
+      ev.push({ type: "cashoutStart", blob: b.id });
+    }
+  }
+  for (const b of w.blobs.values()) {
+    const cmd = b.lastInput && tick - b.lastInputAt <= INPUT_EXPIRE_T ? b.lastInput : null;
+    b.dirX = cmd ? cmd.dirX : 0;
+    b.dirY = cmd ? cmd.dirY : 0;
+  }
+}
+
+function keeper(w: World, b: Blob, tick: number, ev: Ev): void {
+  const r = keeperCheck(w, b, tick);
+  if (r) ev.push({ type: "pop", by: null, victim: b.id, bounty: toUnits(r.bounty), keeper: true });
+}
+
+// 6: spikes are consumed on hit, respawn in 3 s, and give 1 s immunity (GR-01).
+function spikes(w: World, tick: number, ev: Ev): void {
+  respawnSpikes(w, tick);
+  for (const b of players(w)) {
+    if (tick < b.spikeImmuneUntil || shielded(b, tick)) continue;
+    const r = radius(b.mass);
+    const s = w.spikes.find((s) => s.respawnAt === null && dist(s, b) < r + SPIKE_RADIUS);
+    if (!s) continue;
+    const dmg = hitSpike(w, b, s.id, s.big, tick);
+    s.respawnAt = tick + T(C.R.SPIKE_RESPAWN_S);
+    b.spikeImmuneUntil = tick + T(C.R.SPIKE_IMMUNITY_S);
+    ev.push({ type: "spikeHit", blob: b.id, big: s.big, damage: toUnits(dmg) });
+    cancelCashout(b, "spike", ev);
+    keeper(w, b, tick, ev);
+  }
+}
+
+// 7: the zone shrinks linearly to 25% by the bell; outside it, 4% of mass each second to food.
+function zone(w: World, tick: number, ev: Ev): void {
+  const duel = w.mode === "paid" && players(w).filter((b) => b.kind === "human").length <= 2;
+  const t = matchT(w, tick);
+  if (t < T(duel ? C.R.ZONE_START_S_DUEL : C.R.ZONE_START_S)) return;
+  const left = C.MATCH_TICKS - t;
+  if (left > 0) w.zone.r -= (w.zone.r - w.zone.targetR) / left;
+  // Charged once per second like interest, so the Squeeze adds one food piece per blob per second, not 60.
+  if (t % T(1) !== 0) return;
+  for (const b of players(w)) {
+    if (dist(b, { x: w.zone.cx, y: w.zone.cy }) <= w.zone.r) continue;
+    zoneTick(w, b);
+    keeper(w, b, tick, ev);
+  }
+}
+
+// 9: red for 300 ms and touched = popped by the heaviest toucher. Also marks cash-out threats.
+function pops(w: World, tick: number, ev: Ev): void {
+  const all = live(w);
+  for (const b of all) {
+    if (b.kind === "drone") continue;
+    for (const o of all) {
+      if (o === b || o.kind === "drone" || ring(o) === "red" || !outweighs(o, b) || !touching(o, b)) continue;
+      b.lastThreatAt = tick;
+      cancelCashout(b, "contact", ev);
+    }
+  }
+  const victims = all.filter(
+    (v) => v.kind !== "drone" && v.redSince !== null && tick - v.redSince >= RED_GRACE_T && !shielded(v, tick),
+  );
+  for (const v of victims.sort((a, b) => (a.id < b.id ? -1 : 1))) {
+    if (v.state !== "alive") continue;
+    const popper = live(w)
+      .filter((o) => o !== v && !shielded(o, tick) && touching(o, v))
+      .sort(byMassDesc)[0];
+    if (!popper) continue;
+    const r = liquidate(w, v, popper, tick);
+    ev.push({ type: "pop", by: popper.id, victim: v.id, bounty: toUnits(r.bounty), keeper: false });
+  }
+}
+
+// 10: blob eats resolve heaviest eater first; red or shielded blobs eat food only (GR-03).
+function eats(w: World, tick: number, ev: Ev): void {
+  const ps = players(w).sort(byMassDesc);
+  for (const e of ps) {
+    if (e.state !== "alive" || ring(e) === "red" || shielded(e, tick)) continue;
+    for (const v of ps) {
+      if (v === e || v.state !== "alive" || shielded(v, tick) || !outweighs(e, v)) continue;
+      if (dist(e, v) >= radius(e.mass)) continue;
+      const gained = eat(w, e, v, tick);
+      ev.push({ type: "eat", by: e.id, victim: v.id, gained: toUnits(gained) });
+    }
+  }
+  const eaters = players(w).sort(byMassDesc);
+  w.food = w.food.filter((f) => {
+    const e = eaters.find((b) => dist(b, f) < radius(b.mass));
+    if (e) e.mass += f.mass;
+    return !e;
+  });
+}
+
+// 11: a 4 s channel; red cancels it, success repays debt and leaves with equity.
+function cashouts(w: World, tick: number, ev: Ev): void {
+  for (const b of players(w)) {
+    if (!b.cashout) continue;
+    if (ring(b) === "red") cancelCashout(b, "threat", ev);
+    else if (tick - b.cashout.startedAt >= T(C.R.CASHOUT_CHANNEL_S)) {
+      ev.push({ type: "cashedOut", blob: b.id, amount: toUnits(cashOut(w, b, tick)) });
+    }
+  }
+}
+
+// 12: survivors settle at equity; leftover food goes to humans alive at the bell,
+// or pro-rata (equal entries) to every entrant if none survived. Dust to reserve.
+function endMatch(w: World, tick: number, ev: Ev): void {
+  const survivors = players(w).filter((b) => b.kind === "human");
+  for (const b of players(w)) cashOut(w, b, tick);
+  for (const d of live(w)) cashOut(w, d, tick); // drones leave with their bounties
+  const leftover: Micro = w.food.reduce((s, f) => s + f.mass, 0);
+  w.food = [];
+  const to = survivors.length > 0 ? survivors : [...w.blobs.values()].filter((b) => b.kind !== "drone");
+  const each = to.length > 0 ? Math.floor(leftover / to.length) : 0;
+  for (const b of to) {
+    if (each === 0) break;
+    b.payout += each;
+    w.cashedOut += each;
+    w.pendingLog.push({ type: "CASHOUT", tick, data: { blob: b.id, amount: each } });
+  }
+  const dust = leftover - each * to.length;
+  w.reserve += dust;
+  w.phase = "ENDED";
+  const finalMasses: Record<string, Micro> = {};
+  for (const b of w.blobs.values()) finalMasses[b.id] = b.payout;
+  w.pendingLog.push({ type: "MATCH_END", tick, data: { tick, finalMasses, dust } });
+  ev.push({ type: "phase", phase: "ENDED", tick }, { type: "matchEnd", tick });
+}
+
+/** Advance the world to `tick` (one tick at TICK_HZ). Returns what the clients should see. */
+export function step(w: World, inputs: Map<string, InputCmd>, tick: number): GameEventMsg[] {
+  const ev: Ev = [];
+  if (w.phase === "ENDED") return ev;
+  w.tick = tick;
+  // 1. expire inputs / 3. taps (taps only count while LIVE; warm-up ghosts just move)
+  applyInputs(w, inputs, tick, ev);
+  if (w.phase !== "LIVE") {
+    for (const b of w.blobs.values()) move(b, DT, tick, w.arena);
+    return ev;
+  }
+  // 2. phase timers
+  const t = matchT(w, tick);
+  if (t === T(C.R.LAST_CALL_S)) ev.push({ type: "lastCall", tick });
+  for (const b of live(w)) refillPips(b, tick);
+  // 4. move
+  for (const b of live(w)) move(b, DT, tick, w.arena);
+  // 5. interest, once per whole second
+  if (t > 0 && t % T(C.R.INTEREST_ACCRUE_S) === 0) {
+    for (const b of players(w)) {
+      accrueInterest(w, b, tick);
+      keeper(w, b, tick, ev);
+    }
+  }
+  // 6. spikes, 7. zone
+  spikes(w, tick, ev);
+  zone(w, tick, ev);
+  // 8. ring: start or clear the red grace clock (ultra red already popped by the keeper)
+  for (const b of players(w)) b.redSince = ring(b) === "red" ? (b.redSince ?? tick) : null;
+  // 9. pops before 10. eats
+  pops(w, tick, ev);
+  eats(w, tick, ev);
+  // 11. cash-out channels
+  cashouts(w, tick, ev);
+  // 12. the bell
+  if (t >= C.MATCH_TICKS) endMatch(w, tick, ev);
+  // 13. conservation, every tick (cheap: one pass over blobs and food)
+  checkInvariant(w);
+  return ev;
+}

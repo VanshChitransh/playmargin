@@ -30,10 +30,5 @@ export function makeWorld(blobs: Blob[], over: Partial<World> = {}): World {
   };
 }
 
-/** Sum of every Micro bucket minus its sources; 0 means conserved (C4 turns this into checkInvariant). */
-export function leak(w: World): number {
-  let held = w.cashedOut + w.vault.repaid + w.vault.interest + w.fees + w.reserve;
-  for (const b of w.blobs.values()) held += b.mass;
-  for (const f of w.food) held += f.mass;
-  return held - (w.pot + w.vault.lent);
-}
+/** Conservation gap; 0 means conserved. */
+export { leakOf as leak } from "./invariant";
