@@ -125,6 +125,8 @@ export interface PlayerSeed {
 export interface SettleResult {
   matchId: string;
   payouts: Array<{ id: string; accountId: string | null; amount: Micro }>;
+  /** Principal the vault lent (maps to SettleArgs.lent). */
+  lent: Micro;
   vaultRepaid: Micro;
   interestToVault: Micro;
   reserve: Micro;
