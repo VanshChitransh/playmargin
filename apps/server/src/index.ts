@@ -6,10 +6,13 @@ import basicAuth from "express-basic-auth";
 
 import { MATCH_TICKS } from "@margin/core";
 import { MyRoom } from "./rooms/MyRoom";
+import { MatchRoom } from "./rooms/MatchRoom";
 
 const server = defineServer({
   rooms: {
+    // my_room stays until the client switches to "match" (S3), then MyRoom/State/Entity/Player go.
     my_room: defineRoom(MyRoom),
+    match: defineRoom(MatchRoom),
   },
   express: (app) => {
     const pass = process.env.MONITOR_PASS;
