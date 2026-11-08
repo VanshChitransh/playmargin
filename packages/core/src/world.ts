@@ -32,7 +32,8 @@ function newBlob(p: PlayerSeed, x: number, y: number, mass: Micro): Blob {
 
 /** Fresh world in WARMUP: ghosts with display mass, nothing charged, pot 0. */
 export function newWorld(seed: number, mode: Mode, players: PlayerSeed[], matchId = `m${seed}`): World {
-  const side = arenaSide(players.length);
+  // Drones hold no stake and pass through blobs, so only players size the map (2 humans = Duel).
+  const side = arenaSide(players.filter((p) => p.kind !== "drone").length);
   const w: World = {
     matchId, seed, rngState: seedRng(seed), tick: 0, phase: "WARMUP", goTick: -1, mode,
     arena: { w: side, h: side }, pot: 0,
