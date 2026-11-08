@@ -12,6 +12,7 @@
       "Bash(git switch *)",
       "Bash(git log*)",
       "Bash(git rebase *)",
+      "Bash(git fetch*)",
       "Bash(git worktree *)",
       "Bash(git commit *)",
       "Bash(git push *)",

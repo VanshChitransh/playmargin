@@ -19,14 +19,26 @@ and every match settles on NEAR. Built for the NEAR Hackathon (deadline 14 Nov 2
 | S4 Chain | `contracts/**`, `services/relayer/**`, `tools/scripts/**`, `apps/client/src/chain/**` |
 
 Shared contract files `packages/core/src/{constants,types,protocol,events,ports,abi}.ts` belong to S1.
-Need a change? Write an `ICR` line on the board; S1 ships it as a tiny PR that merges first.
+Need a change? Write an `ICR` line on the board; S1 ships it as a tiny PR that merges first
+(the only PRs in this build).
 
-## Git
-- Work only in your worktree (`../worktrees/<lane>`). One branch per task: `<lane>/<task-id>-<slug>`.
-- Commit and push your own work without asking (build speed mode), then report it in one line.
-  Conventional Commits, small, one logical change each, body says why, footer `Task: <id>`.
-  **No `Co-Authored-By` or any AI attribution.**
-- Merge = Rebase and merge (commit history is visible to judges).
+## Git (no PRs: rebase, test, push to main)
+- Work only in your worktree (`../worktrees/<lane>`). One branch per task: `<lane>/<task-id>-<slug>`,
+  created with `git fetch origin && git switch -c <branch> origin/main`.
+- Commit your own work without asking (build speed mode). Conventional Commits, small, one logical
+  change each, body says why, footer `Task: <id>`. **No `Co-Authored-By` or any AI attribution.**
+- Land a finished task on main yourself:
+  ```
+  git fetch origin
+  git rebase origin/main
+  npm run typecheck && npm test && npm run check:dashes   # (+ cargo test for contracts)
+  git push origin HEAD:main      # rejected? another lane landed first: repeat from fetch
+  git push origin HEAD           # keep the task branch on GitHub too
+  ```
+  Tests run AFTER the rebase: two lanes can pass alone and break combined. Never force push.
+  Then post `DONE <task> on main (<hash>)` on the board.
+- Exception: S1 changes to the shared contract files go through `gh pr create`; Vansh merges them
+  with Rebase and merge. History stays linear (judges read it), never squash.
 - Never: force push, `git reset --hard`, `git clean`, `rm -rf`, deleting branches with unmerged work.
   If a rebase goes wrong: `git rebase --abort` and ask.
 
