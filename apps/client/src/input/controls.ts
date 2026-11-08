@@ -27,14 +27,16 @@ export class Controls {
   private off: Array<() => void> = [];
 
   constructor(root: HTMLElement, private send: (cmd: InputCmd) => void) {
+    // Laptop judges see the keys on the buttons themselves; phones don't need them.
+    const key = (k: string): string => (this.touch ? "" : `<kbd class="kbd kbd-xs mt-0.5 opacity-70">${k}</kbd>`);
     const layer = document.createElement("div");
     layer.className = "pointer-events-none fixed inset-0 select-none";
     layer.innerHTML = `
       <div data-zone class="pointer-events-auto absolute inset-y-0 left-0 w-1/2 ${this.touch ? "" : "hidden"}"></div>
-      <div class="absolute right-0 bottom-0 flex flex-col items-end gap-3 p-4 pr-[max(16px,env(safe-area-inset-right))] pb-[max(16px,env(safe-area-inset-bottom))] ${this.touch ? "" : "hidden"}">
-        <button data-tap="cashout" class="pointer-events-auto btn btn-circle size-16 btn-accent hidden">CASH</button>
-        <button data-tap="repay" class="pointer-events-auto btn btn-circle size-16 btn-outline">REPAY</button>
-        <button data-tap="boost" class="pointer-events-auto btn btn-circle size-22 btn-primary">BOOST</button>
+      <div class="absolute right-0 bottom-0 flex flex-col items-end gap-3 p-4 pr-[max(16px,env(safe-area-inset-right))] pb-[max(16px,env(safe-area-inset-bottom))]">
+        <button data-tap="cashout" class="pointer-events-auto btn btn-circle size-16 btn-accent hidden flex-col gap-0">CASH${key("E")}</button>
+        <button data-tap="repay" class="pointer-events-auto btn btn-circle size-16 btn-outline flex-col gap-0">REPAY${key("R")}</button>
+        <button data-tap="boost" class="pointer-events-auto btn btn-circle size-22 btn-primary flex-col gap-0">BOOST${key("SPACE")}</button>
       </div>`;
     root.appendChild(layer);
     const q = (t: Tap): HTMLButtonElement => layer.querySelector(`[data-tap=${t}]`)!;

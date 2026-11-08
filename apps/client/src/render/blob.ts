@@ -4,6 +4,7 @@
 import { Container, Graphics, Text } from "pixi.js";
 import type { BlobView, Ring } from "@margin/core";
 import { C } from "./colors";
+import { displayName } from "../hud/logic";
 
 const RING_GAP = 4;
 const RING_W = 4;
@@ -19,7 +20,7 @@ export class BlobSprite extends Container {
 
   constructor(v: BlobView, isMe: boolean) {
     super();
-    const name = v.kind === "agent" ? `🤖 ${v.label}` : v.label;
+    const name = displayName(v);
     this.nameText = new Text({
       text: name,
       style: { fontFamily: "Rubik", fontSize: 14, fontWeight: "500", fill: v.kind === "human" ? C.paper : C.agent },

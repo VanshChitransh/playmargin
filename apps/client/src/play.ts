@@ -6,6 +6,7 @@ import { ArenaRenderer, type FrameSource } from "./render/arena";
 import { H, W, synthFrame } from "./game/synth";
 import { MatchConnection, guestKey } from "./net/client";
 import { Controls } from "./input/controls";
+import { Hud } from "./hud/hud";
 
 export const play: Screen = (root) => {
   const q = new URLSearchParams(location.search);
@@ -33,9 +34,11 @@ export const play: Screen = (root) => {
   // Pixi init is async: if the player leaves before it resolves, destroy on arrival.
   let left = false;
   let mounted = false;
+  const hud = new Hud(root, controls.els, (open) => controls.setCashoutVisible(open));
   // Dev-only hook so tests and agent-browser can read the drawn frame (stripped from builds).
   const draw: FrameSource = (now) => {
     const f = source(now);
+    if (f) hud.update(f, now);
     if (import.meta.env.DEV) (window as unknown as { __frame?: unknown }).__frame = f;
     return f;
   };
@@ -55,6 +58,7 @@ export const play: Screen = (root) => {
   return () => {
     left = true;
     controls.destroy();
+    hud.destroy();
     conn.leave();
     if (mounted) arena.destroy();
   };

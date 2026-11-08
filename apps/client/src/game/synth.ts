@@ -79,7 +79,7 @@ export function synthFrame(tS: number, mePos?: { x: number; y: number }): Frame 
       mode: "free",
       phase: "LIVE",
       tick: Math.floor(tS * R.TICK_HZ),
-      timeLeftS: R.MATCH_S - loop,
+      timeLeftS: Math.ceil(R.MATCH_S - loop),
       rateTier: "LOW",
       zone: { cx: W / 2, cy: H / 2, r: zoneR },
       leaderboard: [],

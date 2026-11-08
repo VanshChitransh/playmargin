@@ -7,6 +7,7 @@ import { BlobSprite } from "./blob";
 import { C } from "./colors";
 import { spikeWouldRedden } from "./danger";
 import { SPIKE_R, SpikeSprite, bakeSpikeTextures } from "./spike";
+import { boostBlocked, boostPreview } from "../hud/logic";
 
 const CELL = 64;
 /** Spikes further than this from my edge never warn: "within reach" (RULES, Spikes). */
@@ -24,6 +25,7 @@ export class ArenaRenderer {
   private foodLayer = new Container();
   private spikeLayer = new Container();
   private blobLayer = new Container();
+  private preview = new Graphics();
   private foods = new Map<number, Sprite>();
   private spikes = new Map<number, SpikeSprite>();
   private blobs = new Map<string, BlobSprite>();
@@ -43,7 +45,7 @@ export class ArenaRenderer {
     });
     root.appendChild(this.app.canvas);
     this.bake();
-    this.world.addChild(this.grid, this.zone, this.foodLayer, this.spikeLayer, this.blobLayer);
+    this.world.addChild(this.grid, this.zone, this.foodLayer, this.spikeLayer, this.blobLayer, this.preview);
     this.app.stage.addChild(this.world);
     if (opts.fps) {
       this.fps = new Text({ text: "", style: { fontFamily: "JetBrains Mono", fontSize: 12, fill: C.muted } });
@@ -88,6 +90,7 @@ export class ArenaRenderer {
     this.syncFood(f);
     this.syncSpikes(f, meView, tS);
     this.syncBlobs(f, tS);
+    this.drawPreview(f, meView);
     if (meView) this.follow(meView.x, meView.y, meView.radius);
   }
 
@@ -96,17 +99,20 @@ export class ArenaRenderer {
     const key = `${z.cx | 0},${z.cy | 0},${z.r | 0}`;
     if (key === this.zoneKey) return;
     this.zoneKey = key;
-    const pad = Math.max(f.arena.w, f.arena.h);
-    this.zone
-      .clear()
-      .rect(-pad, -pad, f.arena.w + pad * 2, f.arena.h + pad * 2)
-      .fill({ color: C.liq, alpha: 0.14 })
-      .circle(z.cx, z.cy, z.r)
-      .cut()
-      .circle(z.cx, z.cy, z.r)
-      .stroke({ width: 4, color: C.liq, alpha: 0.7 })
-      .rect(0, 0, f.arena.w, f.arena.h)
-      .stroke({ width: 3, color: C.muted, alpha: 0.5 });
+    this.zone.clear();
+    // A zone that covers the whole arena (warm-up, or no zone yet) draws no tint: cutting a
+    // hole bigger than the tint rect fails and would paint everything red.
+    if (z.r < Math.hypot(f.arena.w, f.arena.h)) {
+      const pad = Math.max(f.arena.w, f.arena.h);
+      this.zone
+        .rect(-pad, -pad, f.arena.w + pad * 2, f.arena.h + pad * 2)
+        .fill({ color: C.liq, alpha: 0.14 })
+        .circle(z.cx, z.cy, z.r)
+        .cut()
+        .circle(z.cx, z.cy, z.r)
+        .stroke({ width: 4, color: C.liq, alpha: 0.7 });
+    }
+    this.zone.rect(0, 0, f.arena.w, f.arena.h).stroke({ width: 3, color: C.muted, alpha: 0.5 });
   }
 
   private syncFood(f: Frame): void {
@@ -161,6 +167,22 @@ export class ArenaRenderer {
     }
     this.blobLayer.sortableChildren = true;
     prune(this.blobs, seen);
+  }
+
+  /** Thin solid ring = my size after one BOOST tap; dotted ring = after every lit pip. */
+  private drawPreview(f: Frame, me: Frame["blobs"][number] | undefined): void {
+    this.preview.clear();
+    const p = me && !boostBlocked(me, f.match) ? boostPreview(me) : null;
+    if (!me || !p) return;
+    this.preview.circle(me.x, me.y, p.next).stroke({ width: 2 / this.zoom, color: C.paper, alpha: 0.45 });
+    if (p.max - p.next < 1) return;
+    const n = 40;
+    for (let i = 0; i < n; i += 2) {
+      const a0 = (i / n) * Math.PI * 2;
+      const a1 = ((i + 1) / n) * Math.PI * 2;
+      this.preview.moveTo(me.x + Math.cos(a0) * p.max, me.y + Math.sin(a0) * p.max).arc(me.x, me.y, p.max, a0, a1);
+    }
+    this.preview.stroke({ width: 2 / this.zoom, color: C.paper, alpha: 0.25 });
   }
 
   private follow(x: number, y: number, r: number): void {
