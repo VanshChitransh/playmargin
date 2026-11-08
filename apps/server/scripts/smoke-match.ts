@@ -9,10 +9,10 @@ const sdk = new Client(url);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const cmd = (seq: number, dirX: number) => ({ seq, dirX, dirY: 0, boost: false, repay: false, cashout: false });
 
-const honest = await sdk.joinOrCreate("match");
-const garbage = await sdk.join("match");
-const flood = await sdk.join("match");
-const hostile = await sdk.join("match");
+const honest = await sdk.joinOrCreate("match", { mode: "free" });
+const garbage = await sdk.join("match", { mode: "free" });
+const flood = await sdk.join("match", { mode: "free" });
+const hostile = await sdk.join("match", { mode: "free" });
 let hostileDropped = false;
 hostile.onLeave(() => (hostileDropped = true));
 

@@ -1,6 +1,8 @@
 // One match: WARMUP (ghosts, nothing charged) -> COUNTDOWN 3-2-1 -> GO (seeded fair respawn)
 // -> LIVE 90 s -> ENDED -> dispose. Every timer reads this.phase, nothing else (RULES: Warm-up).
-// The engine runs only in LIVE; before GO players are ghosts that just move.
+// The engine runs only in LIVE; before GO players are ghosts that just move. Registered twice:
+// "match" (public, filtered by mode) and "private" (also by 4-letter roomCode), so a public
+// joinOrCreate can never land in a friend's room.
 import { randomInt } from "node:crypto";
 import { Room, type Client } from "colyseus";
 import {
@@ -18,9 +20,11 @@ import {
 // Swap to @margin/core once C3 (newWorld/step) lands on main.
 import { ARENA, makeBlob, newWorld, step } from "../engine/stub";
 import { RateLimit, parseInput } from "./input";
+import { agentFill, parseRoomKey, warmupNext, type RoomKey } from "./lobby";
 import { MatchState, leaderboard, syncBlobs, syncWorld } from "./schema";
 
 const WARMUP_TICKS = sToTicks(R.WARMUP_S);
+const PAID_WAIT_TICKS = sToTicks(R.PAID_WAIT_S);
 const COUNTDOWN_TICKS = sToTicks(R.COUNTDOWN_S);
 const INPUT_EXPIRE_TICKS = sToTicks(R.INPUT_EXPIRE_MS / 1000);
 const LEADERBOARD_EVERY = sToTicks(1 / R.LEADERBOARD_HZ);
@@ -52,18 +56,40 @@ export class MatchRoom extends Room {
   private pending = new Map<string, Pending>();
   private limits = new Map<string, RateLimit>();
   private lastOwe = new Map<string, number>();
+  private key: RoomKey = { mode: "free", roomCode: null };
+  private startNow = false;
 
-  override onCreate(): void {
-    this.state.mode = "free";
+  override onCreate(opts: unknown): void {
+    this.key = parseRoomKey(opts);
+    if (this.roomName === "private" && !this.key.roomCode) throw new Error("private room needs a 4-letter roomCode");
+    if (this.roomName !== "private") this.key.roomCode = null;
+    this.state.mode = this.key.mode;
     this.onMessage("input", (client, msg: unknown) => this.onInput(client, msg));
+    this.onMessage("startNow", () => (this.startNow = true));
     this.setSimulationInterval(() => this.tick(), TICK_MS);
+  }
+
+  /** filterBy skips options a client leaves out, so re-check mode and code here. */
+  override onAuth(_client: Client, opts: unknown): boolean {
+    const k = parseRoomKey(opts);
+    if (k.mode !== this.key.mode) throw new Error(`mode mismatch: pass { mode: "${this.key.mode}" }`);
+    if (this.key.roomCode && k.roomCode !== this.key.roomCode) throw new Error("wrong room code");
+    return true;
   }
 
   override onJoin(client: Client): void {
     const id = client.sessionId;
     this.limits.set(id, new RateLimit());
     const p = { id, kind: "human" as const, label: `Player ${this.ghosts.size + 1}`, accountId: null };
-    this.ghosts.set(id, makeBlob(p, Math.random() * ARENA.w, Math.random() * ARENA.h, "free"));
+    this.ghosts.set(id, makeBlob(p, Math.random() * ARENA.w, Math.random() * ARENA.h, this.key.mode));
+    this.countHeads();
+  }
+
+  /** Honest lobby counter: "5/12 · 2 humans · 3 agents". */
+  private countHeads(): void {
+    const all = [...(this.world?.blobs.values() ?? this.ghosts.values())];
+    this.state.humans = all.filter((b) => b.kind === "human").length;
+    this.state.agents = all.filter((b) => b.kind === "agent").length;
   }
 
   override onLeave(client: Client): void {
@@ -72,6 +98,7 @@ export class MatchRoom extends Room {
     this.pending.delete(id);
     // Before GO leaving is free; after GO the blob stays and stays poppable (S4 adds reconnection).
     this.ghosts.delete(id);
+    this.countHeads();
   }
 
   private onInput(client: Client, msg: unknown): void {
@@ -120,9 +147,10 @@ export class MatchRoom extends Room {
           g.dirY = cmd?.dirY ?? 0;
           move(g, DT_S, 0, ARENA);
         }
-        if (this.phase === "WARMUP" && this.phaseTick >= WARMUP_TICKS) {
-          void this.lock();
-          this.enter("COUNTDOWN");
+        if (this.phase === "WARMUP") {
+          const next = warmupNext({ mode: this.key.mode, humans: this.ghosts.size, phaseTick: this.phaseTick, startNow: this.startNow });
+          if (next === "close") void this.disconnect();
+          if (next === "countdown") this.countdown();
         } else if (this.phase === "COUNTDOWN" && this.phaseTick >= COUNTDOWN_TICKS) {
           this.go();
         }
@@ -144,10 +172,22 @@ export class MatchRoom extends Room {
     }
   }
 
+  /** Lock the room; free rooms fill the empty seats with labelled agents who appear for the 3-2-1. */
+  private countdown(): void {
+    void this.lock();
+    if (this.key.mode === "free") {
+      for (const p of agentFill(this.ghosts.size)) {
+        this.ghosts.set(p.id, makeBlob(p, Math.random() * ARENA.w, Math.random() * ARENA.h, "free"));
+      }
+      this.countHeads();
+    }
+    this.enter("COUNTDOWN");
+  }
+
   /** GO: seeded fair respawn of everyone still here; from now on the room must not vanish. */
   private go(): void {
     const players = [...this.ghosts.values()].map(({ id, kind, label, accountId }) => ({ id, kind, label, accountId }));
-    this.world = newWorld(this.seed, "free", players);
+    this.world = newWorld(this.seed, this.key.mode, players);
     this.ghosts.clear();
     this.autoDispose = false;
     this.enter("LIVE");
@@ -163,7 +203,7 @@ export class MatchRoom extends Room {
 
   override onBeforePatch(): void {
     const left = {
-      WARMUP: WARMUP_TICKS - this.phaseTick,
+      WARMUP: (this.key.mode === "paid" ? PAID_WAIT_TICKS : WARMUP_TICKS) - this.phaseTick,
       COUNTDOWN: COUNTDOWN_TICKS - this.phaseTick,
       LIVE: sToTicks(R.MATCH_S) - (this.world?.tick ?? 0),
       ENDED: 0,

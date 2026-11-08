@@ -12,7 +12,8 @@ const server = defineServer({
   rooms: {
     // my_room stays until the client switches to "match" (S3), then MyRoom/State/Entity/Player go.
     my_room: defineRoom(MyRoom),
-    match: defineRoom(MatchRoom),
+    match: defineRoom(MatchRoom).filterBy(["mode"]),
+    private: defineRoom(MatchRoom).filterBy(["mode", "roomCode"]),
   },
   express: (app) => {
     const pass = process.env.MONITOR_PASS;

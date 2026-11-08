@@ -39,6 +39,9 @@ export class MatchState extends Schema {
   /** Whole seconds left in the current phase (warm-up, 3-2-1, or the 90 s match). */
   @type("uint8") timeLeftS = 0;
   @type("string") rateTier = "LOW";
+  /** Lobby counter; agents are always counted separately, never passed off as people. */
+  @type("uint8") humans = 0;
+  @type("uint8") agents = 0;
   @type("float32") zoneX = 0;
   @type("float32") zoneY = 0;
   @type("float32") zoneR = 0;
