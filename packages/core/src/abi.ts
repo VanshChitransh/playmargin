@@ -13,9 +13,15 @@ export interface SettleArgs {
   match_id: string;
   /** [account_id, amount] pairs. */
   payouts: Array<[string, U128]>;
+  /** Principal the vault lent in this match; must be <= the budget reserved at open. */
+  lent: U128;
   vault_repaid: U128;
   interest_to_vault: U128;
+  /** Vault share of borrow fees (the rest is inside reserve). */
+  fees: U128;
   reserve: U128;
+  /** Head is the settler-signed anchor: the contract asserts
+   *  sum(payouts) + vault_repaid + interest_to_vault + fees + reserve == stakes + lent. */
   seq: number;
   head: string;
 }
