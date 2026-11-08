@@ -33,7 +33,13 @@ export const play: Screen = (root) => {
   // Pixi init is async: if the player leaves before it resolves, destroy on arrival.
   let left = false;
   let mounted = false;
-  void arena.mount(root, (now) => source(now), { fps: q.has("fps") }).then(() => {
+  // Dev-only hook so tests and agent-browser can read the drawn frame (stripped from builds).
+  const draw: FrameSource = (now) => {
+    const f = source(now);
+    if (import.meta.env.DEV) (window as unknown as { __frame?: unknown }).__frame = f;
+    return f;
+  };
+  void arena.mount(root, draw, { fps: q.has("fps") }).then(() => {
     mounted = true;
     if (left) arena.destroy();
   });
