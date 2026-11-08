@@ -38,6 +38,8 @@ export function makeBlob(p: PlayerSeed, x: number, y: number, mode: Mode): Blob 
     dirY: 0,
     mass: mulBps(entry, START_MASS_BPS),
     debt: 0,
+    boostFees: 0,
+    payout: 0,
     pips: R.BOOST_PIPS,
     pipReadyAt: [],
     boostUntil: 0,
@@ -49,6 +51,7 @@ export function makeBlob(p: PlayerSeed, x: number, y: number, mode: Mode): Blob 
     cashout: null,
     state: "alive",
     lastInput: null,
+    lastInputAt: -1,
   };
 }
 
@@ -57,10 +60,12 @@ export function newWorld(seed: number, mode: Mode, players: PlayerSeed[]): World
   const entry = mode === "paid" ? ENTRY_PAID_MICRO : ENTRY_FREE_MICRO;
   const pot = entry * players.length;
   const w: World = {
+    matchId: `m${seed}`,
     seed,
     rngState: seedRng(seed),
     tick: 0,
     phase: "LIVE",
+    goTick: 0,
     mode,
     arena: ARENA,
     pot,
@@ -74,6 +79,7 @@ export function newWorld(seed: number, mode: Mode, players: PlayerSeed[]): World
     spikes: [],
     zone: { cx: ARENA.w / 2, cy: ARENA.h / 2, r: ARENA.w, targetR: ARENA.w },
     nextId: 1,
+    pendingLog: [],
   };
   const turn = rand(w) * Math.PI * 2;
   const shield = sToTicks(mode === "paid" ? R.SHIELD_S_PAID : R.SHIELD_S);
