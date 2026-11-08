@@ -19,6 +19,8 @@ import {
 } from "@margin/core";
 // Swap to @margin/core once C3 (newWorld/step) lands on main.
 import { ARENA, makeBlob, newWorld, step } from "../engine/stub";
+import { sharedDb } from "../db";
+import { admitFree, chargeEntry, payoutFree } from "./freeMatch";
 import { RateLimit, parseInput } from "./input";
 import { agentFill, parseRoomKey, warmupNext, type RoomKey } from "./lobby";
 import { MatchState, leaderboard, syncBlobs, syncWorld } from "./schema";
@@ -57,6 +59,8 @@ export class MatchRoom extends Room {
   private pending = new Map<string, Pending>();
   private limits = new Map<string, RateLimit>();
   private lastOwe = new Map<string, number>();
+  /** Blob id (= sessionId) to credits user id, humans in free rooms only. */
+  private users = new Map<string, string>();
   private key: RoomKey = { mode: "free", roomCode: null };
   private startNow = false;
   private owedMs = 0;
@@ -82,15 +86,17 @@ export class MatchRoom extends Room {
   }
 
   /** filterBy skips options a client leaves out, so re-check mode and code here. */
-  override onAuth(_client: Client, opts: unknown): boolean {
+  override onAuth(_client: Client, opts: unknown): string | true {
     const k = parseRoomKey(opts);
     if (k.mode !== this.key.mode) throw new Error(`mode mismatch: pass { mode: "${this.key.mode}" }`);
     if (this.key.roomCode && k.roomCode !== this.key.roomCode) throw new Error("wrong room code");
-    return true;
+    // Free: the user id becomes client.auth. Paid admission (ticket check) lands with S6.
+    return this.key.mode === "free" ? admitFree(sharedDb(), opts) : true;
   }
 
-  override onJoin(client: Client): void {
+  override onJoin(client: Client, _opts: unknown, auth?: string | true): void {
     const id = client.sessionId;
+    if (typeof auth === "string") this.users.set(id, auth);
     this.limits.set(id, new RateLimit());
     const p = { id, kind: "human" as const, label: `Player ${this.ghosts.size + 1}`, accountId: null };
     this.ghosts.set(id, makeBlob(p, Math.random() * ARENA.w, Math.random() * ARENA.h, this.key.mode));
@@ -108,6 +114,7 @@ export class MatchRoom extends Room {
     const id = client.sessionId;
     this.limits.delete(id);
     this.pending.delete(id);
+    if (!this.world) this.users.delete(id);
     // Before GO leaving is free; after GO the blob stays and stays poppable (S4 adds reconnection).
     this.ghosts.delete(id);
     this.countHeads();
@@ -174,7 +181,10 @@ export class MatchRoom extends Room {
           this.state.leaderboard.clear();
           this.state.leaderboard.push(...leaderboard(w.blobs.values()));
         }
-        if (w.phase === "ENDED") this.enter("ENDED");
+        if (w.phase === "ENDED") {
+          if (this.key.mode === "free") payoutFree(sharedDb(), this.users, w, this.roomId);
+          this.enter("ENDED");
+        }
         break;
       }
       case "ENDED":
@@ -198,6 +208,13 @@ export class MatchRoom extends Room {
 
   /** GO: seeded fair respawn of everyone still here; from now on the room must not vanish. */
   private go(): void {
+    // Entry is charged here and nowhere else; anyone who can no longer pay is sent home uncharged.
+    for (const [id, userId] of this.users) {
+      if (chargeEntry(sharedDb(), userId, this.roomId)) continue;
+      this.users.delete(id);
+      this.ghosts.delete(id);
+      this.clients.getById(id)?.leave(4001, "not enough credits");
+    }
     const players = [...this.ghosts.values()].map(({ id, kind, label, accountId }) => ({ id, kind, label, accountId }));
     this.world = newWorld(this.seed, this.key.mode, players);
     this.ghosts.clear();

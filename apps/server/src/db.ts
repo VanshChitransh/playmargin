@@ -114,3 +114,10 @@ export function creditBalance(db: Db, userId: string): Micro {
   ) as { b: number };
   return row.b;
 }
+
+let shared: Db | null = null;
+
+/** The process-wide database (DB_PATH, default margin.sqlite), opened on first use. */
+export function sharedDb(): Db {
+  return (shared ??= openDb());
+}

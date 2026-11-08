@@ -3,6 +3,7 @@
 // Usage: `npx tsx apps/server/scripts/smoke-lobby.ts ws://localhost:2599`
 import { Client } from "@colyseus/sdk";
 
+const RUN = Date.now().toString(36);
 const sdk = new Client(process.argv[2] ?? "ws://localhost:2567");
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const quiet = <T extends { onMessage: (t: string, cb: () => void) => void }>(r: T) => {
@@ -11,13 +12,13 @@ const quiet = <T extends { onMessage: (t: string, cb: () => void) => void }>(r: 
   return r;
 };
 
-const a = quiet(await sdk.joinOrCreate("match", { mode: "free" }));
+const a = quiet(await sdk.joinOrCreate("match", { mode: "free", guestKey: `ed25519:smoke${RUN}k1` }));
 await sleep(3000);
-const b = quiet(await sdk.joinOrCreate("match", { mode: "free" }));
-const f1 = quiet(await sdk.joinOrCreate("private", { mode: "free", roomCode: "ABCD" }));
-const f2 = quiet(await sdk.joinOrCreate("private", { mode: "free", roomCode: "ABCD" }));
-const noCode = await sdk.joinOrCreate("private", { mode: "free" }).then(() => "joined", () => "rejected");
-const wrongCode = await sdk.join("private", { mode: "free", roomCode: "ZZZZ" }).then(() => "joined", () => "rejected");
+const b = quiet(await sdk.joinOrCreate("match", { mode: "free", guestKey: `ed25519:smoke${RUN}k2` }));
+const f1 = quiet(await sdk.joinOrCreate("private", { mode: "free", guestKey: `ed25519:smoke${RUN}k3`, roomCode: "ABCD" }));
+const f2 = quiet(await sdk.joinOrCreate("private", { mode: "free", guestKey: `ed25519:smoke${RUN}k4`, roomCode: "ABCD" }));
+const noCode = await sdk.joinOrCreate("private", { mode: "free", guestKey: `ed25519:smoke${RUN}k5` }).then(() => "joined", () => "rejected");
+const wrongCode = await sdk.join("private", { mode: "free", guestKey: `ed25519:smoke${RUN}k6`, roomCode: "ZZZZ" }).then(() => "joined", () => "rejected");
 
 await sleep(6000);
 const st = a.state as { phase: string; humans: number; agents: number; blobs: Map<string, { kind: string; label: string }> };

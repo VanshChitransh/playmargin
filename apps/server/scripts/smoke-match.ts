@@ -5,14 +5,15 @@
 import { Client, type Room } from "@colyseus/sdk";
 
 const url = process.argv[2] ?? "ws://localhost:2567";
+const RUN = Date.now().toString(36);
 const sdk = new Client(url);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const cmd = (seq: number, dirX: number) => ({ seq, dirX, dirY: 0, boost: false, repay: false, cashout: false });
 
-const honest = await sdk.joinOrCreate("match", { mode: "free" });
-const garbage = await sdk.join("match", { mode: "free" });
-const flood = await sdk.join("match", { mode: "free" });
-const hostile = await sdk.join("match", { mode: "free" });
+const honest = await sdk.joinOrCreate("match", { mode: "free", guestKey: `ed25519:smoke${RUN}k1` });
+const garbage = await sdk.join("match", { mode: "free", guestKey: `ed25519:smoke${RUN}k2` });
+const flood = await sdk.join("match", { mode: "free", guestKey: `ed25519:smoke${RUN}k3` });
+const hostile = await sdk.join("match", { mode: "free", guestKey: `ed25519:smoke${RUN}k4` });
 let hostileDropped = false;
 hostile.onLeave(() => (hostileDropped = true));
 
@@ -59,12 +60,20 @@ await new Promise<void>((resolve) => honest.onLeave(() => resolve()));
 timers.forEach(clearInterval);
 console.log(JSON.stringify({ phases, ...report, hostileDropped }, null, 1));
 
+// Ledger: players who were in at GO paid 100 and got their equity back (80 with the movement
+// stub); the hostile client was dropped during warm-up, so it was never charged.
+const http = url.replace(/^ws/, "http");
+const bal = async (k: number) =>
+  ((await (await fetch(`${http}/api/credits?guestKey=ed25519:smoke${RUN}k${k}`)).json()) as { balance: number }).balance;
+const balances = [await bal(1), await bal(2), await bal(3), await bal(4)];
+console.log("balances", balances.join(" "));
 const order = phases.map((p) => p[0]).join(",");
 const ok =
   order === "COUNTDOWN,LIVE,ENDED" &&
   report.garbageMoved === 0 &&
   report.honestDx > 0 &&
   report.floodDx <= report.honestDx + 1 &&
-  hostileDropped;
+  hostileDropped &&
+  balances.join() === "980,980,980,1000";
 console.log(ok ? "SMOKE OK" : "SMOKE FAIL");
 process.exit(ok ? 0 : 1);
