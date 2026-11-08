@@ -10,9 +10,9 @@ export type LogEvent =
   | { type: "REPAY"; data: { blob: string; amount: Micro } }
   | { type: "INTEREST"; data: { blob: string; amount: Micro; toFood: Micro; toVault: Micro; toReserve: Micro } }
   | { type: "SPIKE"; data: { blob: string; spike: number; damage: Micro } }
-  | { type: "EAT"; data: { by: string; victim: string; debtRepaid: Micro; gained: Micro; scattered: Micro } }
-  | { type: "POP"; data: { by: string; victim: string; debtRepaid: Micro; bounty: Micro; fee: Micro; scattered: Micro } }
-  | { type: "KEEPER_POP"; data: { victim: string; debtRepaid: Micro; fee: Micro; scattered: Micro } }
+  | { type: "EAT"; data: { by: string; victim: string; debtRepaid: Micro; badDebt: Micro; gained: Micro; scattered: Micro } }
+  | { type: "POP"; data: { by: string; victim: string; debtRepaid: Micro; badDebt: Micro; bounty: Micro; fee: Micro; scattered: Micro } }
+  | { type: "KEEPER_POP"; data: { victim: string; debtRepaid: Micro; badDebt: Micro; fee: Micro; scattered: Micro } }
   | { type: "CASHOUT"; data: { blob: string; amount: Micro } }
   | { type: "MATCH_END"; data: { tick: number; finalMasses: Record<string, Micro> } };
 
