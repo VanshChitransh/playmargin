@@ -4,6 +4,7 @@ import { defineServer, defineRoom, monitor } from "colyseus";
 import { listen } from "@colyseus/tools";
 import basicAuth from "express-basic-auth";
 
+import { MATCH_TICKS } from "@margin/core";
 import { MyRoom } from "./rooms/MyRoom";
 
 const server = defineServer({
@@ -18,4 +19,4 @@ const server = defineServer({
   },
 });
 
-listen(server).then(() => console.log("Listening on http://localhost:2567"));
+listen(server).then(() => console.log(`Listening on http://localhost:2567 (match = ${MATCH_TICKS} ticks)`));
