@@ -156,7 +156,7 @@ export class ArenaRenderer {
         this.blobs.set(v.id, s);
         this.blobLayer.addChild(s);
       }
-      s.update(v, tS, isMe);
+      s.update(v, tS, isMe, this.zoom);
       s.zIndex = isMe ? 1e6 : v.radius; // small under big, me always on top
     }
     this.blobLayer.sortableChildren = true;

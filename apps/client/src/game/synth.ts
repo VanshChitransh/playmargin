@@ -5,8 +5,8 @@
 import { MICRO, R, radius, type BlobView, type Ring } from "@margin/core";
 import type { Frame, FoodView, SpikeView } from "./frame";
 
-const W = 3000;
-const H = 3000;
+export const W = 3000;
+export const H = 3000;
 const START = R.ENTRY_FREE * R.START_MASS_RATIO;
 
 const KINDS: BlobView["kind"][] = ["human", "human", "human", "human", "human", "human", "human", "agent", "agent", "agent", "agent", "drone"];
@@ -38,8 +38,8 @@ const ringOf = (equity: number, owe: number): Ring => {
   return hf >= R.HF_GREEN ? "green" : hf >= R.HF_RED ? "yellow" : "red";
 };
 
-/** Frame at tS seconds; me cycles 0 to 3 pips then loses equity, so spikes flip to red. */
-export function synthFrame(tS: number): Frame {
+/** Frame at tS seconds; me cycles 0 to 3 pips then loses equity, so spikes flip to red. mePos overrides my position (offline steering). */
+export function synthFrame(tS: number, mePos?: { x: number; y: number }): Frame {
   const loop = tS % R.MATCH_S;
   const blobs: BlobView[] = KINDS.map((kind, i) => {
     const phase = hash(i + 7000) * Math.PI * 2;
@@ -54,12 +54,13 @@ export function synthFrame(tS: number): Frame {
     const owe = equity * 0.5 * pips;
     if (c > 12) equity *= 1 - 0.7 * Math.min(1, (c - 12) / 3);
     const mass = equity + owe;
+    const pos = i === 0 && mePos ? mePos : { x, y };
     return {
       id: `b${i}`,
       kind,
       label: NAMES[i]!,
-      x,
-      y,
+      x: pos.x,
+      y: pos.y,
       radius: kind === "drone" ? 28 : radius(Math.round(mass * MICRO)),
       ring: kind === "drone" ? "green" : ringOf(equity, owe),
       pips: 3 - pips,

@@ -31,8 +31,8 @@ export class BlobSprite extends Container {
     this.addChild(this.shield, this.body, this.ring, this.nameText, this.warnSign);
   }
 
-  /** Sync to a view; tS is seconds since start, used only for pulses. */
-  update(v: BlobView, tS: number, isMe: boolean): void {
+  /** Sync to a view; tS is seconds since start (pulses), zoom keeps text a fixed screen size. */
+  update(v: BlobView, tS: number, isMe: boolean, zoom: number): void {
     this.position.set(v.x, v.y);
     this.visible = v.state === "alive";
     if (!this.visible) return;
@@ -41,9 +41,12 @@ export class BlobSprite extends Container {
       this.redraw(v, isMe);
     }
     const r = v.radius + RING_GAP;
-    this.nameText.position.set(0, r + 14);
+    const k = 1 / zoom;
+    this.nameText.scale.set(k);
+    this.warnSign.scale.set(k);
+    this.nameText.position.set(0, r + 12 * k);
     this.warnSign.visible = v.ring === "red" && v.kind !== "drone";
-    this.warnSign.position.set(0, -r - 14);
+    this.warnSign.position.set(0, -r - 14 * k);
     this.shield.visible = v.shielded;
     // Red pulses fast (heartbeat), yellow breathes slowly, green is still.
     const hz = v.ring === "red" ? 4 : v.ring === "yellow" ? 1 : 0;

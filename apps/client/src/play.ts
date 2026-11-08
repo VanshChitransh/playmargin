@@ -1,22 +1,55 @@
-// #/play: mounts the arena renderer. Frames come from the synthetic generator until
-// U2 wires the Colyseus room; open /?fps#/play to see the frame rate.
+// #/play: joins a free match and draws it. If the server is unreachable (or the URL
+// has ?synth) it plays the synthetic loop instead, so the client is always demoable.
+// Open /?fps#/play to see the frame rate.
 import type { Screen } from "./router";
-import { ArenaRenderer } from "./render/arena";
-import { synthFrame } from "./game/synth";
+import { ArenaRenderer, type FrameSource } from "./render/arena";
+import { H, W, synthFrame } from "./game/synth";
+import { MatchConnection, guestKey } from "./net/client";
+import { Controls } from "./input/controls";
 
 export const play: Screen = (root) => {
+  const q = new URLSearchParams(location.search);
   const arena = new ArenaRenderer();
+  const conn = new MatchConnection();
   const t0 = performance.now();
-  const showFps = new URLSearchParams(location.search).has("fps");
+  // Offline mode steers my blob locally so controls can be felt without a server.
+  const me = { x: W / 2, y: H / 2 };
+  let dir = { x: 0, y: 0 };
+  let last = t0;
+  const synth: FrameSource = (now) => {
+    const dt = (now - last) / 1000;
+    last = now;
+    me.x = Math.min(W, Math.max(0, me.x + dir.x * 300 * dt));
+    me.y = Math.min(H, Math.max(0, me.y + dir.y * 300 * dt));
+    return synthFrame((now - t0) / 1000, me);
+  };
+  let source: FrameSource = synth;
+  const controls = new Controls(root, (cmd) => {
+    dir = { x: cmd.dirX, y: cmd.dirY };
+    if (cmd.boost || cmd.repay || cmd.cashout) console.debug("tap", cmd);
+    conn.send(cmd);
+  });
+
   // Pixi init is async: if the player leaves before it resolves, destroy on arrival.
   let left = false;
   let mounted = false;
-  void arena.mount(root, (now) => synthFrame((now - t0) / 1000), { fps: showFps }).then(() => {
+  void arena.mount(root, (now) => source(now), { fps: q.has("fps") }).then(() => {
     mounted = true;
     if (left) arena.destroy();
   });
+  if (!q.has("synth")) {
+    conn
+      .join(guestKey())
+      .then(() => {
+        if (left) return conn.leave();
+        source = (now) => conn.buffer.frameAt(now);
+      })
+      .catch((e: unknown) => console.warn("server unreachable, playing the synthetic loop", e));
+  }
   return () => {
     left = true;
+    controls.destroy();
+    conn.leave();
     if (mounted) arena.destroy();
   };
 };
