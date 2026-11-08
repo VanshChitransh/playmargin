@@ -1,6 +1,10 @@
+node_modules/
+dist/
+target/
 .env
 .env.*
 !.env.example
-node_modules/
-target/
-dist/
+*.sqlite
+*.sqlite-*
+.claude/settings.local.json
+.DS_Store
