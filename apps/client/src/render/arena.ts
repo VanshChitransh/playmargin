@@ -14,6 +14,7 @@ import { NitroFeel } from "./nitro";
 import type { Shot } from "./director";
 import { reducedMotion } from "./motion";
 import { JUICE } from "./juice";
+import { wallDistance } from "./membrane";
 
 /** ~35 grid cells across the screen at start size (agar.io measured). */
 const CELL = 60;
@@ -23,6 +24,8 @@ const BEYOND = 3000;
 const WARN_REACH = 500;
 /** World units across the LONG screen side at start size: a start blob is ~5.5% of it (agar.io). */
 const VIEW_AT_START = 2100;
+/** Points on the BOOST preview rings; even, so the dotted ring alternates dash and gap. */
+const PREVIEW_PTS = 64;
 
 export type FrameSource = (nowMs: number) => Frame | null;
 
@@ -285,20 +288,34 @@ export class ArenaRenderer {
     prune(this.blobs, seen);
   }
 
-  /** Thin solid ring = my size after one BOOST tap; dotted ring = after every lit pip. */
+  /** Thin solid ring = my size after one BOOST tap; dotted ring = after every lit pip. Both
+   *  flatten on the wall like the membrane, and fade while pressed there, so a squish stays a squish. */
   private drawPreview(f: Frame, me: Frame["blobs"][number] | undefined): void {
     this.preview.clear();
     const p = me && !boostBlocked(me, f.match) ? boostPreview(me) : null;
     if (!me || !p) return;
-    this.preview.circle(me.x, me.y, p.next).stroke({ width: 2 / this.zoom, color: C.ink, alpha: 0.4 });
+    const ring = (r: number): { pts: number[]; flat: boolean } => {
+      const pts: number[] = [];
+      let flat = false;
+      for (let i = 0; i < PREVIEW_PTS; i++) {
+        const a = (i / PREVIEW_PTS) * Math.PI * 2;
+        const c = Math.cos(a);
+        const s = Math.sin(a);
+        const rr = Math.min(r, wallDistance(me.x, me.y, c, s, f.arena.w, f.arena.h));
+        flat ||= rr < r;
+        pts.push(me.x + c * rr, me.y + s * rr);
+      }
+      return { pts, flat };
+    };
+    const next = ring(p.next);
+    this.preview.poly(next.pts).stroke({ width: 2 / this.zoom, color: C.ink, alpha: 0.4 * (next.flat ? JUICE.PREVIEW_WALL_FADE : 1) });
     if (p.max - p.next < 1) return;
-    const n = 40;
-    for (let i = 0; i < n; i += 2) {
-      const a0 = (i / n) * Math.PI * 2;
-      const a1 = ((i + 1) / n) * Math.PI * 2;
-      this.preview.moveTo(me.x + Math.cos(a0) * p.max, me.y + Math.sin(a0) * p.max).arc(me.x, me.y, p.max, a0, a1);
+    const max = ring(p.max);
+    for (let i = 0; i < PREVIEW_PTS; i += 2) {
+      const j = (i + 1) % PREVIEW_PTS;
+      this.preview.moveTo(max.pts[i * 2]!, max.pts[i * 2 + 1]!).lineTo(max.pts[j * 2]!, max.pts[j * 2 + 1]!);
     }
-    this.preview.stroke({ width: 2 / this.zoom, color: C.ink, alpha: 0.25 });
+    this.preview.stroke({ width: 2 / this.zoom, color: C.ink, alpha: 0.25 * (max.flat ? JUICE.PREVIEW_WALL_FADE : 1) });
   }
 
   /** Boost camera: a touch wider and leading the way while boosting, with one small kick on press. */

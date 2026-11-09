@@ -136,4 +136,6 @@ export const JUICE = {
   WALL_TINT_ALPHA: 0.07,
   WALL_LINE_PX: 3.5,
   WALL_LINE_ALPHA: 0.35,
+  /** BOOST preview rings fade to this share of their alpha while they touch the wall. */
+  PREVIEW_WALL_FADE: 0.5,
 } as const;
