@@ -1,6 +1,7 @@
 // One call behind the PLAY $1 button: make sure quick play is on, hold exactly one live ticket,
-// and hand back a join signer for the room the server assigns. The client joins the queue only
-// after this resolves, so the 8 s window counts only funded players (EDGE-CASES NS-10).
+// and hand back a join signer. Colyseus reads join options before it picks a room, so the proof
+// names the "paid" scope, not a room id: the server's one-use 60 s nonce stops replays. The client
+// joins the queue only after this resolves, so the 8 s window counts only funded players (NS-10).
 
 import { ENTRY_STAKE } from "./config";
 import { balanceOf, ticketOf } from "./funds";
@@ -18,8 +19,8 @@ export class NeedFunds extends Error {
 export interface PaidEntry {
   /** Relayed enter_arena tx, or null when an unused ticket was reused. */
   ticketTx: string | null;
-  /** Signs the NEP-413 join proof for the room id the server assigned. */
-  join: (roomId: string) => SignedJoin;
+  /** Signs a fresh NEP-413 join proof: JoinOpts {mode: "paid", join: e.join()}. Call per join. */
+  join: () => SignedJoin;
 }
 
 /** Throws NeedFunds when the idle balance is below 1 USDC. `onStep` drives the button label. */
@@ -40,5 +41,5 @@ export async function payToPlay(accountId: string, onStep: (s: PaidStep) => void
   }
 
   onStep("ready");
-  return { ticketTx, join: (roomId) => signJoin(accountId, secret, roomId) };
+  return { ticketTx, join: () => signJoin(accountId, secret, "paid") };
 }

@@ -20,6 +20,10 @@ if ((await balanceOf(player)) < 1_000_000n) {
   const args = { receiver_id: contract, amount: "2000000", msg: "" };
   await near.call(usdc, "ft_transfer_call", args, { signerId: player, gas: "100 Tgas", attachedDeposit: "1 yocto", ...fin });
 }
+// Other lanes test with player1 too: hand back a leftover unassigned ticket so we start clean.
+if ((await ticketOf(player))?.match_id === null) {
+  await near.call(contract, "refund_ticket", { account_id: player }, { signerId: settler, ...fin });
+}
 const before = await balanceOf(player);
 
 const key = generateKey();
@@ -46,10 +50,10 @@ const steps: string[] = [];
 const entry = await payToPlay(player, (s) => steps.push(s));
 assert.deepEqual(steps, ["quick-play", "ticket", "ready"]);
 assert.ok(entry.ticketTx, "payToPlay bought a ticket");
-const j = entry.join("room-check");
+const j = entry.join();
 const ok = await verifyNep413Signature(
   { accountId: j.accountId, publicKey: j.publicKey, signature: j.signature },
-  { message: joinMessage("room-check", player), recipient: contract, nonce: Uint8Array.from(atob(j.nonce), (c) => c.charCodeAt(0)) },
+  { message: joinMessage("paid", player), recipient: contract, nonce: Uint8Array.from(atob(j.nonce), (c) => c.charCodeAt(0)) },
   { maxAge: 60_000 },
 );
 assert.ok(ok, "join proof verifies like the server will");
