@@ -60,6 +60,9 @@ const MIGRATIONS: string[] = [
      tx_hash TEXT,
      created INTEGER NOT NULL
    );`,
+  // v2: each free match remembers which hourly anchor covers it and its Merkle proof (JSON).
+  `ALTER TABLE matches ADD COLUMN anchor_hour INTEGER;
+   ALTER TABLE matches ADD COLUMN proof TEXT;`,
 ];
 
 /** Open (or create) the database and apply pending migrations. Use ":memory:" in tests. */

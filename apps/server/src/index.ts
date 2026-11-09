@@ -9,6 +9,8 @@ import { MyRoom } from "./rooms/MyRoom";
 import { MatchRoom, drain } from "./rooms/MatchRoom";
 import { creditsRepo, isGuestKey, topUpDaily } from "./credits";
 import { sharedDb, userForGuestKey } from "./db";
+import { anchorPending } from "./anchor/job";
+import { sharedChain } from "./settlement";
 
 const server = defineServer({
   rooms: {
@@ -40,5 +42,11 @@ server.onBeforeShutdown(() => {
   drain.on = true;
   console.log("draining: no new matches, LIVE matches finish first");
 });
+
+// Hourly anchor: checked every 5 min so a finished hour goes on chain within minutes. unref() so a
+// drain exit never waits on it.
+const anchor = () => anchorPending(sharedDb(), sharedChain()).catch((err: unknown) => console.error("[anchor]", err));
+setInterval(anchor, 5 * 60_000).unref();
+void anchor();
 
 listen(server).then(() => console.log(`MARGIN server up on :${process.env.PORT ?? 2567} (match = ${MATCH_TICKS} ticks)`));
