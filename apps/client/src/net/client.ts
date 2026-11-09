@@ -38,6 +38,7 @@ export class MatchConnection {
   private room?: Room;
   private listeners = new Set<(e: GameEventMsg) => void>();
   onCommander?: (rationale: string | null) => void;
+  onAborted?: (reason: string) => void;
 
   /** Join a match (free or paid); rejects if the server is unreachable or refuses the seat. */
   async join(opts: JoinOpts): Promise<void> {
@@ -52,6 +53,8 @@ export class MatchConnection {
     });
     this.room.onMessage("ev", (e: GameEventMsg) => this.listeners.forEach((l) => l(e)));
     // The NEAR AI commander's one-line plan for the agents (S1 A6), null until the first plan.
+    // Paid room cancelled before GO (open_match failed): every ticket is refunded.
+    this.room.onMessage("aborted", (m: { reason?: string }) => this.onAborted?.(m.reason ?? ""));
     this.room.onMessage("commander", (m: { rationale: string | null }) => this.onCommander?.(m.rationale));
   }
 

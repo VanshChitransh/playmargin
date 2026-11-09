@@ -74,3 +74,19 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
 function wire<A extends string>(el: HTMLElement, act: (a: A) => void): void {
   el.querySelectorAll<HTMLElement>("[data-act]").forEach((b) => b.addEventListener("click", () => act(b.dataset.act as A)));
 }
+
+/** Paid match cancelled before GO: nothing was spent, say so in game words, then go home. */
+export function showAborted(root: HTMLElement, reason: string, home: () => void): HTMLElement {
+  const el = document.createElement("div");
+  el.className = "fixed inset-0 z-20 grid place-items-center bg-ink/80 p-4";
+  el.innerHTML = `<div class="sticker max-w-sm rounded-box bg-paper p-6 text-center text-ink">
+    <h2 class="font-display text-4xl">Match cancelled</h2>
+    <p class="mt-2 text-lg">Your $1 is back in your balance.</p>
+    <p data-r class="mt-3 text-xs text-muted"></p>
+    <button class="sticker sticker-press mt-5 rounded-box bg-liq px-6 py-3 font-display text-xl text-paper">Back home</button></div>`;
+  el.querySelector("[data-r]")!.textContent = reason;
+  el.querySelector("button")!.addEventListener("click", home);
+  setTimeout(home, 8000);
+  root.appendChild(el);
+  return el;
+}

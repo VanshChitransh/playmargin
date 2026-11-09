@@ -10,7 +10,7 @@ import { Controls } from "./input/controls";
 import { MatchConnection, guestKey } from "./net/client";
 import { ArenaRenderer } from "./render/arena";
 import { rerender, type Screen } from "./router";
-import { showDeath, showResults } from "./screens/overlays";
+import { showAborted, showDeath, showResults } from "./screens/overlays";
 import { setLocalLog } from "./screens/verify";
 import { C } from "./render/colors";
 import { play as sfx } from "./audio";
@@ -23,6 +23,7 @@ interface Source {
   onEvent(cb: (e: GameEventMsg) => void): () => void;
   leave?(): void;
   onCommander?: (rationale: string | null) => void;
+  onAborted?: (reason: string) => void;
 }
 
 const JOIN_TIMEOUT_MS = 2500;
@@ -167,6 +168,11 @@ export const play: Screen = (root, params) => {
     status.textContent = s instanceof LocalMatch ? "Offline practice: real rules, local bots" : "";
     receipt = new Receipt(s.me);
     s.onCommander = (r) => hud.commander(r);
+    s.onAborted = (reason) => {
+      ended = true;
+      overlay?.remove();
+      overlay = showAborted(root, reason, () => !left && home());
+    };
     s.onEvent((e) => {
       receipt?.event(e);
       juice(e, s.me);
