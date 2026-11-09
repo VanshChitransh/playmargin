@@ -14,6 +14,9 @@ use near_contract_standards::storage_management::{
 use near_sdk::json_types::U128;
 use near_sdk::{AccountId, NearToken, PanicOnDefault, PromiseOrValue, env, near, require};
 
+/// 10 USDC (6 decimals).
+const FAUCET_MAX: u128 = 10_000_000;
+
 #[near(contract_state)]
 #[derive(PanicOnDefault)]
 pub struct Contract {
@@ -28,9 +31,12 @@ impl Contract {
         Self { owner, token: FungibleToken::new(b"t".to_vec()) }
     }
 
-    /// Owner-only faucet. Registers the account on first mint so tests skip storage_deposit.
+    /// Test faucet: anyone may mint up to 10 USDC per call, the owner any amount. This is a
+    /// worthless testnet token; the cap only stops one call from overflowing total supply.
+    /// Registers the account on first mint so players skip storage_deposit.
     pub fn mint(&mut self, account_id: AccountId, amount: U128) {
-        require!(env::predecessor_account_id() == self.owner, "only owner can mint");
+        let owner = env::predecessor_account_id() == self.owner;
+        require!(owner || amount.0 <= FAUCET_MAX, "faucet gives at most 10 USDC per call");
         if !self.token.accounts.contains_key(&account_id) {
             self.token.internal_register_account(&account_id);
         }

@@ -11,7 +11,12 @@ const wasm = (crate: string, file: string) => readFileSync(new URL(`${crate}/tar
 
 async function deployMockUsdc(): Promise<void> {
   await ensureSubAccount(IDS.usdc, "2 NEAR");
-  if ((await near.getAccount(IDS.usdc)).hasContract) return;
+  if ((await near.getAccount(IDS.usdc)).hasContract) {
+    if (process.env.UPGRADE !== "1") return;
+    const r = await near.transaction(IDS.usdc).deployContract(IDS.usdc, wasm("mock-usdc", "mock_usdc")).send();
+    console.log(`mock USDC upgraded: ${txLink(r)}`);
+    return;
+  }
   const r = await near
     .transaction(IDS.usdc)
     .deployContract(IDS.usdc, wasm("mock-usdc", "mock_usdc"))

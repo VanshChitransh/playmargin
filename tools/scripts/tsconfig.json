@@ -1,5 +1,10 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "allowImportingTsExtensions": true, "types": ["node"], "typeRoots": ["../../node_modules/@types"] },
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "lib": ["ES2022", "DOM"],
+    "types": ["node", "vite/client"],
+    "typeRoots": ["../../node_modules/@types", "../../node_modules"]
+  },
   "include": ["*.ts"]
 }
