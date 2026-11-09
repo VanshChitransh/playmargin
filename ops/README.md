@@ -1,7 +1,7 @@
 # Ops: one droplet, game server + relayer
 
 Nothing here has run on a real droplet yet (Vansh buys it on deploy day). The scripts pass `bash -n`;
-Caddy and systemd files get their first real check in step 6 below.
+Caddy and systemd files get their first real check in step 7 below.
 
 | File | What it does |
 |---|---|
