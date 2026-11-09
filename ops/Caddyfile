@@ -4,5 +4,8 @@
 api.playmargin.fun {
 	encode gzip
 	# Gasless relayer (S4, services/relayer) joins here at S10: handle /relay* { reverse_proxy localhost:3030 }
-	reverse_proxy localhost:2567
+	# The server rate-limits joins by X-Real-IP: set it here so a client can't send its own.
+	reverse_proxy localhost:2567 {
+		header_up X-Real-IP {remote_host}
+	}
 }

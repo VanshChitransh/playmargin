@@ -29,8 +29,9 @@ import { agentView, createBrain } from "../agents";
 import { sharedDb, userForAccount } from "../db";
 import { settlementFor } from "../settlement";
 import { admitFree, chargeEntry } from "./freeMatch";
-import { admitPaid } from "./paidMatch";
+import { admitPaid, seatedAccounts } from "./paidMatch";
 import { InputQueue } from "./input";
+import { clientIp, joinLimit, rooms } from "./guard";
 import { MatchRecord } from "./matchRecord";
 import { agentFill, droneFill, parseRoomKey, warmupNext, type RoomKey } from "./lobby";
 import { MatchState, syncState } from "./schema";
@@ -70,6 +71,8 @@ export class MatchRoom extends Room {
   private lastMe = new Map<string, string>();
   /** Blob id (= sessionId) to credits user id, humans in free rooms only. */
   private users = new Map<string, string>();
+  /** Paid accounts this room holds in seatedAccounts; released on leave before GO and on dispose. */
+  private accounts = new Set<string>();
   private key: RoomKey = { mode: "free", roomCode: null };
   private startNow = false;
   private joined = 0;
@@ -81,6 +84,7 @@ export class MatchRoom extends Room {
 
   override onCreate(opts: unknown): void {
     if (drain.on) throw new Error("server is restarting, try again in a moment");
+    if (rooms.live >= rooms.max) throw new Error("all arenas are full, try again in a minute");
     this.key = parseRoomKey(opts);
     if (this.roomName === "private" && !this.key.roomCode) throw new Error("private room needs a 4-letter roomCode");
     if (this.roomName !== "private") this.key.roomCode = null;
@@ -105,17 +109,22 @@ export class MatchRoom extends Room {
         this.tick();
       }
     }, TICK_MS);
+    rooms.live++; // last, so a create that throws above never counts (onDispose won't run for it)
   }
 
   /** filterBy skips options a client leaves out, so re-check mode and code here. */
-  override async onAuth(_client: Client, opts: unknown): Promise<string | { accountId: string }> {
+  override async onAuth(_client: Client, opts: unknown, ctx?: { ip?: string | string[] }): Promise<string | { accountId: string }> {
+    if (!joinLimit.allow(clientIp(ctx))) throw new Error("too many joins, slow down");
     const k = parseRoomKey(opts);
     if (k.mode !== this.key.mode) throw new Error(`mode mismatch: pass { mode: "${this.key.mode}" }`);
     if (this.key.roomCode && k.roomCode !== this.key.roomCode) throw new Error("wrong room code");
     // Free: the credits user id. Paid: the NEAR account holding a live ticket (one seat each).
     if (this.key.mode === "free") return admitFree(sharedDb(), opts);
     const paid = await admitPaid(opts);
-    if ([...this.world.blobs.values()].some((b) => b.accountId === paid.accountId)) throw new Error("account already in this room");
+    // Claimed synchronously after the last await, so two parallel joins can't both pass.
+    if (seatedAccounts.has(paid.accountId)) throw new Error("this account is already in a match");
+    seatedAccounts.add(paid.accountId);
+    this.accounts.add(paid.accountId);
     return paid;
   }
 
@@ -159,6 +168,11 @@ export class MatchRoom extends Room {
     this.lastMe.delete(client.sessionId);
   }
 
+  override onDispose(): void {
+    rooms.live--;
+    for (const a of this.accounts) seatedAccounts.delete(a);
+  }
+
   /** Drain: before GO nobody was charged, so close; LIVE rooms play out, settle and close. */
   override onBeforeShutdown(): void {
     if (!this.started) void this.disconnect();
@@ -169,6 +183,8 @@ export class MatchRoom extends Room {
     this.inputs.close(id);
     if (this.started) return; // after GO the blob stays in the arena
     this.users.delete(id);
+    const acc = this.world.blobs.get(id)?.accountId;
+    if (acc) (seatedAccounts.delete(acc), this.accounts.delete(acc));
     removePlayer(this.world, id);
     this.countHeads();
   }

@@ -52,9 +52,13 @@ export async function verifyJoin(chain: Chain, join: unknown, nowMs = Date.now()
   const p = key?.permission as unknown;
   const fc = typeof p === "object" && p !== null ? (p as { FunctionCall?: { receiver_id: string } }).FunctionCall : undefined;
   if (p !== "FullAccess" && fc?.receiver_id !== chain.cfg.contractId) throw new Error("join key is not a key of this account");
-  if (!useNonce(nonce, nowMs)) throw new Error("join proof already used");
+  // Key on the canonical bytes: base64 decoding is lenient, so two spellings can mean one nonce.
+  if (!useNonce(nonceBytes.toString("base64"), nowMs)) throw new Error("join proof already used");
   return accountId;
 }
+
+/** Paid accounts seated in any live room on this process: one ticket, one room. */
+export const seatedAccounts = new Set<string>();
 
 /** The joining NEAR account; throws (join refused) without a valid join proof and a live, unassigned ticket. */
 export async function admitPaid(opts: unknown): Promise<{ accountId: string }> {

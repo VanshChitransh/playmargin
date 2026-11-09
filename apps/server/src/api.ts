@@ -5,8 +5,11 @@ import { toUnits } from "@margin/core";
 import { creditsRepo, isGuestKey, topUpDaily } from "./credits";
 import { userForGuestKey, type Db } from "./db";
 import { loadLog } from "./matches";
+import { RateLimiter } from "./rooms/guard";
 
 const DAY_MS = 86_400_000;
+/** Each new guestKey makes a user row, so cap credit lookups per IP. */
+const creditsLimit = new RateLimiter(30, 60_000);
 
 interface MatchRow {
   id: string;
@@ -87,6 +90,7 @@ export function mountApi(app: Application, db: () => Db): void {
   });
   // Balance for the home screen; first visit of the UTC day also applies the daily top-up.
   app.get("/api/credits", (req, res) => {
+    if (!creditsLimit.allow(req.get("x-real-ip") ?? req.socket.remoteAddress ?? "unknown")) return void res.status(429).json({ error: "slow down" });
     const key = req.query.guestKey;
     if (!isGuestKey(key)) return void res.status(400).json({ error: "bad guestKey" });
     const userId = userForGuestKey(db(), key);
