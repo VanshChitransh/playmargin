@@ -10,7 +10,7 @@ import { leak, makeBlob, makeWorld } from "./testkit";
 const u = (x: number) => Math.round(x * MICRO);
 
 describe("RULES worked check", () => {
-  it("80 -> hold BOOST to the cap -> spike -> hold REPAY 0.8 s", () => {
+  it("80 -> hold BOOST to the cap -> spike -> hold REPAY out of red", () => {
     const a = makeBlob();
     const w = makeWorld([a]);
     expect(ring(a)).toBe("green");
@@ -36,17 +36,16 @@ describe("RULES worked check", () => {
     expect(ring(a)).toBe("red");
     expect(keeperCheck(w, a, 10)).toBeNull(); // red, not dead
 
-    // Held REPAY compounds per tick to the old tap's pace: 0.4 s pays 15% (18), 0.8 s pays 27.75% (33.3).
-    const hold = (from: number, n: number) => { for (let t = from; t < from + n; t++) repayHold(w, a, t); };
-    hold(20, 24);
-    expect(a.debt / MICRO).toBeCloseTo(102, 2);
-    hold(44, 24);
-    expect(a.debt / MICRO).toBeCloseTo(86.7, 2);
-    expect((a.mass - a.debt) / MICRO).toBeCloseTo(22.5, 6); // repaying never changes equity
+    // Held REPAY pays 1.5x own money a second, linear: (22.5 + 1.2 fees) x 1.5 / 60 = 0.5925 a tick
+    // (fees shrink with the loan, so a touch less). Red ends at debt 90 (HF 1.0): 51 ticks, 0.85 s.
+    let t = 20;
+    while (ring(a) === "red") repayHold(w, a, t++);
+    expect(t - 20).toBe(51);
+    expect(a.debt).toBeLessThanOrEqual(u(90));
+    expect(a.mass - a.debt).toBe(u(22.5)); // repaying never changes equity
     expect(w.pendingLog.filter((e) => e.type === "REPAY")).toHaveLength(0); // pending until release
-    expect(flushRepay(w, a, 68) / MICRO).toBeCloseTo(33.3, 2);
+    expect(flushRepay(w, a, t)).toBe(u(120) - a.debt);
     expect(w.pendingLog.filter((e) => e.type === "REPAY")).toHaveLength(1);
-    expect(Math.round(hfBps(a) / 10)).toBe(1008); // 1.01
     expect(ring(a)).toBe("yellow");
     expect(leak(w)).toBe(0);
   });
@@ -114,6 +113,16 @@ describe("BOOST (hold to nitro)", () => {
     expect(a.pendingBorrow).toBe(0);
     boostHold(w, a, 32); // borrowing again logs the open repayment first
     expect(w.pendingLog.map((e) => e.type)).toEqual(["BOOST", "REPAY"]);
+    expect(leak(w)).toBe(0);
+  });
+
+  it("a full-cap loan clears in 1 s of held REPAY", () => {
+    const a = makeBlob({ mass: u(200), debt: u(120) }); // equity 80: 2 units a tick
+    const w = makeWorld([a]);
+    let t = 1;
+    while (repayHold(w, a, t) > 0) t++;
+    expect(t - 1).toBe(60);
+    expect(a.debt).toBe(0);
     expect(leak(w)).toBe(0);
   });
 

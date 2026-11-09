@@ -42,7 +42,7 @@ function canStartCashout(w: World, b: Blob, tick: number): boolean {
   );
 }
 
-const REPAY_MIN_HOLD_T = T(C.R.REPAY_COOLDOWN_S);
+const REPAY_MIN_HOLD_T = T(C.R.REPAY_MIN_HOLD_S);
 const BOOST_MIN_HOLD_T = T(C.R.BOOST_MIN_HOLD_S);
 const BURST_COOLDOWN_T = T(C.R.BOOST_BURST_COOLDOWN_S);
 const SPUTTER_T = T(C.R.BOOST_EMPTY_SPUTTER_S);

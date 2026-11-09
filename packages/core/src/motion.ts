@@ -53,9 +53,9 @@ export function easeS(b: Blob, tick = 0): number {
 }
 
 /**
- * Ease velocity toward dir * speed, move by it, and keep the centre at least half the current
- * radius from every wall (agar.io): the body presses half its radius into the wall, where the
- * client flattens it, and never hangs outside.
+ * Ease velocity toward dir * speed, move by it, and keep the centre at least WALL_INSET x the
+ * current radius from every wall: only a thin slice (15% of the radius) presses past the wall
+ * line, where the client gently flattens it.
  */
 export function move(b: Blob, dtS: number, tick: number, arena: { w: number; h: number }): void {
   let { dirX, dirY } = b;
@@ -70,8 +70,8 @@ export function move(b: Blob, dtS: number, tick: number, arena: { w: number; h: 
   if (b.burst > 0) b.burst = b.burst * Math.exp(-dtS / R.BOOST_BURST_TAU_S) < 1 ? 0 : b.burst * Math.exp(-dtS / R.BOOST_BURST_TAU_S);
   b.vx += (dirX * s - b.vx) * k;
   b.vy += (dirY * s - b.vy) * k;
-  const mx = Math.min(radius(b.mass) / 2, arena.w / 2);
-  const my = Math.min(radius(b.mass) / 2, arena.h / 2);
+  const mx = Math.min(radius(b.mass) * R.WALL_INSET_RADII, arena.w / 2);
+  const my = Math.min(radius(b.mass) * R.WALL_INSET_RADII, arena.h / 2);
   b.x = Math.min(arena.w - mx, Math.max(mx, b.x + b.vx * dtS));
   b.y = Math.min(arena.h - my, Math.max(my, b.y + b.vy * dtS));
   // A wall stops you dead instead of letting speed build up against it.

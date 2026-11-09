@@ -127,16 +127,14 @@ export function flushRepay(w: World, b: Blob, tick: number): Micro {
 }
 
 /**
- * One tick of held REPAY: pays REPAY_HOLD_FRACTION of the current debt every REPAY_HOLD_WINDOW_S,
- * compounded per tick (about 40% a second), from mass, any ring. Same speed as perfect mashing of
- * the old 15% / 0.4 s tap, so holding is ergonomics, not balance. Pending until flushRepay, which
- * runs on release, at payoff, and before anything settle checks against the debt. Returns Micro repaid.
+ * One tick of held REPAY: pays REPAY_RATE x own money per second from mass (BOOST borrows 1x), so
+ * a full-cap loan clears in about 1 s, linear like the borrow. Any ring. Pending until flushRepay,
+ * which runs on release, at payoff, and before anything settle checks against the debt. Returns Micro repaid.
  */
 export function repayHold(w: World, b: Blob, tick: number): Micro {
   if (w.phase !== "LIVE" || b.state !== "alive" || b.kind === "drone" || b.debt === 0) return 0;
   if (b.pendingBorrow > 0) flushBoost(w, b, tick);
-  // A tiny debt would floor to 0 forever; take at least 1 Micro so a hold always finishes.
-  const paid = payDown(w, b, Math.max(1, Math.floor((b.debt * C.REPAY_HOLD_PPM_PER_TICK) / 1_000_000)));
+  const paid = payDown(w, b, Math.max(1, Math.floor((borrowBase(b) * C.REPAY_RATE_BPS) / (BPS * C.R.TICK_HZ))));
   b.pendingRepay += paid;
   if (b.debt === 0) flushRepay(w, b, tick);
   return paid;
