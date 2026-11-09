@@ -6,7 +6,7 @@ import { radius } from "./motion";
 import type { BlobView, FoodView, MatchView, RateTier, SpikeView } from "./protocol";
 import type { Blob, Food, Spike, World } from "./types";
 import { toUnits } from "./units";
-import { ranking } from "./world";
+import { ranking, spikeRadius } from "./world";
 
 /** What any client may see of one blob. */
 export function blobView(b: Blob, tick: number): BlobView {
@@ -41,7 +41,7 @@ export function foodView(f: Food): FoodView {
 
 /** Live spikes only; a consumed spike is invisible until it respawns. */
 export function spikeViews(w: World): SpikeView[] {
-  return w.spikes.filter((s: Spike) => s.respawnAt === null).map((s) => ({ id: s.id, x: s.x, y: s.y, big: s.big }));
+  return w.spikes.filter((s: Spike) => s.respawnAt === null).map((s) => ({ id: s.id, x: s.x, y: s.y, big: s.big, r: spikeRadius(s) }));
 }
 
 /** This blob's own interest drain in display units per second (the "-0.12/s" under the ring). */

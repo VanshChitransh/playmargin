@@ -2,7 +2,7 @@
 // Entry is charged only at GO (RULES: Warm-up), and every unit of mass at GO is backed by the pot.
 import * as C from "./constants";
 import { equity } from "./economy";
-import { playPoint, seedPellets } from "./food";
+import { playPoint, refillFood } from "./food";
 import { rand, randInt, seedRng } from "./rng";
 import type { Blob, Micro, Mode, PlayerSeed, Spike, World } from "./types";
 import { mulBps } from "./units";
@@ -23,7 +23,7 @@ const startMass = (mode: Mode): Micro => mulBps(entryFor(mode), C.START_MASS_BPS
 
 function newBlob(p: PlayerSeed, x: number, y: number, mass: Micro): Blob {
   return {
-    id: p.id, kind: p.kind, label: p.label, accountId: p.accountId, x, y, dirX: 0, dirY: 0,
+    id: p.id, kind: p.kind, label: p.label, accountId: p.accountId, x, y, dirX: 0, dirY: 0, vx: 0, vy: 0,
     mass, debt: 0, boostFees: 0, payout: 0, pendingBorrow: 0, boostUntil: 0,
     repayReadyAt: 0, shieldUntil: 0, spikeImmuneUntil: 0, redSince: null, lastThreatAt: -1e9,
     cashout: null, state: "alive", lastInput: null, lastInputAt: -1e9,
@@ -41,7 +41,7 @@ export function newWorld(seed: number, mode: Mode, players: PlayerSeed[], matchI
     reserve: 0, fees: 0, cashedOut: 0, ratePerMinBps: C.RATE_BASE_BPS,
     blobs: new Map(), food: [], spikes: [],
     zone: { cx: side / 2, cy: side / 2, r: Math.hypot(side, side) / 2, targetR: (side / 2) * C.R.ZONE_FINAL_RADIUS },
-    nextId: 1, pendingLog: [],
+    foodPool: 0, nextId: 1, pendingLog: [],
   };
   for (const p of players) addPlayer(w, p);
   return w;
@@ -81,7 +81,7 @@ function charge(w: World, b: Blob, tick: number): void {
   w.vault.budget += mulBps(entry, C.LEVERAGE_CAP_BPS - 10_000);
   b.mass = mass;
   w.pendingLog.push({ type: "CHARGE", tick, data: { blob: b.id, entry } });
-  seedPellets(w, entry - mass);
+  w.foodPool += entry - mass; // laid out as pellets by refillFood
 }
 
 function placeSpike(w: World, s: Spike): void {
@@ -111,6 +111,7 @@ export function startMatch(w: World, tick: number, ratePerMinBps: number = C.RAT
     const a = rot + (i / blobs.length) * Math.PI * 2;
     b.x = w.zone.cx + Math.cos(a) * ringR;
     b.y = w.zone.cy + Math.sin(a) * ringR;
+    b.vx = b.vy = 0; // respawned at GO: no warm-up momentum carries over
     b.shieldUntil = tick + shield;
     charge(w, b, tick);
   });
@@ -120,6 +121,7 @@ export function startMatch(w: World, tick: number, ratePerMinBps: number = C.RAT
     placeSpike(w, s);
     w.spikes.push(s);
   }
+  refillFood(w);
 }
 
 /** Respawn spikes whose 3 s are up, at the next seeded spot. */

@@ -31,7 +31,7 @@ describe("Judge Run", () => {
   it("only moves what the pot paid for: food rings the player, big spikes ring the final zone", () => {
     const w = judgeWorld();
     const you = w.blobs.get("you")!;
-    expect(w.food.reduce((s, f) => s + f.mass, 0)).toBe(Math.floor(w.pot * 0.2));
+    expect(w.food.reduce((s, f) => s + f.mass, w.foodPool)).toBe(Math.floor(w.pot * 0.2)); // on the map + still pooled
     for (const f of w.food) expect(Math.hypot(f.x - you.x, f.y - you.y)).toBeGreaterThan(radius(you.mass));
     const big = w.spikes.filter((s) => s.big);
     expect(big.length).toBeGreaterThanOrEqual(w.spikes.length / 2);

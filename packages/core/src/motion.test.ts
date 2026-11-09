@@ -1,14 +1,14 @@
 // C1 done-when: same seed gives the same sequence; distance per second is equal at 30 and 60 Hz.
 import { describe, expect, it } from "vitest";
 import { MICRO, R } from "./constants";
-import { blobSpeed, move, radius, speed, BASE_SPEED_PX_S } from "./motion";
+import { easeS, blobSpeed, move, radius, speed, BASE_SPEED_PX_S } from "./motion";
 import { rand, randInt, seedRng } from "./rng";
 import type { Blob } from "./types";
 import { mulBps, mulDiv, mulDivUp, toMicro, assertMicro } from "./units";
 
 function blob(over: Partial<Blob> = {}): Blob {
   return {
-    id: "a", kind: "human", label: "a", accountId: null, x: 500, y: 500, dirX: 1, dirY: 0,
+    id: "a", kind: "human", label: "a", accountId: null, x: 500, y: 500, dirX: 1, dirY: 0, vx: 0, vy: 0,
     mass: 80 * MICRO, debt: 0, boostFees: 0, payout: 0, lastInputAt: -1e9, pendingBorrow: 0, boostUntil: 0, repayReadyAt: 0,
     shieldUntil: 0, spikeImmuneUntil: 0, redSince: null, lastThreatAt: -1e9, cashout: null,
     state: "alive", lastInput: null, ...over,
@@ -58,20 +58,35 @@ describe("motion", () => {
   });
   it("distance per second is equal at 30 and 60 Hz", () => {
     const arena = { w: 1e6, h: 1e6 };
-    const b30 = blob({ dirX: 0.6, dirY: 0.8 });
-    const b60 = blob({ dirX: 0.6, dirY: 0.8 });
+    // Already cruising, so easing has nothing to close and only the tick rate differs.
+    const cruise = { dirX: 0.6, dirY: 0.8, vx: 0.6 * BASE_SPEED_PX_S, vy: 0.8 * BASE_SPEED_PX_S };
+    const b30 = blob(cruise);
+    const b60 = blob(cruise);
     for (let i = 0; i < 30; i++) move(b30, 1 / 30, i * 2, arena);
     for (let i = 0; i < 60; i++) move(b60, 1 / 60, i, arena);
     expect(b30.x).toBeCloseTo(b60.x, 6);
     expect(b30.y).toBeCloseTo(b60.y, 6);
     expect(Math.hypot(b60.x - 500, b60.y - 500)).toBeCloseTo(BASE_SPEED_PX_S, 6);
   });
+  it("eases: from rest a start blob reaches ~63% of its speed in easeS, and glides to a stop", () => {
+    const b = blob({ dirX: 1, dirY: 0 });
+    const t = easeS(b);
+    expect(t).toBeCloseTo(0.08 + radius(80 * MICRO) / 1000);
+    const ticks = Math.round(t * 60);
+    for (let i = 0; i < ticks; i++) move(b, 1 / 60, i, { w: 1e6, h: 1e6 });
+    expect(b.vx / BASE_SPEED_PX_S).toBeGreaterThan(0.6);
+    expect(b.vx / BASE_SPEED_PX_S).toBeLessThan(0.66);
+    expect(easeS(blob({ mass: 400 * MICRO }))).toBeGreaterThan(t); // big blobs are heavier
+    b.dirX = 0;
+    for (let i = 0; i < 60; i++) move(b, 1 / 60, 100 + i, { w: 1e6, h: 1e6 });
+    expect(b.vx).toBeLessThan(1);
+  });
   it("burst x1.5, cash-out x0.5, dir clamped, arena clamped", () => {
     const b = blob({ boostUntil: 60 });
     expect(blobSpeed(b, 59)).toBeCloseTo(BASE_SPEED_PX_S * R.BOOST_SPEED_MULT);
     expect(blobSpeed(b, 60)).toBeCloseTo(BASE_SPEED_PX_S);
     expect(blobSpeed(blob({ cashout: { startedAt: 0 } }), 0)).toBeCloseTo(BASE_SPEED_PX_S / 2);
-    const f = blob({ dirX: 50, dirY: 0 });
+    const f = blob({ dirX: 50, dirY: 0, vx: BASE_SPEED_PX_S });
     move(f, 1, 100, { w: 1e6, h: 1e6 });
     expect(f.x - 500).toBeCloseTo(BASE_SPEED_PX_S);
     const e = blob({ dirX: -1, dirY: Number.NaN });

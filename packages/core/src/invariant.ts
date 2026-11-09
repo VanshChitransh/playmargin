@@ -11,7 +11,7 @@ export function debtGap(w: World): number {
 
 /** Micro held minus Micro that entered the room; 0 when conserved. */
 export function leakOf(w: World): number {
-  let held = w.cashedOut + w.vault.repaid + w.vault.interest + w.fees + w.reserve;
+  let held = w.cashedOut + w.vault.repaid + w.vault.interest + w.fees + w.reserve + w.foodPool;
   for (const b of w.blobs.values()) {
     if (!Number.isSafeInteger(b.mass) || b.mass < 0) throw new Error(`bad mass on ${b.id}: ${b.mass}`);
     held += b.mass;

@@ -22,6 +22,9 @@ export interface Blob {
   y: number;
   dirX: number;
   dirY: number;
+  /** Current velocity in px/s: it eases toward dir * speed, so blobs accelerate and glide (agar feel). */
+  vx: number;
+  vy: number;
   mass: Micro;
   debt: Micro;
   /** Borrow fees paid on the open loan; added back when sizing BOOST so fees never shrink your limit (RULES worked check: a full hold borrows 120). */
@@ -105,6 +108,9 @@ export interface World {
   ratePerMinBps: number;
   blobs: Map<string, Blob>;
   food: Food[];
+  /** Interest and zone food not yet big enough for a whole pellet: dropped one pellet at a time so
+   *  the map never floods with crumbs. Part of the pot (invariant), paid out with the leftover. */
+  foodPool: Micro;
   spikes: Spike[];
   zone: Zone;
   nextId: number;

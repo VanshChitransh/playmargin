@@ -7,7 +7,7 @@ import type { Blob, World } from "./types";
 /** A live, unshielded human at (500, 500) with 80 mass and a full BOOST tank. */
 export function makeBlob(over: Partial<Blob> = {}): Blob {
   return {
-    id: "a", kind: "human", label: "a", accountId: null, x: 500, y: 500, dirX: 0, dirY: 0,
+    id: "a", kind: "human", label: "a", accountId: null, x: 500, y: 500, dirX: 0, dirY: 0, vx: 0, vy: 0,
     mass: 80 * MICRO, debt: 0, boostFees: 0, payout: 0, pendingBorrow: 0,
     boostUntil: 0, repayReadyAt: 0, shieldUntil: 0, spikeImmuneUntil: 0, redSince: null,
     lastThreatAt: -1e9, cashout: null, state: "alive", lastInput: null, lastInputAt: -1e9,
@@ -25,7 +25,7 @@ export function makeWorld(blobs: Blob[], over: Partial<World> = {}): World {
     vault: { budget: Math.floor(pot * 1.5) + lent, lent, repaid: 0, interest: 0, badDebt: 0 },
     reserve: 0, fees: 0, cashedOut: 0, ratePerMinBps: 600,
     blobs: new Map(blobs.map((b) => [b.id, b])), food: [], spikes: [],
-    zone: { cx: 1000, cy: 1000, r: 1400, targetR: 1400 }, nextId: 1, pendingLog: [],
+    zone: { cx: 1000, cy: 1000, r: 1400, targetR: 1400 }, foodPool: 0, nextId: 1, pendingLog: [],
     ...over,
   };
 }
