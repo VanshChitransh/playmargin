@@ -2,7 +2,7 @@
 // patch into a plain Frame snapshot, and exposes my private "owe" and the event stream.
 // The server is the only authority; this file never computes game state.
 import { Client, type Room } from "@colyseus/sdk";
-import { R, SPIKE_RADIUS, TICK_MS, type BlobView, type GameEventMsg, type InputCmd, type JoinOpts, type MatchView, type Phase, type RateTier, type Ring } from "@margin/core";
+import { R, TICK_MS, type BlobView, type GameEventMsg, type InputCmd, type JoinOpts, type MatchView, type Phase, type RateTier, type Ring } from "@margin/core";
 import type { Frame } from "../game/frame";
 import { SnapshotBuffer } from "./interp";
 
@@ -145,7 +145,7 @@ export class MatchConnection {
     // The schema sends core hitbox radii (S2 b784118); older servers sent a mass radius, so fall back.
     s.food.forEach((f, k) => food.push({ id: Number(k), x: f.x, y: f.y, r: f.radius >= R.FOOD_RADIUS_PX ? f.radius : R.FOOD_RADIUS_PX }));
     const spikes: Frame["spikes"] = [];
-    s.spikes.forEach((p, k) => p.live && spikes.push({ id: Number(k), x: p.x, y: p.y, big: p.big, r: p.radius || SPIKE_RADIUS }));
+    s.spikes.forEach((p, k) => p.live && spikes.push({ id: Number(k), x: p.x, y: p.y, big: p.big, r: p.radius || (p.big ? R.SPIKE_RADIUS_BIG_PX : R.SPIKE_RADIUS_SMALL_PX) }));
     const leaderboard: string[] = [];
     s.leaderboard.forEach((id) => leaderboard.push(id));
     const arena = { w: s.arenaW || 2000, h: s.arenaH || 2000 };
