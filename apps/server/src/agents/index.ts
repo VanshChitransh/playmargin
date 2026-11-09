@@ -1,10 +1,12 @@
 // The Brain hook for the room (S2): one brain per agent blob, asked for an InputCmd every tick
 // before core.step. Brains throttle themselves and emit each tap for exactly one tick.
 import type { Blob, Brain } from "@margin/core";
+import { Drone } from "./drone";
 import { FreeBot } from "./freebot";
 
 export { agentView, VIEW_R } from "./view";
 export { FreeBot, type Personality } from "./freebot";
+export { Drone } from "./drone";
 
 /** Stable 32-bit hash so a blob id plus the match seed always makes the same bot. */
 function hashId(id: string): number {
@@ -13,9 +15,10 @@ function hashId(id: string): number {
   return h >>> 0;
 }
 
-/** Brain for an agent blob, or null for humans (and drones until A2). */
+/** Brain for an agent or drone blob, or null for humans. */
 export function createBrain(blob: Blob, matchSeed: number): Brain | null {
   const seed = (matchSeed ^ hashId(blob.id)) >>> 0;
   if (blob.kind === "agent") return new FreeBot(seed);
+  if (blob.kind === "drone") return new Drone(seed);
   return null;
 }
