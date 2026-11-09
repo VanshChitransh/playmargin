@@ -215,10 +215,19 @@ export class Hud {
     };
     // Rows are keyed by blob id and placed with translateY, so a rank change slides the
     // same element (CSS transition) instead of re-creating it. Rows are opaque and the one
-    // climbing rides on top, so two rows swapping never show text through each other; a new
-    // entrant fades in instead of popping onto the row sliding out of its slot.
+    // climbing rides on top, so two rows swapping never show text through each other. Only a
+    // small reorder slides: when someone enters or leaves (popped, cashed, overtaken) every row
+    // snaps to its slot at once, so a vacated slot never shows as a blank row mid-slide.
     const lb = this.q("lb");
     const keep = new Set<string>();
+    const had = [...lb.querySelectorAll<HTMLElement>("li")].map((li) => li.dataset.id).sort().join();
+    // A row jumping two or more slots also opens a half-row hole mid-slide, so only one-slot
+    // swaps animate (two rows trading places always cover both slots).
+    const jump = top.some((b, i) => {
+      const at = lb.querySelector<HTMLElement>(`[data-id="${b.id}"]`)?.dataset.i;
+      return at !== undefined && Math.abs(Number(at) - i) > 1;
+    });
+    const snap = jump || had !== top.map((b) => b.id).sort().join();
     top.forEach((b, i) => {
       keep.add(b.id);
       let li = lb.querySelector<HTMLElement>(`[data-id="${b.id}"]`);
@@ -226,11 +235,10 @@ export class Hud {
         li = document.createElement("li");
         li.dataset.id = b.id;
         li.className = "bg-navy";
-        li.style.cssText = `position:absolute;left:8px;right:8px;top:8px;height:${ROW_PX}px;transition:transform 250ms ease,opacity 250ms ease;opacity:0`;
-        li.style.transform = `translateY(${i * ROW_PX}px)`;
+        li.style.cssText = `position:absolute;left:8px;right:8px;top:8px;height:${ROW_PX}px`;
         lb.appendChild(li);
-        requestAnimationFrame(() => li && (li.style.opacity = "1"));
       }
+      li.style.transition = snap ? "none" : "transform 250ms ease";
       const was = Number(li.dataset.i ?? i);
       li.style.zIndex = i < was ? "2" : "1";
       li.dataset.i = String(i);
