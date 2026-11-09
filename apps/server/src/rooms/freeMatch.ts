@@ -1,6 +1,6 @@
-// Credits side of a free match: admit at join, charge the entry at GO (never earlier, so
-// leaving during warm-up is free), pay out at the end. Agents never touch the ledger.
-import { ENTRY_FREE_MICRO, type Micro, type SettleResult } from "@margin/core";
+// Credits side of a free match: admit at join and charge the entry at GO (never earlier, so
+// leaving during warm-up is free). Payouts go through CreditsSettlement. Agents never touch the ledger.
+import { ENTRY_FREE_MICRO } from "@margin/core";
 import { creditsRepo, isGuestKey, topUpDaily } from "../credits";
 import { userForGuestKey, type Db } from "../db";
 
@@ -20,17 +20,4 @@ export function chargeEntry(db: Db, userId: string, matchId: string): boolean {
   if (repo.balance(userId) < ENTRY_FREE_MICRO) return false;
   repo.append({ userId, delta: -ENTRY_FREE_MICRO, reason: "entry", matchId });
   return true;
-}
-
-/** Credit each human's settled payout (from settle(log), never from live state). Returns the total. */
-export function payFromSettle(db: Db, users: Map<string, string>, result: SettleResult, matchId: string): Micro {
-  const repo = creditsRepo(db);
-  let total = 0;
-  for (const p of result.payouts) {
-    const userId = users.get(p.id);
-    if (!userId || p.amount <= 0) continue;
-    repo.append({ userId, delta: p.amount, reason: "payout", matchId });
-    total += p.amount;
-  }
-  return total;
 }

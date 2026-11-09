@@ -23,9 +23,10 @@ import {
 } from "@margin/core";
 import { agentView, createBrain } from "../agents";
 import { sharedDb } from "../db";
-import { admitFree, chargeEntry, payFromSettle } from "./freeMatch";
+import { settlementFor } from "../settlement";
+import { admitFree, chargeEntry } from "./freeMatch";
 import { InputQueue } from "./input";
-import { MatchLog } from "./matchLog";
+import { MatchRecord } from "./matchRecord";
 import { agentFill, parseRoomKey, warmupNext, type RoomKey } from "./lobby";
 import { MatchState, syncState } from "./schema";
 
@@ -36,6 +37,7 @@ const LATE_JOIN_TICKS = sToTicks(R.LATE_JOIN_S);
 /** Results stay on screen this long before the room closes. */
 const ENDED_HOLD_TICKS = sToTicks(5);
 const MAX_CATCHUP_TICKS = 10;
+const LOG_FLUSH_TICKS = sToTicks(5);
 
 /** Set when SIGTERM arrives: no new matches start while LIVE ones finish (drain deploys). */
 export const drain = { on: false };
@@ -53,7 +55,7 @@ export class MatchRoom extends Room {
   private readonly seed = randomInt(2 ** 31);
   /** Warm-up world for ghosts; replaced at GO by one sized for the final head count. */
   private world!: World;
-  private log = new MatchLog();
+  private log!: MatchRecord;
   private settled = false;
   private inputs = new InputQueue();
   /** Agent seats only (humans get null from createBrain and are never stored). */
@@ -76,6 +78,8 @@ export class MatchRoom extends Room {
     if (this.roomName === "private" && !this.key.roomCode) throw new Error("private room needs a 4-letter roomCode");
     if (this.roomName !== "private") this.key.roomCode = null;
     this.world = newWorld(this.seed, this.key.mode, [], this.roomId);
+    const db = sharedDb();
+    this.log = new MatchRecord(db, this.roomId, this.key.mode, settlementFor(this.key.mode, db, this.users));
     this.state.mode = this.key.mode;
     this.onMessage("input", (client, msg: unknown) => this.inputs.push(client.sessionId, msg, Date.now()));
     this.onMessage("startNow", () => (this.startNow = true));
@@ -109,6 +113,7 @@ export class MatchRoom extends Room {
         return;
       }
       addPlayer(this.world, p, this.roomTick);
+      this.log.seat(auth, id);
     } else {
       addPlayer(this.world, p);
     }
@@ -176,6 +181,7 @@ export class MatchRoom extends Room {
         break;
       case "LIVE":
         this.log.drain(w);
+        if (this.phaseTick % LOG_FLUSH_TICKS === 0) this.log.flush();
         if (this.key.mode === "free" && this.phaseTick === LATE_JOIN_TICKS) void this.lock();
         if (w.phase === "ENDED") {
           this.enter("ENDED", false); // core already sent the ENDED phase event
@@ -216,19 +222,13 @@ export class MatchRoom extends Room {
     this.autoDispose = false;
     if (this.key.mode === "free") void this.unlock(); // late joins for 15 s
     this.log.drain(this.world);
+    this.log.open(this.world, this.seed, this.users);
     this.enter("LIVE");
   }
 
-  /** Pay from the replayed log only; on any mismatch the match stays unpaid and loud. */
   private async settle(): Promise<void> {
-    try {
-      const result = await this.log.settle(this.world);
-      if (this.key.mode === "free") payFromSettle(sharedDb(), this.users, result, this.roomId);
-    } catch (err) {
-      console.error(`[settle] ${this.roomId} refused:`, err);
-    } finally {
-      this.settled = true;
-    }
+    await this.log.settle(this.world);
+    this.settled = true;
   }
 
   private enter(phase: Phase, announce = true): void {
