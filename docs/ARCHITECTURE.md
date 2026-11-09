@@ -99,7 +99,7 @@ LIVE matches finish and settle first, and systemd waits up to 120 s.
   check therefore always holds. This is tested on 2,000 random splits.
 - **Bad debt.** It is capped at 10% of the match budget. Anything above that is repaid to the vault
   out of the largest payouts.
-- **Drone bounties.** Drones have no account, so their bounties go to the reserve.
+- **Drone bounties.** Each drone settles to its registered account `drone-N.<contract>` once `is_agent` is true (otherwise the bounty goes to the reserve). The drones' total is clamped to 12% of the stakes, the contract's cap, with any excess to the reserve.
 - **No survivors.** If nobody survives, the leftover pot goes to the vault.
 
 ### Trust boundaries

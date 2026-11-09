@@ -53,7 +53,7 @@ Spikes knock mass off (harder the more you borrowed), a zone shrinks in the last
 blobs eat smaller ones. The full rulebook is mirrored as constants in
 [`packages/core/src/constants.ts`](packages/core/src/constants.ts).
 
-**The thesis, measured.** In a 300-match sim with one greedy player who holds BOOST to the cap
+**The thesis, measured.** In a 900-match sim with one greedy player who holds BOOST to the cap
 (`npm run sweep`), the greedy player is liquidated in about 57% to 79% of matches, while a careful
 newcomer who never borrows survives about 67% of matches and finishes at median rank 4 of 12
 (`npx tsx tools/sim/human.ts`). Safe play survives. Greed gets liquidated.
@@ -65,7 +65,9 @@ newcomer who never borrows survives about 67% of matches and finishes at median 
   (`packages/core/src/step.ts`, `settle.ts`). Their skill is one tuned constant
   (`apps/server/src/agents/freebot.ts`, `AGENT_SKILL`).
 - **Paid rooms:** humans only, plus liquidator drones that cannot eat anyone. They only pop blobs
-  that are already red (`apps/server/src/agents/drone.ts`).
+  that are already red (`apps/server/src/agents/drone.ts`). Each drone is its own NEAR account
+  (`drone-1.playmargin.testnet`) and its bounties settle to it on chain, so the house's AI earnings are
+  public.
 - **The commander:** every 15 s an LLM on NEAR AI Cloud retunes the agents and its one-line reason is
   shown to spectators. It never touches money or positions (`apps/server/src/agents/commander.ts`).
 
@@ -82,6 +84,7 @@ Every feature, why it is there, the code, and a testnet transaction: [`docs/NEAR
 | NEAR Intents 1-Click | Add funds from any chain, credited as USDC on NEAR | dry quotes until mainnet (Intents has no testnet) |
 | Hourly Merkle anchors | Free matches anchored as one root per hour | [anchor tx](https://testnet.nearblocks.io/txns/B87qTFs8NSDUuAkhD1TUyCnBuKR7Z9abR8j1CVjcgNeY) |
 | NEAR AI Cloud | The agent commander, structured JSON output | `apps/server/src/agents/commander.ts` |
+| Named accounts for house AI | Each liquidator drone is a registered sub-account. Its bounties settle to it on chain, at most 12% of a match's stakes, so its P&L is public | [drone-1](https://testnet.nearblocks.io/address/drone-1.playmargin.testnet) paid [0.0925 USDC](https://testnet.nearblocks.io/txns/8nDTHu1ZmeW19fSEaa9LoXtrUtdSsEALwVJWdNfpuWwf) in a real match ([registration](https://testnet.nearblocks.io/txns/4eH66oURfLpz9FXafY8Y7QWb3LpRx6kQCwq46yghdgy2)) |
 
 ### Proof it works
 
@@ -93,14 +96,20 @@ Every feature, why it is there, the code, and a testnet transaction: [`docs/NEAR
   a human in the first 30 s).
 - **Anyone can verify a match.** The Verify page replays the log in the browser with the same code
   as the server and shows the exact event if anything was changed (`apps/client/src/screens/verify.ts`).
-- **Tests:** 200 TypeScript tests (`npm test`) and 41 contract tests (`cargo test`, 3 in near-sandbox).
-- **Load:** 50 rooms of 12 on one server at 0.17 ms of CPU per room tick (`npm run soak`).
+- **Tests:** 222 TypeScript tests (`npm test`) and 52 contract tests (`cargo test`, 3 in near-sandbox).
+- **Load:** 50 rooms of 12 on one server at 0.12 ms of CPU per room tick (`npm run soak`).
 
 ### Honest status
 
 - **Testnet today.** Mainnet deploy planned for 12 or 13 Nov by the runbook in
   `tools/scripts/MAINNET-RUNBOOK.md`, with real USDC at a small stake.
-- **Agent wallets are planned, not built.** Agents are labelled in game but have no NEAR account yet.
+- **Drone wallets are live on testnet.** The liquidator drones are registered NEAR accounts
+  (`drone-1..3.playmargin.testnet`, owner-only `set_agents`). Settle pays them their bounties, capped
+  by the contract at 12% of a match's stakes: [drone-1 earned 0.0925 USDC](https://testnet.nearblocks.io/txns/8nDTHu1ZmeW19fSEaa9LoXtrUtdSsEALwVJWdNfpuWwf) and
+  [0.0913 USDC](https://testnet.nearblocks.io/txns/41tkSWiySoUYk1kJ3eJrpBtVMJDdTMbxzDipBnwfBHnf) in two real paid matches. Its balance in the contract is the sum,
+  0.183805 USDC (`balance_of("drone-1.playmargin.testnet")`), withdrawable only with the drone's own
+  full key. Free-room agent
+  players play for credits and have no account.
 - **NEAR Auth email login** is built behind a flag and waits on NEAR's mainnet approval.
 - **Traction:** TODO(Vansh) fill from `/api/stats` after launch (users, matches, share of matches with
   2 or more humans, agent liquidations).
@@ -115,8 +124,7 @@ play, none used loans or liquidation as the core loop, and none used Intents ins
 
 ### Roadmap, team, credits
 
-- Roadmap: leagues, clans with Sputnik DAO treasuries, agent wallets with public P&L, bring your own
-  agent. TODO(Vansh): link the public roadmap.
+- Roadmap: leagues, clans with Sputnik DAO treasuries, bring your own agent. TODO(Vansh): link the public roadmap.
 - Team: TODO(Vansh).
 - Third-party code and licences: [`docs/CREDITS.md`](docs/CREDITS.md). Architecture:
   [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
@@ -175,16 +183,16 @@ the room fills with labelled AI agents (🤖).
 | 1 | `npm run demo` | A narrated paid match: BOOSTs (loans), eats, two players liquidated by Drone-2 (20.6 s and 54.5 s), one of them escaping red once with REPAY first, payouts and the drones' bounties, then `0 micro-units created or destroyed` and `settle == live` |
 | 1b | `npm run e2e:local` | The strongest end-to-end proof: boots the real game server with a fresh database, two network clients play a full free match, then it checks the match settled, the credit ledger is exact for both players, and replaying the served log gives exactly the stored payouts. Ends with `E2E OK` (about 35 s). On the way it prints one expected error, `you are already in this match`: that is the test proving the server refuses a second seat for the same player |
 | 2 | `npm run sim -- --matches 500` | 500 full matches (2,940,000 ticks, about 177,000 logged money events) with the conservation check every tick, every hash chain verified, `0 micro-units created or destroyed` and `settle == live in 500/500` (1 to 3 minutes) |
-| 3 | `npm test` | The whole TypeScript suite passes: 200 tests in 42 files (engine, settle, bots, server, client logic), about 15 s |
-| 4 | `cd contracts/margin && cargo test` | 38 contract unit tests and 3 near-sandbox integration tests pass. Slow: about 7 minutes, most of it downloading and running near-sandbox |
+| 3 | `npm test` | The whole TypeScript suite passes: 222 tests in 44 files (engine, settle, bots, server, client logic), about 15 s |
+| 4 | `cd contracts/margin && cargo test` | 49 contract unit tests and 3 near-sandbox integration tests pass. Slow: about 7 minutes, most of it downloading and running near-sandbox |
 | 5 | `npm run dev`, open http://localhost:1234, press **Practice free** | A 90 s match: steer with the mouse, hold Space = BOOST (borrow, like nitro: the fuel ring empties as you borrow), hold R = REPAY, E = cash out. Watch your ring go green, yellow, red |
 | 6 | Hold BOOST until the fuel ring is empty, then run into a big spike | Your ring turns red. Within a moment a blob or a drone touches you: "LIQUIDATED", and your receipt shows what the vault took back |
 | 7 | After any match, open the receipt's Verify link (`/#/verify/<id>`) | The browser replays the log with the same code as the server, checks every hash, and shows settle == what you were paid. Press "Tamper" and the exact broken event turns red |
 | 8 | Open `/#/judge` | Judge Run: a published seed (20261114), normal rules, Drone-1 hunting red blobs. Most first-timers get greedy |
 | 9 | `npm run sweep -- 300` | The balance table behind the rules, for the shipped settings: a greedy player holds BOOST to the cap in every match. Measured: 0.74 to 0.93 liquidations per match, the greedy player popped in 57% (practised) to 79% (first-timer) of matches. A few minutes |
 | 9b | `npx tsx tools/sim/human.ts 60` | Can a newcomer win? A careful never-BOOST newcomer bot against 11 agents: measured median rank 4 of 12, top 3 in about 35%, survives about 67% |
-| 9c | `npx tsx tools/sim/contacts.ts 40` | Do players meet on the big map? Rooms of 12 agents and no human: about 17 contacts per minute, a typical player's first contact at about 3.5 s. Liquidations here are rare (about 0.1 per match) because agents borrow carefully: greed is what brings liquidations (row 9) |
-| 10 | `npm run soak -- --rooms 50` | 50 rooms of 12 on the real server for one full match (about 100 s at any room count): CPU per room tick and match length under load. Measured 0.17 ms per room tick at 50 rooms and 0.23 ms at 10 (budget 4 ms), every match 90 s |
+| 9c | `npx tsx tools/sim/contacts.ts 40` | Do players meet? Rooms of 12 agents and no human: about 17 contacts per minute, a typical player's first contact at about 3.5 s. Liquidations here are rare (about 0.1 per match) because agents borrow carefully: greed is what brings liquidations (row 9) |
+| 10 | `npm run soak -- --rooms 50` | 50 rooms of 12 on the real server for one full match (about 100 s at any room count): CPU per room tick and match length under load. Measured 0.12 ms per room tick at 50 rooms and 0.24 ms at 10 (budget 4 ms). Matches last 90 s at 10 rooms and 92 to 93 s of wall time at 50 |
 | 11 | Put `NEAR_AI_API_KEY` in `.env`, then `npm run commander` (without a key it prints one line saying so and exits normally) | One live match with the AI commander on NEAR AI Cloud. Each new plan prints with its one-line rationale |
 
 ### 3. What needs keys
@@ -241,6 +249,7 @@ USDC. Free matches are anchored hourly as one Merkle root on NEAR.
 | NEAR Auth email login | `apps/client/src/chain/email.ts`, `services/relayer/fastauth.ts` |
 | NEAR Intents 1-Click: Add funds from any chain, settled as USDC on NEAR | `services/relayer/oneclick.ts`, `apps/client/src/chain/addfunds.ts` |
 | Named sub-accounts (`settler.`, `relayer.`, `usdc.playmargin.testnet`) | `tools/scripts/keys.ts`, `tools/scripts/deploy.ts` |
+| House AI drones as registered accounts (`drone-N.playmargin.testnet`, owner-only `set_agents`, payouts capped at 12% of stakes) | `contracts/margin/src/lib.rs` (`set_agents`), `arena.rs` (cap), `tools/scripts/drones.ts`, `apps/server/src/settlement/toSettleArgs.ts` |
 | On-chain anchors: paid match heads in `settle`, free matches as an hourly Merkle root | `contracts/margin/src/arena.rs` (`anchor`), `apps/server/src/anchor/job.ts` |
 | NEAR AI Cloud (OpenAI-compatible, structured JSON output) | `apps/server/src/agents/commander.ts` |
 
