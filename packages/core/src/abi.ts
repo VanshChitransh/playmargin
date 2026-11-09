@@ -9,21 +9,37 @@ export interface EnterArgs {
   stake: U128;
 }
 
+/** open_match (settler, at GO): assigns these players' tickets and reserves budget = 1.5 x stakes. */
+export interface OpenMatchArgs {
+  match_id: string;
+  players: string[];
+}
+
+/**
+ * settle (settler only). Matches contracts/margin/src/arena.rs: the contract asserts
+ * sum(payouts) + vault_repaid + interest_to_vault + reserve == stakes + budget and
+ * vault_repaid <= budget. Build it with toSettleArgs, never by hand.
+ */
 export interface SettleArgs {
   match_id: string;
   /** [account_id, amount] pairs. */
   payouts: Array<[string, U128]>;
-  /** Principal the vault lent in this match; must be <= the budget reserved at open. */
-  lent: U128;
+  /** Principal back plus the unused budget (budget - lent + repaid); less than budget only on bad debt. */
   vault_repaid: U128;
+  /** Interest plus the vault share of borrow fees. */
   interest_to_vault: U128;
-  /** Vault share of borrow fees (the rest is inside reserve). */
-  fees: U128;
+  /** Reserve share plus Micro-to-USDC rounding dust. */
   reserve: U128;
-  /** Head is the settler-signed anchor: the contract asserts
-   *  sum(payouts) + vault_repaid + interest_to_vault + fees + reserve == stakes + lent. */
   seq: number;
   head: string;
+}
+
+/** reclaim (player, 15 min after an unsettled match): no args. */
+export type ReclaimArgs = Record<string, never>;
+
+/** refund_ticket (settler): an unassigned or no-show ticket. */
+export interface RefundTicketArgs {
+  account_id: string;
 }
 
 export interface AnchorArgs {

@@ -19,3 +19,4 @@ export * from "./log";
 export * from "./settle";
 export * from "./scenario";
 export * from "./merkle";
+export * from "./settleargs";
