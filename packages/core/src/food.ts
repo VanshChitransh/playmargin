@@ -12,15 +12,18 @@ function clampToArena(w: World, x: number, y: number): [number, number] {
   return [Math.min(w.arena.w, Math.max(0, x)), Math.min(w.arena.h, Math.max(0, y))];
 }
 
-/** Split amount into food pieces around (x, y) within spread px. Exact: pieces sum to amount. */
-export function scatterFood(w: World, amount: Micro, x: number, y: number, spread: number): void {
+/**
+ * Split amount into food pieces in a ring around (x, y): from minR to minR + spread px.
+ * Exact: pieces sum to amount. minR keeps shards out from under the blob that lost them.
+ */
+export function scatterFood(w: World, amount: Micro, x: number, y: number, spread: number, minR = 0): void {
   if (amount <= 0) return;
   const n = Math.max(1, Math.min(MAX_PIECES, Math.floor(amount / PIECE)));
   const each = Math.floor(amount / n);
   for (let i = 0; i < n; i++) {
     const m = i === n - 1 ? amount - each * (n - 1) : each;
     const a = rand(w) * Math.PI * 2;
-    const d = rand(w) * spread;
+    const d = minR + rand(w) * spread;
     const [fx, fy] = clampToArena(w, x + Math.cos(a) * d, y + Math.sin(a) * d);
     w.food.push({ id: w.nextId++, x: fx, y: fy, mass: m });
   }

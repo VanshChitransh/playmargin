@@ -153,7 +153,8 @@ export function spikeDamage(b: Blob, big: boolean): Micro {
 /** Apply a spike hit; shards scatter as food around the blob. Returns Micro lost. */
 export function hitSpike(w: World, b: Blob, spikeId: number, big: boolean, tick: number): Micro {
   const damage = takeMass(b, spikeDamage(b, big));
-  scatterFood(w, damage, b.x, b.y, radius(b.mass) * 2 + 40);
+  // Shards land outside the blob, or it would eat its own damage back the same tick.
+  scatterFood(w, damage, b.x, b.y, radius(b.mass) + 40, radius(b.mass) + 12);
   w.pendingLog.push({ type: "SPIKE", tick, data: { blob: b.id, spike: spikeId, damage } });
   return damage;
 }
@@ -226,7 +227,8 @@ export function eat(w: World, eater: Blob, victim: Blob, tick: number): Micro {
   w.vault.repaid += debtRepaid;
   w.vault.badDebt += badDebt;
   eater.mass += gained;
-  scatterFood(w, scattered, victim.x, victim.y, radius(victim.mass));
+  // The 30% must really scatter: outside the eater, or feeding a teammate would cost nothing.
+  scatterFood(w, scattered, eater.x, eater.y, radius(victim.mass) + 40, radius(eater.mass) + 12);
   closeBlob(victim);
   victim.state = "popped";
   w.pendingLog.push({ type: "EAT", tick, data: { by: eater.id, victim: victim.id, debtRepaid, badDebt, gained, scattered } });

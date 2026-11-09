@@ -92,6 +92,25 @@ describe("step", () => {
     expect(red.mass).toBe(u(301));
   });
 
+  it("eat scatter lands outside the eater: the 30% is not swallowed back", () => {
+    const a = makeBlob({ mass: u(200) });
+    const v = makeBlob({ id: "v", mass: u(100), x: 510 });
+    const w = makeWorld([a, v]);
+    step(w, new Map(), 1);
+    expect(v.state).toBe("popped");
+    expect(a.mass).toBe(u(270));
+    expect(w.food.reduce((s, f) => s + f.mass, 0)).toBe(u(30));
+  });
+
+  it("spike shards land outside the blob that lost them", () => {
+    const a = makeBlob({ mass: u(200) });
+    const w = makeWorld([a]);
+    w.spikes.push({ id: 1, x: 505, y: 500, big: true, respawnAt: null });
+    step(w, new Map(), 1);
+    expect(a.mass).toBe(u(160));
+    expect(w.food.reduce((s, f) => s + f.mass, 0)).toBe(u(40));
+  });
+
   it("held input expires after 250 ms (no stuck BOOST or steering)", () => {
     const a = makeBlob();
     const w = makeWorld([a]);
