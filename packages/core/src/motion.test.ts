@@ -101,6 +101,10 @@ describe("motion", () => {
     expect(e.x).toBe(500);
     const w = blob({ dirX: -1, dirY: 0 });
     move(w, 10, 100, { w: 1000, h: 1000 });
-    expect(w.x).toBe(0);
+    expect(w.x).toBe(radius(w.mass) / 2); // centre stops half a radius from the wall
+    expect(w.vx).toBe(0);
+    const big = blob({ mass: 5000 * MICRO, x: 990, y: 990, dirX: 1, dirY: 1 });
+    move(big, 1, 100, { w: 1000, h: 1000 });
+    expect([big.x, big.y]).toEqual([1000 - radius(big.mass) / 2, 1000 - radius(big.mass) / 2]); // corner
   });
 });
