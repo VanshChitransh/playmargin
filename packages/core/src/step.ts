@@ -48,7 +48,8 @@ function applyInputs(w: World, inputs: Map<string, InputCmd>, tick: number, ev: 
     if (!b || b.state !== "alive") continue;
     b.lastInput = cmd;
     b.lastInputAt = tick;
-    if (w.phase !== "LIVE") continue;
+    // Drones hold no stake: they only steer, so BOOST, REPAY and cash-out never apply to them.
+    if (w.phase !== "LIVE" || b.kind === "drone") continue;
     if (cmd.boost) {
       const amt = boostTap(w, b, tick);
       if (amt > 0) ev.push({ type: "boost", blob: b.id, amount: toUnits(amt) });

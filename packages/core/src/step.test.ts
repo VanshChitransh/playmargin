@@ -66,6 +66,16 @@ describe("step", () => {
     expect(w.vault.budget).toBe(4 * 150 * MICRO);
   });
 
+  it("a drone holding bounty mass can't BOOST, REPAY or cash out (settle would refuse it)", () => {
+    const drone = makeBlob({ id: "d", kind: "drone", mass: u(30), x: 100 });
+    const w = makeWorld([drone, makeBlob({ id: "p" })]);
+    const t = w.goTick + sToTicks(50);
+    step(w, new Map([["d", { seq: 1, dirX: 1, dirY: 0, boost: true, repay: false, cashout: true }]]), t);
+    expect(drone.debt).toBe(0);
+    expect(drone.cashout).toBeNull();
+    expect(w.pendingLog.some((e) => e.type === "BOOST")).toBe(false);
+  });
+
   it("pops resolve before eats: a big red blob is popped by the small toucher", () => {
     // Red (HF 0.923) and past the 300 ms grace; the small blob sits inside it.
     const red = makeBlob({ id: "red", mass: u(300), debt: u(260), redSince: -100 });
