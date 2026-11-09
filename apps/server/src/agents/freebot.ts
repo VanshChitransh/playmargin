@@ -19,8 +19,9 @@ export interface Personality {
 
 /** Global free-room agent skill (later per league). Tuned with tools/sim/human.ts. */
 export const AGENT_SKILL = 0.5;
-/** Agents leave humans alone for the first 20 s: a first-timer gets to find their feet. */
-const HUMAN_GRACE_T = sToTicks(20);
+/** The engine bars agents from eating humans this early; agents also don't BOOST before it, so their
+ *  early growth matches a human who has not found BOOST yet. */
+const HUMAN_SAFE_T = sToTicks(R.AGENT_NO_EAT_HUMAN_S);
 const CASHOUT_OPEN_T = sToTicks(R.CASHOUT_OPEN_S);
 const CASHOUT_CLOSE_T = sToTicks(R.CASHOUT_CLOSE_S);
 const CHASE_RANGE = 450;
@@ -35,6 +36,9 @@ export class FreeBot implements Brain {
   private held: { x: number; y: number } = { x: 0, y: 0 };
   /** BOOST is held from one decision to the next (200 to 400 ms of nitro), like a held key. */
   private boosting = false;
+  /** This decision, may a smaller human be prey? Otherwise the bot steers around humans, so it
+   *  never eats one by drifting into it while chasing food. */
+  private huntHumans = false;
   private liveSince: number | null = null;
   private startEquity = 0;
   readonly personality: Personality;
@@ -64,7 +68,9 @@ export class FreeBot implements Brain {
     this.nextAt = tick + minT + Math.floor(rand(this.rng) * (maxT - minT + 1));
 
     const t0 = this.liveSince === null ? 0 : tick - this.liveSince;
-    let { dir, prey } = this.field(v, tick, t0);
+    // An agent hunts humans only by choice, after 30 s, on some decisions (fewer at lower skill).
+    this.huntHumans = v.self.kind !== "agent" || (t0 >= HUMAN_SAFE_T && rand(this.rng) < 0.5 * this.personality.skill);
+    let { dir, prey } = this.field(v, tick);
     // Less skill: sometimes wander or let prey go, and aim with noise, like a human on a touchpad.
     if (rand(this.rng) < 0.35 * slow) {
       dir = { x: randRange(this.rng, -1, 1), y: randRange(this.rng, -1, 1) };
@@ -87,7 +93,7 @@ export class FreeBot implements Brain {
     const appetiteBps = 10_000 + Math.round(this.personality.greed * 15_000);
     // Careful bots deleverage at once; reckless ones hesitate, as panicking humans do.
     if (state !== "green" && me.debt > 0 && rand(this.rng) < 0.3 + 0.6 * Math.min(1, this.personality.caution)) cmd.repay = true;
-    else if (state === "green" && fuel(me) > 0 && (prey ? rand(this.rng) < this.personality.greed : leverageBps(me) < appetiteBps && rand(this.rng) < 0.25)) {
+    else if (state === "green" && fuel(me) > 0 && (me.kind !== "agent" || t >= HUMAN_SAFE_T) && (prey ? rand(this.rng) < this.personality.greed : leverageBps(me) < appetiteBps && rand(this.rng) < 0.25)) {
       this.boosting = cmd.boost = true;
     }
     const ahead = equity(me) * 10_000 >= this.startEquity * CASHOUT_GAIN_BPS;
@@ -102,7 +108,7 @@ export class FreeBot implements Brain {
   }
 
   /** MultiOgar's potential field, with MARGIN's rules for who can eat or pop whom. */
-  private field(v: AgentView, tick: number, sinceGo: number): { dir: { x: number; y: number }; prey: Blob | null } {
+  private field(v: AgentView, tick: number): { dir: { x: number; y: number }; prey: Blob | null } {
     const me = v.self;
     const mySize = radius(me.mass);
     const iAmRed = ring(me) === "red";
@@ -128,7 +134,10 @@ export class FreeBot implements Brain {
       }
       if (iAmRed) push(o, -theirSize / mySize - 1, edge); // any touch pops a red blob
       else if (tick < o.shieldUntil) continue; // shielded: can't be eaten or popped, ignore
-      else if (o.kind === "human" && sinceGo < HUMAN_GRACE_T && !outweighs(o, me)) continue; // let newcomers settle in
+      else if (o.kind === "human" && !this.huntHumans && !outweighs(o, me)) {
+        push(o, -0.5, edge); // not hunting: keep a gap instead of bumping into them
+        continue;
+      }
       else if (ring(o) === "red") {
         push(o, theirSize / Math.log(n) + 2, edge); // a red blob is a bounty on legs
         if (dist(o, me) < CHASE_RANGE) prey ??= o;

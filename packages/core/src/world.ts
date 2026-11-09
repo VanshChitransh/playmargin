@@ -8,7 +8,8 @@ import type { Blob, Micro, Mode, PlayerSeed, Spike, World } from "./types";
 import { mulBps } from "./units";
 
 /** Spike hit radius in px (feel constant, tune in playtests). */
-export const SPIKE_RADIUS = 18;
+/** Hitbox radius of a spike in px (drawn the same size): small and big, agar virus style. */
+export const spikeRadius = (s: Spike): number => (s.big ? C.R.SPIKE_RADIUS_BIG_PX : C.R.SPIKE_RADIUS_SMALL_PX);
 
 /** Arena side in px for n players: smaller rooms are tighter (2 humans = Duel). */
 export function arenaSide(n: number): number {
