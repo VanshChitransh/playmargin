@@ -74,6 +74,7 @@ function applyInputs(w: World, inputs: Map<string, InputCmd>, tick: number, ev: 
     b.repayHeld = repayPressed;
     if (repayPressed || tick < b.repayMinUntil) {
       b.boostHeld = cmd?.boost === true; // no burst from a BOOST already held when REPAY lets go
+      b.boostMinUntil = 0; // nor a tap's minimum borrow resuming after it
       repay(w, b, tick, ev);
       continue;
     }
