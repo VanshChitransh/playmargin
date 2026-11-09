@@ -25,7 +25,7 @@ describe("commander", () => {
     const c = new Commander(async () => JSON.stringify({ rationale: "Pincer h0", agents: [{ id: "a1", greed: 0.9, caution: 0.2, focus: null }, { id: "d1", greed: 0, caution: 0, focus: "h0" }] }));
     c.update(w, 2, brains);
     await flush();
-    expect((brains.get("a1") as FreeBot).personality).toEqual({ greed: 0.9, caution: 0.2 });
+    expect((brains.get("a1") as FreeBot).personality).toMatchObject({ greed: 0.9, caution: 0.2 });
     expect((brains.get("d1") as Drone).focus).toBe("h0");
     expect(c.rationale).toBe("Pincer h0");
   });

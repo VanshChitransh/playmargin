@@ -12,10 +12,15 @@ export interface Personality {
   greed: number;
   /** How much spikes repel it. */
   caution: number;
+  /** 0 to 1. 1 = sharp (200 to 400 ms reactions, exact aim, tight food routing); lower is slower,
+   *  noisier, wanders and lets prey go. Free-room agents use AGENT_SKILL so a first-timer can win. */
+  skill: number;
 }
 
-const REACT_MIN_T = Math.round(0.2 * R.TICK_HZ);
-const REACT_MAX_T = Math.round(0.4 * R.TICK_HZ);
+/** Global free-room agent skill (later per league). Tuned with tools/sim/human.ts. */
+export const AGENT_SKILL = 0.5;
+/** Agents leave humans alone for the first 20 s: a first-timer gets to find their feet. */
+const HUMAN_GRACE_T = sToTicks(20);
 const CASHOUT_OPEN_T = sToTicks(R.CASHOUT_OPEN_S);
 const CASHOUT_CLOSE_T = sToTicks(R.CASHOUT_CLOSE_S);
 const CHASE_RANGE = 450;
@@ -40,6 +45,7 @@ export class FreeBot implements Brain {
       // A spread from careful to reckless, like a real lobby: some bots will get liquidated.
       greed: personality?.greed ?? randRange(this.rng, 0.2, 1),
       caution: personality?.caution ?? randRange(this.rng, 0.1, 1.2),
+      skill: personality?.skill ?? AGENT_SKILL,
     };
   }
 
@@ -51,9 +57,21 @@ export class FreeBot implements Brain {
       this.startEquity = equity(v.self);
     }
     if (tick < this.nextAt) return cmd;
-    this.nextAt = tick + REACT_MIN_T + Math.floor(rand(this.rng) * (REACT_MAX_T - REACT_MIN_T + 1));
+    // Reaction 200 to 400 ms at skill 1, up to 450 to 700 ms at skill 0.
+    const slow = 1 - this.personality.skill;
+    const minT = Math.round((0.2 + 0.25 * slow) * R.TICK_HZ);
+    const maxT = Math.round((0.4 + 0.3 * slow) * R.TICK_HZ);
+    this.nextAt = tick + minT + Math.floor(rand(this.rng) * (maxT - minT + 1));
 
-    const { dir, prey } = this.field(v, tick);
+    const t0 = this.liveSince === null ? 0 : tick - this.liveSince;
+    let { dir, prey } = this.field(v, tick, t0);
+    // Less skill: sometimes wander or let prey go, and aim with noise, like a human on a touchpad.
+    if (rand(this.rng) < 0.35 * slow) {
+      dir = { x: randRange(this.rng, -1, 1), y: randRange(this.rng, -1, 1) };
+      prey = null;
+    } else if (prey && rand(this.rng) < 0.4 * slow) prey = null;
+    const turn = randRange(this.rng, -1, 1) * 0.6 * slow;
+    dir = { x: dir.x * Math.cos(turn) - dir.y * Math.sin(turn), y: dir.x * Math.sin(turn) + dir.y * Math.cos(turn) };
     this.held = dir;
     this.boosting = false;
     cmd.dirX = dir.x;
@@ -84,7 +102,7 @@ export class FreeBot implements Brain {
   }
 
   /** MultiOgar's potential field, with MARGIN's rules for who can eat or pop whom. */
-  private field(v: AgentView, tick: number): { dir: { x: number; y: number }; prey: Blob | null } {
+  private field(v: AgentView, tick: number, sinceGo: number): { dir: { x: number; y: number }; prey: Blob | null } {
     const me = v.self;
     const mySize = radius(me.mass);
     const iAmRed = ring(me) === "red";
@@ -110,6 +128,7 @@ export class FreeBot implements Brain {
       }
       if (iAmRed) push(o, -theirSize / mySize - 1, edge); // any touch pops a red blob
       else if (tick < o.shieldUntil) continue; // shielded: can't be eaten or popped, ignore
+      else if (o.kind === "human" && sinceGo < HUMAN_GRACE_T && !outweighs(o, me)) continue; // let newcomers settle in
       else if (ring(o) === "red") {
         push(o, theirSize / Math.log(n) + 2, edge); // a red blob is a bounty on legs
         if (dist(o, me) < CHASE_RANGE) prey ??= o;
@@ -119,7 +138,8 @@ export class FreeBot implements Brain {
       } else if (outweighs(o, me)) push(o, -Math.log(theirSize / mySize) - 0.5, edge);
       else push(o, -theirSize / mySize, edge);
     }
-    for (const f of v.food) push(f, 1, 0);
+    // Skill 1 weighs every pellet in view (near-perfect routing); less skill, a weaker pull.
+    for (const f of v.food) push(f, 0.4 + 0.6 * this.personality.skill, 0);
     const boosted = me.debt > 0 ? 1.5 : 1;
     for (const s of v.spikes) push(s, -this.personality.caution * boosted * 3, mySize + 18);
     // Outside the shrinking zone, everything else matters less than getting back in.
