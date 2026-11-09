@@ -25,7 +25,7 @@ import {
   type PlayerSeed,
   type World,
 } from "@margin/core";
-import { agentView, createBrain } from "../agents";
+import { Commander, agentView, createBrain, nearAiCall } from "../agents";
 import { sharedDb, userForAccount } from "../db";
 import { settlementFor } from "../settlement";
 import { admitFree, chargeEntry } from "./freeMatch";
@@ -68,6 +68,9 @@ export class MatchRoom extends Room {
   private inputs = new InputQueue();
   /** Agent seats only (humans get null from createBrain and are never stored). */
   private brains = new Map<string, Brain>();
+  /** NEAR AI strategist for this room's agents, only when NEAR_AI_API_KEY is set. Never blocks a tick. */
+  private commander = process.env.NEAR_AI_API_KEY ? new Commander(nearAiCall(process.env.NEAR_AI_API_KEY)) : null;
+  private lastRationale: string | null = null;
   private lastMe = new Map<string, string>();
   /** Blob id (= sessionId) to credits user id, humans in free rooms only. */
   private users = new Map<string, string>();
@@ -152,6 +155,7 @@ export class MatchRoom extends Room {
     }
     if (typeof auth === "string") this.users.set(id, auth);
     this.inputs.open(id);
+    if (this.lastRationale) client.send("commander", { rationale: this.lastRationale });
     this.countHeads();
   }
 
@@ -206,6 +210,12 @@ export class MatchRoom extends Room {
     for (const [id, brain] of this.brains) {
       const view = agentView(w, id);
       if (view) inputs.set(id, brain.decide(view, this.roomTick));
+    }
+    this.commander?.update(w, this.roomTick, this.brains);
+    const why = this.commander?.rationale ?? null;
+    if (why !== this.lastRationale) {
+      this.lastRationale = why;
+      this.broadcast("commander", { rationale: why });
     }
     const events = step(w, inputs, this.roomTick);
     for (const ev of events) this.broadcast("ev", ev);
