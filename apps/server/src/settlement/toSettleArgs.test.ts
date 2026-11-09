@@ -41,7 +41,21 @@ describe("toSettleArgs", () => {
       expect(BigInt(a.reserve) >= 0n).toBe(true);
       expect(BigInt(a.vault_repaid) <= BigInt(a.lent)).toBe(true);
       expect(a.payouts.some(([acc]) => !acc)).toBe(false);
+      // chain rule: bad debt <= 10% of the 1.5x stakes budget
+      expect((BigInt(a.lent) - BigInt(a.vault_repaid)) * 10_000n <= stakes * 15_000n / 10_000n * 1_000n).toBe(true);
     }
+  });
+
+  it("repays bad debt above the chain cap from the biggest payout", () => {
+    // 2 players, budget 3 USDC, cap 0.3 USDC; 1 USDC of bad debt, so 0.7 comes out of the winner.
+    const r: SettleResult = {
+      matchId: "m", lent: 150 * 1_000_000, vaultRepaid: 50 * 1_000_000, interestToVault: 0, fees: 0, reserve: 0, head: "h", seq: 1,
+      payouts: [{ id: "a", accountId: "a.testnet", amount: 250 * 1_000_000 }, { id: "b", accountId: "b.testnet", amount: 50 * 1_000_000 }],
+    };
+    const a = toSettleArgs(r);
+    expect(a.vault_repaid).toBe("1200000");
+    expect(a.payouts).toEqual([["a.testnet", "1800000"], ["b.testnet", "500000"]]);
+    expect(a.reserve).toBe("0");
   });
 
   it("refuses stakes that are not whole base units", () => {

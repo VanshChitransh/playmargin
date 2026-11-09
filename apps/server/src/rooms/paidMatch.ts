@@ -70,3 +70,12 @@ export async function admitPaid(opts: unknown): Promise<{ accountId: string }> {
   if (t.match_id) throw new Error("ticket already in a match");
   return { accountId };
 }
+
+/** Settler refunds for a room that never started (open_match failed, so tickets are unbound). */
+export async function refundTickets(accounts: string[]): Promise<void> {
+  const chain = sharedChain();
+  if (!chain) return;
+  for (const account_id of accounts) {
+    await chain.call("refund_ticket", { account_id }).catch((err: unknown) => console.error(`[refund] ${account_id}:`, err));
+  }
+}

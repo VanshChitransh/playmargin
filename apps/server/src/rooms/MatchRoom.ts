@@ -29,7 +29,7 @@ import { agentView, createBrain } from "../agents";
 import { sharedDb, userForAccount } from "../db";
 import { settlementFor } from "../settlement";
 import { admitFree, chargeEntry } from "./freeMatch";
-import { admitPaid, seatedAccounts } from "./paidMatch";
+import { admitPaid, refundTickets, seatedAccounts } from "./paidMatch";
 import { InputQueue } from "./input";
 import { clientIp, joinLimit, rooms } from "./guard";
 import { MatchRecord } from "./matchRecord";
@@ -73,10 +73,17 @@ export class MatchRoom extends Room {
   private users = new Map<string, string>();
   /** Paid accounts this room holds in seatedAccounts; released on leave before GO and on dispose. */
   private accounts = new Set<string>();
+  /** Paid: open_match on chain, started at the 3-2-1. GO waits for it, a failure aborts the room. */
+  private opening: "none" | "pending" | "ok" | "failed" = "none";
   private key: RoomKey = { mode: "free", roomCode: null };
   private startNow = false;
   private joined = 0;
   private owedMs = 0;
+
+  /** Paid roster is final from the 3-2-1 on: open_match names exactly these accounts. */
+  private get paidLocked(): boolean {
+    return this.key.mode === "paid" && this.phase === "COUNTDOWN";
+  }
 
   private get started(): boolean {
     return this.world.goTick >= 0;
@@ -157,9 +164,10 @@ export class MatchRoom extends Room {
 
   /** Dropped mid-match: the blob stays where it is, input expires, still poppable, seat held. */
   override onDrop(client: Client): void {
-    if (!this.started) return; // before GO leaving is free: onLeave runs next
+    // Before GO leaving is free (onLeave runs next), except a paid 3-2-1: the ticket is being bound.
+    if (!this.started && !this.paidLocked) return;
     this.inputs.close(client.sessionId);
-    const ticksLeft = sToTicks(R.MATCH_S) - matchT(this.world, this.roomTick) + ENDED_HOLD_TICKS;
+    const ticksLeft = (this.started ? sToTicks(R.MATCH_S) - matchT(this.world, this.roomTick) : sToTicks(R.MATCH_S + 20)) + ENDED_HOLD_TICKS;
     this.allowReconnection(client, Math.max(1, Math.ceil(ticksLeft / R.TICK_HZ)));
   }
 
@@ -181,7 +189,7 @@ export class MatchRoom extends Room {
   override onLeave(client: Client): void {
     const id = client.sessionId;
     this.inputs.close(id);
-    if (this.started) return; // after GO the blob stays in the arena
+    if (this.started || this.paidLocked) return; // after GO (paid: after the 3-2-1) the blob stays
     this.users.delete(id);
     const acc = this.world.blobs.get(id)?.accountId;
     if (acc) (seatedAccounts.delete(acc), this.accounts.delete(acc));
@@ -210,7 +218,9 @@ export class MatchRoom extends Room {
         break;
       }
       case "COUNTDOWN":
-        if (this.phaseTick >= COUNTDOWN_TICKS) this.go();
+        if (this.phaseTick < COUNTDOWN_TICKS || this.opening === "pending") break;
+        if (this.opening === "failed") this.abort();
+        else this.go();
         break;
       case "LIVE":
         this.log.drain(w);
@@ -234,6 +244,7 @@ export class MatchRoom extends Room {
     const fill = this.judge && human ? judgeLineup(human).slice(1) : this.key.mode === "free" ? agentFill(this.state.humans) : droneFill(this.state.humans);
     for (const p of fill) addPlayer(this.world, p);
     this.world.phase = "COUNTDOWN";
+    if (this.key.mode === "paid") this.openOnChain();
     this.countHeads();
     this.enter("COUNTDOWN");
   }
@@ -247,7 +258,7 @@ export class MatchRoom extends Room {
       removePlayer(this.world, id);
       this.clients.getById(id)?.leave(4001, "not enough credits");
     }
-    const players = [...this.world.blobs.values()].map(({ id, kind, label, accountId }) => ({ id, kind, label, accountId }));
+    const players = this.roster();
     this.world = newWorld(this.seed, this.key.mode, players, this.roomId);
     startMatch(this.world, this.roomTick);
     const human = players.find((p) => p.kind === "human");
@@ -259,8 +270,34 @@ export class MatchRoom extends Room {
     this.autoDispose = false;
     if (this.key.mode === "free" && !this.judge) void this.unlock(); // late joins for 15 s
     this.log.drain(this.world);
-    this.log.open(this.world, this.seed, this.key.mode === "free" ? this.users : this.accountSeats());
+    this.log.open(this.world, this.seed, this.key.mode === "free" ? this.users : this.accountSeats(), this.opening === "ok");
     this.enter("LIVE");
+  }
+
+  /** Bind the tickets and reserve the vault budget during the 3-2-1, sized exactly as GO will be. */
+  private openOnChain(): void {
+    this.opening = "pending";
+    const preview = newWorld(this.seed, this.key.mode, this.roster(), this.roomId);
+    startMatch(preview, 0);
+    this.log.reserve(preview).then(
+      () => (this.opening = "ok"),
+      (err: unknown) => {
+        console.error(`[open] ${this.roomId}:`, err);
+        this.opening = "failed";
+      },
+    );
+  }
+
+  /** open_match failed (vault low, ticket gone): nobody played, so refund every ticket and close. */
+  private abort(): void {
+    const accounts = [...this.world.blobs.values()].flatMap((b) => (b.accountId ? [b.accountId] : []));
+    this.broadcast("aborted", { reason: "The match could not start on NEAR. Your 1 USDC is back in your balance." });
+    void refundTickets(accounts).finally(() => this.disconnect());
+    this.enter("ENDED", false);
+  }
+
+  private roster(): PlayerSeed[] {
+    return [...this.world.blobs.values()].map(({ id, kind, label, accountId }) => ({ id, kind, label, accountId }));
   }
 
   /** Paid seats: blob id to the user row of its NEAR account. */
@@ -288,7 +325,7 @@ export class MatchRoom extends Room {
     const w = this.world;
     const left =
       this.phase === "WARMUP" ? (this.key.mode === "paid" ? PAID_WAIT_TICKS : WARMUP_TICKS) - this.phaseTick
-      : this.phase === "COUNTDOWN" ? COUNTDOWN_TICKS - this.phaseTick
+      : this.phase === "COUNTDOWN" ? Math.max(0, COUNTDOWN_TICKS - this.phaseTick)
       : 0;
     syncState(this.state, w, this.roomTick, this.started ? null : left / R.TICK_HZ);
     for (const c of this.clients) {

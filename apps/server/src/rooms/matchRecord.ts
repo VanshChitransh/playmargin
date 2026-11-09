@@ -31,16 +31,19 @@ export class MatchRecord {
     this.saved = this.entries.length;
   }
 
-  /** At GO: match row, human seats, and the adapter's open(). */
-  open(w: World, seed: number, users: ReadonlyMap<string, string>): void {
-    createMatch(this.db, { id: this.matchId, mode: this.mode, seed, pot: w.pot });
-    for (const [blobId, userId] of users) this.seat(userId, blobId);
+  /** The adapter's open() for this world's players. Paid rooms await it before GO. */
+  reserve(w: World): Promise<void> {
     const players = [...w.blobs.values()]
       .filter((b) => b.kind !== "drone")
       .map((b) => ({ id: b.id, accountId: b.accountId, entry: entryFor(this.mode) }));
-    this.settlement
-      .open({ matchId: this.matchId, mode: this.mode, pot: w.pot, vaultBudget: w.vault.budget, players })
-      .catch((err: unknown) => console.error(`[open] ${this.matchId}:`, err));
+    return this.settlement.open({ matchId: this.matchId, mode: this.mode, pot: w.pot, vaultBudget: w.vault.budget, players });
+  }
+
+  /** At GO: match row and human seats, plus open() unless the room already awaited it. */
+  open(w: World, seed: number, users: ReadonlyMap<string, string>, reserved = false): void {
+    createMatch(this.db, { id: this.matchId, mode: this.mode, seed, pot: w.pot });
+    for (const [blobId, userId] of users) this.seat(userId, blobId);
+    if (!reserved) this.reserve(w).catch((err: unknown) => console.error(`[open] ${this.matchId}:`, err));
   }
 
   /** A human seat (also used for late joins). */

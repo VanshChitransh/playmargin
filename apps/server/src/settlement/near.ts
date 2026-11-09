@@ -15,7 +15,11 @@ export class NearSettlement implements Settlement {
 
   async open(match: MatchOpen): Promise<void> {
     if (await this.chain.view<OnchainMatch>("match_of", { match_id: match.matchId })) return;
-    const players = match.players.map((p) => p.accountId).filter((a): a is string => !!a);
+    // Every staked seat must name its account: core counts its entry in the pot either way.
+    const players = match.players.map((p) => {
+      if (!p.accountId) throw new Error(`paid seat ${p.id} has no NEAR account`);
+      return p.accountId;
+    });
     try {
       await this.chain.call("open_match", { match_id: match.matchId, players });
     } catch (err) {

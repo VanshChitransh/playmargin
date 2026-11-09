@@ -38,10 +38,12 @@ console.log("tickets ready");
 const sdk = new Client(process.argv[2] ?? "ws://localhost:2567");
 const unsigned = await sdk.joinOrCreate("match", { mode: "paid", accountId: PLAYERS[0] }).then(() => "joined", () => "refused");
 const rooms = [];
+let aborted = "";
 for (const id of PLAYERS) {
   const r = await sdk.joinOrCreate("match", { mode: "paid", join: signedJoin(id) });
   r.onMessage("ev", () => {});
   r.onMessage("me", () => {});
+  r.onMessage("aborted", (m: { reason: string }) => (aborted = m.reason));
   rooms.push(r);
 }
 await sleep(8_500);
@@ -50,6 +52,14 @@ await sleep(5_000);
 type St = { phase: string; blobs: Map<string, { kind: string; label: string }> };
 const st = rooms[0]!.state as unknown as St;
 const drones = [...st.blobs.values()].filter((b) => b.kind === "drone").map((b) => b.label);
+if (process.env.EXPECT_ABORT) {
+  // Server runs with a key that is not the settler: open_match must fail and the room abort before GO.
+  await sleep(20_000);
+  const ok = aborted !== "" && (rooms[0]!.state as unknown as St).phase !== "LIVE";
+  console.log({ aborted, phase: (rooms[0]!.state as unknown as St).phase });
+  console.log(ok ? "SMOKE OK (abort)" : "SMOKE FAIL (abort)");
+  process.exit(ok ? 0 : 1);
+}
 console.log({ unsigned, sameRoom: rooms[0]!.roomId === rooms[1]!.roomId, phase: st.phase, drones });
 // Play it out: steer in circles, BOOST now and then, so the drone has something to hunt.
 let t = 0;
