@@ -2,7 +2,7 @@
 // Entry is charged only at GO (RULES: Warm-up), and every unit of mass at GO is backed by the pot.
 import * as C from "./constants";
 import { equity } from "./economy";
-import { scatterFood, randomPoint } from "./food";
+import { playPoint, seedPellets } from "./food";
 import { rand, randInt, seedRng } from "./rng";
 import type { Blob, Micro, Mode, PlayerSeed, Spike, World } from "./types";
 import { mulBps } from "./units";
@@ -12,7 +12,7 @@ export const SPIKE_RADIUS = 18;
 
 /** Arena side in px for n players: smaller rooms are tighter (2 humans = Duel). */
 export function arenaSide(n: number): number {
-  return Math.round(1000 * Math.sqrt(Math.max(n, 2)));
+  return Math.round(C.R.ARENA_SIDE_PER_SQRT_PLAYER * Math.sqrt(Math.max(n, 2)));
 }
 
 /** Entry in Micro for this room mode. */
@@ -46,10 +46,14 @@ export function newWorld(seed: number, mode: Mode, players: PlayerSeed[], matchI
   return w;
 }
 
+/** Spawn ring radius: spread out, but central (the zone pulls everyone in) and clear of every edge. */
+const spawnRing = (w: World): number => Math.min(w.arena.w * 0.35, C.R.SPAWN_RING_MAX_PX, w.arena.w / 2 - C.R.SPAWN_EDGE_MARGIN_PX);
+
 /** Join during warm-up (ghost, free to leave) or a late join in the first 15 s of a free match. */
 export function addPlayer(w: World, p: PlayerSeed, tick = w.tick): Blob {
   if (w.blobs.has(p.id)) throw new Error(`duplicate player ${p.id}`);
-  const [x, y] = randomPoint(w);
+  const a = rand(w) * Math.PI * 2;
+  const [x, y] = [w.zone.cx + Math.cos(a) * spawnRing(w), w.zone.cy + Math.sin(a) * spawnRing(w)];
   const b = newBlob(p, x, y, p.kind === "drone" ? 0 : startMass(w.mode));
   w.blobs.set(p.id, b);
   w.pendingLog.push({ type: "JOIN", tick, data: { player: p } });
@@ -76,12 +80,11 @@ function charge(w: World, b: Blob, tick: number): void {
   w.vault.budget += mulBps(entry, C.LEVERAGE_CAP_BPS - 10_000);
   b.mass = mass;
   w.pendingLog.push({ type: "CHARGE", tick, data: { blob: b.id, entry } });
-  const [fx, fy] = randomPoint(w);
-  scatterFood(w, entry - mass, fx, fy, w.arena.w / 2);
+  seedPellets(w, entry - mass);
 }
 
 function placeSpike(w: World, s: Spike): void {
-  [s.x, s.y] = randomPoint(w);
+  [s.x, s.y] = playPoint(w);
   s.respawnAt = null;
 }
 
@@ -100,7 +103,8 @@ export function startMatch(w: World, tick: number, ratePerMinBps: number = C.RAT
     [blobs[i], blobs[j]] = [blobs[j] as Blob, blobs[i] as Blob];
   }
   const rot = rand(w) * Math.PI * 2;
-  const ringR = w.arena.w * 0.35;
+  // Evenly spaced on the spawn ring, so nobody starts closer to a rival than anyone else.
+  const ringR = spawnRing(w);
   const shield = C.sToTicks(w.mode === "paid" ? C.R.SHIELD_S_PAID : C.R.SHIELD_S);
   blobs.forEach((b, i) => {
     const a = rot + (i / blobs.length) * Math.PI * 2;

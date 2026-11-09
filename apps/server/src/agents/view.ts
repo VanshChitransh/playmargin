@@ -2,8 +2,8 @@
 // read the whole world, so a labelled agent has no information edge over the humans it plays.
 import { radius, type AgentView, type World } from "@margin/core";
 
-/** Half the side of a bot's "screen" in px, plus its own radius. */
-export const VIEW_R = 900;
+/** Half a human screen width at the agar-style camera (start blob ~5.5% of ~2,100 px), plus own radius. */
+export const VIEW_R = 1050;
 
 /** The AgentView for blob `id`, or null if it is not alive. */
 export function agentView(w: World, id: string): AgentView | null {

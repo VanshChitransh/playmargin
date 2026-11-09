@@ -7,7 +7,7 @@ import { rand, seedRng } from "./rng";
 import { step } from "./step";
 import { leak, makeBlob, makeWorld } from "./testkit";
 import type { PlayerSeed, World } from "./types";
-import { newWorld, startMatch } from "./world";
+import { addPlayer, newWorld, startMatch } from "./world";
 
 const u = (x: number) => Math.round(x * MICRO);
 const seeds = (n: number): PlayerSeed[] =>
@@ -54,6 +54,19 @@ describe("step", () => {
     const duel = newWorld(1, "paid", [...seeds(2), { id: "d", kind: "drone", label: "D", accountId: null }]);
     expect(duel.arena.w).toBe(newWorld(1, "paid", seeds(2)).arena.w);
     expect(duel.arena.w).toBeLessThan(newWorld(1, "free", seeds(12)).arena.w);
+  });
+
+  it("spawns keep SPAWN_EDGE_MARGIN_PX from every edge: GO on a small Duel map and a late join", () => {
+    const edge = (w: World, x: number, y: number) => Math.min(x, y, w.arena.w - x, w.arena.h - y);
+    const duel = newWorld(4, "paid", seeds(2));
+    startMatch(duel, 1);
+    for (const b of duel.blobs.values()) expect(edge(duel, b.x, b.y)).toBeGreaterThanOrEqual(300 - 1e-9);
+    const free = newWorld(4, "free", seeds(3));
+    startMatch(free, 1);
+    for (let i = 0; i < 50; i++) {
+      const b = addPlayer(free, { id: `late${i}`, kind: "human", label: "L", accountId: null }, 2);
+      expect(edge(free, b.x, b.y)).toBeGreaterThanOrEqual(300);
+    }
   });
 
   it("warm-up ghosts move but nothing is charged", () => {
@@ -129,7 +142,7 @@ describe("step", () => {
     const red = makeBlob({ id: "red", mass: u(300), debt: u(260) });
     const small = makeBlob({ id: "small", mass: u(100), x: 520 });
     const w = makeWorld([red, small]);
-    w.food.push({ id: 99, x: 440, y: 500, mass: u(1) }); // inside red, out of small's reach
+    w.food.push({ id: 99, x: 420, y: 500, mass: u(1) }); // inside red's reach, out of small's (64 + 23 px)
     w.pot += u(1);
     step(w, new Map(), 1);
     expect(small.state).toBe("alive");
