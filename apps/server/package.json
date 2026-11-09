@@ -9,10 +9,11 @@
     "typecheck": "tsc -p ."
   },
   "dependencies": {
+    "@colyseus/tools": "~0.17.0",
     "@margin/core": "*",
     "colyseus": "~0.17.0",
-    "@colyseus/tools": "~0.17.0",
     "express": "^5.2.1",
-    "express-basic-auth": "^1.2.1"
+    "express-basic-auth": "^1.2.1",
+    "near-kit": "^0.20.2"
   }
 }

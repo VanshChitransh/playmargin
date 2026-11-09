@@ -22,9 +22,10 @@ import {
   type World,
 } from "@margin/core";
 import { agentView, createBrain } from "../agents";
-import { sharedDb } from "../db";
+import { sharedDb, userForAccount } from "../db";
 import { settlementFor } from "../settlement";
 import { admitFree, chargeEntry } from "./freeMatch";
+import { admitPaid } from "./paidMatch";
 import { InputQueue } from "./input";
 import { MatchRecord } from "./matchRecord";
 import { agentFill, parseRoomKey, warmupNext, type RoomKey } from "./lobby";
@@ -95,17 +96,21 @@ export class MatchRoom extends Room {
   }
 
   /** filterBy skips options a client leaves out, so re-check mode and code here. */
-  override onAuth(_client: Client, opts: unknown): string | true {
+  override async onAuth(_client: Client, opts: unknown): Promise<string | { accountId: string }> {
     const k = parseRoomKey(opts);
     if (k.mode !== this.key.mode) throw new Error(`mode mismatch: pass { mode: "${this.key.mode}" }`);
     if (this.key.roomCode && k.roomCode !== this.key.roomCode) throw new Error("wrong room code");
-    // Free: the user id becomes client.auth. Paid admission (ticket check) lands with S6.
-    return this.key.mode === "free" ? admitFree(sharedDb(), opts) : true;
+    // Free: the credits user id. Paid: the NEAR account holding a live ticket (one seat each).
+    if (this.key.mode === "free") return admitFree(sharedDb(), opts);
+    const paid = await admitPaid(opts);
+    if ([...this.world.blobs.values()].some((b) => b.accountId === paid.accountId)) throw new Error("account already in this room");
+    return paid;
   }
 
-  override onJoin(client: Client, _opts: unknown, auth?: string | true): void {
+  override onJoin(client: Client, _opts: unknown, auth?: string | { accountId: string }): void {
     const id = client.sessionId;
-    const p: PlayerSeed = { id, kind: "human", label: `Player ${++this.joined}`, accountId: null };
+    const accountId = typeof auth === "object" ? auth.accountId : null;
+    const p: PlayerSeed = { id, kind: "human", label: accountId ?? `Player ${++this.joined}`, accountId };
     if (this.started) {
       // Late join (free, first 15 s): pay now, then core charges the pot and shields 10 s.
       if (typeof auth !== "string" || !chargeEntry(sharedDb(), auth, this.roomId)) {
@@ -222,8 +227,16 @@ export class MatchRoom extends Room {
     this.autoDispose = false;
     if (this.key.mode === "free") void this.unlock(); // late joins for 15 s
     this.log.drain(this.world);
-    this.log.open(this.world, this.seed, this.users);
+    this.log.open(this.world, this.seed, this.key.mode === "free" ? this.users : this.accountSeats());
     this.enter("LIVE");
+  }
+
+  /** Paid seats: blob id to the user row of its NEAR account. */
+  private accountSeats(): Map<string, string> {
+    const db = sharedDb();
+    const seats = new Map<string, string>();
+    for (const b of this.world.blobs.values()) if (b.accountId) seats.set(b.id, userForAccount(db, b.accountId));
+    return seats;
   }
 
   private async settle(): Promise<void> {

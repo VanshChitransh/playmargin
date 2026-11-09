@@ -92,6 +92,15 @@ export function userForGuestKey(db: Db, guestKey: string): string {
   return id;
 }
 
+/** Find or create the user row for a NEAR account (paid players, verified leaderboard). */
+export function userForAccount(db: Db, accountId: string): string {
+  const row = db.prepare("SELECT id FROM users WHERE account_id = ?").get(accountId) as { id: string } | undefined;
+  if (row) return row.id;
+  const id = randomUUID();
+  db.prepare("INSERT INTO users (id, account_id, created) VALUES (?, ?, ?)").run(id, accountId, Date.now());
+  return id;
+}
+
 /** Append one ledger row; delta is signed Micro. */
 export function appendCredit(
   db: Db,
