@@ -57,7 +57,19 @@ export async function emailSession(): Promise<{ accountId: string } | { needsNam
   signer ??= await client.getSigner();
   const publicKey = (await signer.getPublicKey()).toString();
   const r = await fetch(`${NET.lookup}/v0/public_key/${publicKey}`).then((x) => x.json() as Promise<{ account_ids?: string[] }>, () => ({ account_ids: [] }));
-  const id = r.account_ids?.[0];
+  // Public keys are public: anyone can add ours to THEIR account to hijack this lookup. Only an
+  // account whose every full-access key is this player's MPC key belongs to the player.
+  let id: string | undefined;
+  for (const cand of r.account_ids ?? []) {
+    const keys = (await rpc.query({ request_type: "view_access_key_list", finality: "final", account_id: cand })) as unknown as {
+      keys: { public_key: string; access_key: { permission: unknown } }[];
+    };
+    const full = keys.keys.filter((k) => k.access_key.permission === "FullAccess").map((k) => k.public_key);
+    if (full.length > 0 && full.every((k) => k === publicKey)) {
+      id = cand;
+      break;
+    }
+  }
   if (!id) {
     account = { id: "", publicKey };
     return { needsName: true };

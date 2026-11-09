@@ -11,7 +11,7 @@ import { Near, decodeSignedDelegateAction } from "near-kit";
 import { FileKeyStore } from "near-kit/keys/file";
 import { createError, signError } from "./fastauth.ts";
 import * as oneclick from "./oneclick.ts";
-import { RateLimit, refuseReason, type Policy } from "./validate.ts";
+import { WindowCap, RateLimit, delegateKey, keyRefusal, refuseReason, signatureOk, type KeyView, type Policy } from "./validate.ts";
 
 const NETWORK = process.env.NETWORK === "mainnet" ? "mainnet" : "testnet";
 const RELAYER_ID = process.env.RELAYER_ID ?? `relayer.playmargin.${NETWORK === "mainnet" ? "near" : "testnet"}`;
@@ -32,6 +32,10 @@ const near = process.env.RELAYER_PRIVATE_KEY
   : new Near({ network: NETWORK, keyStore: new FileKeyStore(join(homedir(), ".near-credentials"), NETWORK) });
 
 const limiter = new RateLimit(Number(process.env.RELAYER_WINDOW_MS ?? 2_000));
+const ipLimiter = new RateLimit(Number(process.env.RELAYER_IP_WINDOW_MS ?? 1_000));
+/** Paid relays per minute and per UTC day: at ~0.0002 NEAR each, a day costs at most ~0.4 NEAR. */
+const perMinute = new WindowCap(Number(process.env.RELAYER_MINUTE_CAP ?? 60), 60_000);
+const perDay = new WindowCap(Number(process.env.RELAYER_DAILY_CAP ?? 2_000), 86_400_000);
 
 function reply(res: ServerResponse, status: number, body: object): void {
   res.writeHead(status, {
@@ -71,10 +75,23 @@ async function relay(req: IncomingMessage, res: ServerResponse): Promise<void> {
   } catch {
     return reply(res, 400, { error: "not a signed delegate action" });
   }
-  const why = refuseReason(decoded.signedDelegate, policy);
+  const sd = decoded.signedDelegate;
+  const why = refuseReason(sd, policy);
   if (why) return reply(res, 400, { error: why });
-  const sender = decoded.signedDelegate.delegateAction.senderId;
-  if (!limiter.allow(sender, Date.now())) return reply(res, 429, { error: "slow down" });
+  // Everything below is free for us: a forged or replayed delegate never becomes a paid tx.
+  if (!signatureOk(payload, sd)) return reply(res, 400, { error: "bad signature" });
+  const now = Date.now();
+  if (!ipLimiter.allow(ip(req), now)) return reply(res, 429, { error: "slow down" });
+  const sender = sd.delegateAction.senderId;
+  const pk = delegateKey(sd)!;
+  const fc = sd.delegateAction.actions[0]!;
+  const method = "functionCall" in fc ? fc.functionCall.methodName : "";
+  const [key, status] = await Promise.all([near.getAccessKey(sender, pk).catch(() => null), near.getStatus()]);
+  const height = BigInt(status.sync_info.latest_block_height);
+  const refusal = keyRefusal(sd, key as KeyView | null, height, policy.contractId, method);
+  if (refusal) return reply(res, 400, { error: refusal });
+  if (!limiter.allow(`${sender}/${pk}`, now)) return reply(res, 429, { error: "slow down" });
+  if (!perMinute.take(now) || !perDay.take(now)) return reply(res, 503, { error: "relayer busy, try again in a minute" });
 
   try {
     const r = (await near.transaction(RELAYER_ID).signedDelegateAction(decoded).send({ waitUntil: "FINAL" })) as unknown as Outcome;
@@ -114,6 +131,9 @@ const FUND = `${Number(process.env.FASTAUTH_FUND ?? 0.01)} NEAR` as const;
 const createLimiter = new RateLimit(60_000);
 const signLimiter = new RateLimit(3_000);
 const daily = { day: "", n: 0, cap: Number(process.env.FASTAUTH_DAILY_CAP ?? 200) };
+/** Email login spends relayer NEAR per call: off until NEAR approves our Auth0 app and JWTs are
+ * verified here (CSO H2/M3). Until then the routes answer 404. */
+const FASTAUTH = process.env.FASTAUTH_ENABLED === "1";
 const ip = (req: IncomingMessage) => String(req.headers["x-forwarded-for"] ?? req.socket.remoteAddress ?? "?").split(",")[0] ?? "?";
 
 /** POST /fastauth/create {accountId, publicKey}: registrar create_account, funded with FUND. */
@@ -152,15 +172,17 @@ async function fastauthSign(req: IncomingMessage, res: ServerResponse): Promise<
 
 async function health(res: ServerResponse): Promise<void> {
   const balance = Number(await near.getBalance(RELAYER_ID));
-  reply(res, 200, { relayer: RELAYER_ID, contract: policy.contractId, balance, alarm: balance < LOW_BALANCE });
+  // Alarm also when a relay cap refused someone in the last 10 min (flood, or real demand to raise caps).
+  const capped = Date.now() - Math.max(perMinute.hitAt, perDay.hitAt) < 600_000;
+  reply(res, 200, { relayer: RELAYER_ID, contract: policy.contractId, balance, capped, alarm: balance < LOW_BALANCE || capped });
 }
 
 createServer((req, res) => {
   if (req.method === "OPTIONS") return reply(res, 204, {});
-  if (req.method === "POST" && req.url === "/relay") return void relay(req, res);
+  if (req.method === "POST" && req.url === "/relay") return void relay(req, res).catch((e) => reply(res, 502, { error: String(e) }));
   const err = (e: unknown) => reply(res, 502, { error: e instanceof Error ? e.message : String(e) });
-  if (req.method === "POST" && req.url === "/fastauth/create") return void fastauthCreate(req, res).catch(err);
-  if (req.method === "POST" && req.url === "/fastauth/sign") return void fastauthSign(req, res).catch(err);
+  if (FASTAUTH && req.method === "POST" && req.url === "/fastauth/create") return void fastauthCreate(req, res).catch(err);
+  if (FASTAUTH && req.method === "POST" && req.url === "/fastauth/sign") return void fastauthSign(req, res).catch(err);
   if (req.method === "GET" && req.url === "/health") return void health(res).catch(() => reply(res, 502, {}));
   const fail = () => reply(res, 502, { error: "1-Click unavailable" });
   if (req.method === "GET" && req.url === "/tokens") return void oneclick.tokens().then((t) => reply(res, 200, t), fail);
