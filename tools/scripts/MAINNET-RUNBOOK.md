@@ -6,7 +6,7 @@ nothing should be run before Vansh says go. Every transaction he approves is mar
 **Rehearsed end to end on testnet on 9 Nov** (same commands, only the network swapped, Option B
 shape: `margin.<funder>`). Results, costs and the mistakes it caught are in "Rehearsal" at the end.
 
-Budget: **about 2.8 NEAR parked + about 0.05 NEAR spent** (2.75 into the contract account, the
+Budget: **about 3.0 NEAR parked + about 0.05 NEAR spent** (2.96 into the contract account, the
 rest is gas from `vanshverse.near`) and **USDC for the vault seed + one real deposit** (step 6).
 About 2.7 NEAR comes back at cleanup (measured: 0.049 NEAR net for the whole rehearsal).
 
@@ -37,24 +37,24 @@ the server (or wait for an empty queue), change it, then restart, so no ticket s
 ## 1. Pre-flight (free, no mainnet tx, about 2 min)
 
 1. Main is green: `npm run typecheck && npm test && (cd contracts/margin && cargo test)`.
-2. Build the exact wasm that ships (199,001 bytes, about 1.99 NEAR of storage):
+2. Build the exact wasm that ships (204,955 bytes with A7 agents, about 2.05 NEAR of storage):
    ```
    cd contracts/margin && cargo near build non-reproducible-wasm --no-embed-abi
    ls -l target/near/margin.wasm
    ```
 3. The name is free (Option A): `near account view-account-summary playmargin.near network-config mainnet now`
    prints an ERROR ending in `does not exist while viewing`. That error is the good answer.
-4. `vanshverse.near` holds at least 2.85 NEAR and the USDC for step 6.
+4. `vanshverse.near` holds at least 3.05 NEAR and the USDC for step 6.
 5. Put the owner key where the scripts can sign (once, from the Meteor seed phrase):
    `near account import-account using-seed-phrase "<12 words>" --seed-phrase-hd-path "m/44'/397'/0'" network-config mainnet`
    and choose "save to legacy keychain" (writes `~/.near-credentials/mainnet/vanshverse.near.json`).
 
 ## 2. Create the contract account (about 10 s)
 
-**[TX 1]** from `vanshverse.near`, funds the contract account with 2.75 NEAR:
+**[TX 1]** from `vanshverse.near`, funds the contract account with 2.96 NEAR:
 
 ```
-near account create-account fund-myself $CONTRACT_ID '2.75 NEAR' \
+near account create-account fund-myself $CONTRACT_ID '2.96 NEAR' \
   autogenerate-new-keypair save-to-legacy-keychain \
   sign-as vanshverse.near network-config mainnet sign-with-legacy-keychain send
 ```
@@ -63,7 +63,8 @@ Measured fee 0.0071 NEAR. The new full-access key lands in
 `~/.near-credentials/mainnet/$CONTRACT_ID.json`. Back it up (password manager). Losing it means
 the code can never be upgraded.
 
-Why 2.75: code storage 1.995 + deploy and register gas 0.018 + settler 0.25 + relayer 0.15 +
+Why 2.96: code storage 2.05 + deploy and register gas 0.018 + settler 0.25 + relayer 0.15 +
+3 drone accounts 0.15 (step 3b, funded from the contract account) +
 **0.33 headroom for state**. The contract pays for its own state: about 130 bytes per settled
 match (tombstone) and about 90 bytes per new player balance, so 0.33 NEAR is about 2,000 matches
 or players together. With only 2.3 NEAR (the first plan) the headroom was 0.038 NEAR, about 25
@@ -93,6 +94,15 @@ before running a tx. The server sends every call at 100 Tgas, so the settler nee
 hit exactly this). Real burn is about 0.0004 NEAR per call, about 0.0007 per paid match. Top up
 when it falls under 0.12. The relayer burns about 0.0002 NEAR per ticket. Email login's MPC
 `sign` runs at 300 Tgas, so with `VITE_NEAR_AUTH=1` fund the relayer with at least 0.5 NEAR.
+
+### 3b. Drone accounts and agents (A7, about 10 s, 3 small txs + 1 owner call)
+
+`NETWORK=mainnet CONFIRM_MAINNET=yes ../../node_modules/.bin/tsx drones.ts --register` (from
+`tools/scripts`). It creates `drone-1..3.$CONTRACT_ID` (0.05 NEAR each, skipped if they exist, never
+recreated) and, as the owner, calls `set_agents` (1 yocto) so settle may pay drones their bounties
+(capped at 12% of a match's stakes by the contract). Check: `near contract call-function as-read-only
+$CONTRACT_ID is_agent json-args '{"account_id":"drone-1.'$CONTRACT_ID'"}' network-config mainnet now`
+prints `true`. Then point the server's paid-room drones at these accounts.
 
 ## 4. Check the deploy (free)
 
@@ -146,7 +156,7 @@ Never delete or recreate the accounts (name squatters watch for it). Recover val
    near contract call-function as-transaction $CONTRACT_ID withdraw json-args '{"amount":"<sum>"}' prepaid-gas '100 Tgas' attached-deposit '1 yoctoNEAR' sign-as vanshverse.near network-config mainnet sign-with-legacy-keychain send
    ```
    Players withdraw their own balances first. `reserve_withdraw` refuses while matches are open.
-3. **Storage NEAR out [TX]:** the 1.99 NEAR is locked by the wasm bytes. Replace the code with an
+3. **Storage NEAR out [TX]:** the 2.05 NEAR is locked by the wasm bytes. Replace the code with an
    empty 8-byte module (state stays, about 1 KB), then send the freed NEAR home:
    ```
    printf '\x00asm\x01\x00\x00\x00' > tiny.wasm
@@ -155,7 +165,7 @@ Never delete or recreate the accounts (name squatters watch for it). Recover val
    near tokens $CONTRACT_ID send-near vanshverse.near '<balance - 0.02> NEAR' network-config mainnet sign-with-legacy-keychain send
    ```
    Do this only after every balance is withdrawn: the empty module cannot pay anyone out.
-4. **Sub-accounts:** `near tokens settler.$CONTRACT_ID send-near vanshverse.near '<balance - 0.003> NEAR' ...`
+4. **Sub-accounts:** (drone-1..3 too, same command) `near tokens settler.$CONTRACT_ID send-near vanshverse.near '<balance - 0.003> NEAR' ...`
    and the same for the relayer (each keeps about 0.002 NEAR for its own storage).
 5. **Bad code, keep the money:** redeploy a fixed wasm with `CONFIRM_MAINNET=yes UPGRADE=1 npm run deploy`
    (state kept) or `MIGRATE=1` when the state layout changed (write a ContractVn + migrate first).

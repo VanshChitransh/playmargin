@@ -79,9 +79,18 @@ impl Contract {
         require!(vault_repaid.0 <= lent.0, "vault_repaid above lent");
         require!(lent.0 - vault_repaid.0 <= m.budget.0, "outstanding debt above the budget reserved at open");
         let paid = payouts.iter().fold(0u128, |s, (_, a)| add(s, a.0));
-        for (who, _) in &payouts {
-            require!(m.players.contains(who), "payout to an account not in the match");
+        // A payout goes to a match player, or to a registered house agent (drone bounty), and the
+        // agents' share of one match is capped at AGENT_PAYOUT_MAX_BPS of its stakes.
+        let mut to_agents = 0u128;
+        for (who, a) in &payouts {
+            if m.players.contains(who) {
+                continue;
+            }
+            require!(agent_registered(who), "payout to an account not in the match");
+            to_agents = add(to_agents, a.0);
         }
+        let agent_cap = m.stakes.0.checked_mul(AGENT_PAYOUT_MAX_BPS).expect("overflow") / 10_000;
+        require!(to_agents <= agent_cap, "agent payouts above 12% of the stakes");
         let out = [vault_repaid.0, interest_to_vault.0, fees.0, reserve.0].into_iter().fold(paid, add);
         require!(out == add(m.stakes.0, lent.0), "settle does not conserve value");
 
@@ -423,6 +432,92 @@ mod tests {
         let mut c = two_players();
         open(&mut c);
         st(&mut c, vec![("a.near", 2_200_000)], [USDC, 800_000, 0, 0, 0]);
+    }
+
+    /// A7: drone bounties. Stakes 2 USDC, so agents may get at most 0.24 USDC of one match.
+    fn with_drone(c: &mut Contract) {
+        ctx("owner.near", 1, 0);
+        c.set_agents(vec![acc("drone-1.near")], vec![]);
+    }
+
+    #[test]
+    fn agent_bounty_settles_to_the_drone() {
+        let mut c = two_players();
+        with_drone(&mut c);
+        assert!(c.is_agent(acc("drone-1.near")));
+        open(&mut c);
+        st(&mut c, vec![("a.near", 1_700_000), ("b.near", 100_000), ("drone-1.near", 100_000)], [USDC, USDC, 50_000, 20_000, 30_000]);
+        assert_eq!(c.balance_of(acc("drone-1.near")).0, 100_000);
+    }
+
+    #[test]
+    #[should_panic(expected = "not in the match")]
+    fn unregistered_agent_rejected() {
+        let mut c = two_players();
+        open(&mut c);
+        st(&mut c, vec![("a.near", 1_700_000), ("b.near", 100_000), ("drone-1.near", 100_000)], [USDC, USDC, 50_000, 20_000, 30_000]);
+    }
+
+    #[test]
+    #[should_panic(expected = "above 12% of the stakes")]
+    fn agent_payout_over_cap_rejected() {
+        let mut c = two_players();
+        with_drone(&mut c);
+        open(&mut c);
+        st(&mut c, vec![("a.near", 1_559_999), ("b.near", 100_000), ("drone-1.near", 240_001)], [USDC, USDC, 50_000, 20_000, 30_000]);
+    }
+
+    #[test]
+    fn agent_payout_exactly_at_cap_settles() {
+        let mut c = two_players();
+        with_drone(&mut c);
+        open(&mut c);
+        // Two entries for one drone count together: 120000 + 120000 = 240000, the cap.
+        st(&mut c, vec![("a.near", 1_560_000), ("b.near", 100_000), ("drone-1.near", 120_000), ("drone-1.near", 120_000)], [USDC, USDC, 50_000, 20_000, 30_000]);
+        assert_eq!(c.balance_of(acc("drone-1.near")).0, 240_000);
+    }
+
+    #[test]
+    #[should_panic(expected = "above 12% of the stakes")]
+    fn duplicate_agent_entries_count_toward_cap() {
+        let mut c = two_players();
+        with_drone(&mut c);
+        open(&mut c);
+        st(&mut c, vec![("a.near", 1_559_999), ("b.near", 100_000), ("drone-1.near", 120_000), ("drone-1.near", 120_001)], [USDC, USDC, 50_000, 20_000, 30_000]);
+    }
+
+    #[test]
+    #[should_panic(expected = "not in the match")]
+    fn removed_agent_cannot_be_paid() {
+        let mut c = two_players();
+        with_drone(&mut c);
+        c.set_agents(vec![], vec![acc("drone-1.near")]);
+        open(&mut c);
+        st(&mut c, vec![("a.near", 1_700_000), ("b.near", 100_000), ("drone-1.near", 100_000)], [USDC, USDC, 50_000, 20_000, 30_000]);
+    }
+
+    #[test]
+    fn removed_agent_is_not_an_agent() {
+        let mut c = two_players();
+        with_drone(&mut c);
+        c.set_agents(vec![], vec![acc("drone-1.near")]);
+        assert!(!c.is_agent(acc("drone-1.near")));
+    }
+
+    #[test]
+    #[should_panic(expected = "only the owner")]
+    fn non_owner_cannot_set_agents() {
+        let mut c = setup();
+        ctx("settler.near", 1, 0);
+        c.set_agents(vec![acc("drone-1.near")], vec![]);
+    }
+
+    #[test]
+    #[should_panic(expected = "exactly 1 yoctoNEAR")]
+    fn set_agents_needs_yocto() {
+        let mut c = setup();
+        ctx("owner.near", 0, 0);
+        c.set_agents(vec![acc("drone-1.near")], vec![]);
     }
 
     /// N11 H2: a leaked settler key cannot pay an outsider, nor push more than 10% bad debt.
