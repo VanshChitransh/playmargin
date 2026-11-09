@@ -8,3 +8,4 @@ target/
 *.sqlite-*
 .claude/settings.local.json
 .DS_Store
+playtest-out/
