@@ -48,6 +48,8 @@ const FOOD_REACH = 12;
 
 export class Receipt {
   private stats: Stats = { foodEaten: 0, aliveS: 0, blobsEaten: 0, topRank: 0, peakEquity: 0 };
+  /** Match clock (s) when I was first and last seen alive after GO: time alive survives dropped frames. */
+  private aliveFrom: number | null = null;
   private food = new Map<number, { x: number; y: number }>();
   private gains = new Map<string, number>();
   private spikes = 0;
@@ -79,7 +81,8 @@ export class Receipt {
     if (!me || me.state !== "alive") return;
     this.lastMe = me;
     if (elapsedS !== undefined) {
-      this.stats.aliveS += dtS;
+      this.aliveFrom ??= elapsedS;
+      this.stats.aliveS = elapsedS - this.aliveFrom;
       this.stats.peakEquity = Math.max(this.stats.peakEquity, me.equity);
       const rank = blobs.filter((b) => b.kind !== "drone" && b.state === "alive" && b.equity > me.equity).length + 1;
       this.stats.topRank = this.stats.topRank ? Math.min(this.stats.topRank, rank) : rank;
