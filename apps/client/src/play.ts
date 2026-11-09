@@ -19,7 +19,7 @@ import { rerender, type Screen } from "./router";
 import { showAborted, showDeath, showResults } from "./screens/overlays";
 import { setLocalLog } from "./screens/verify";
 import { C } from "./render/colors";
-import { engine, play as sfx } from "./audio";
+import { engine, engineFuel, play as sfx } from "./audio";
 import { JUICE } from "./render/juice";
 
 interface Source {
@@ -95,6 +95,7 @@ export const play: Screen = (root, params) => {
     arena.held = on;
     hud.held = on;
     engine(on);
+    sfx(on ? "press" : "release");
   };
   const status = document.createElement("div");
   status.className = "tag pointer-events-none fixed bottom-3 left-3 max-w-[55vw] text-muted";
@@ -102,6 +103,25 @@ export const play: Screen = (root, params) => {
   root.appendChild(status);
 
   /** Event to effect: every money moment gets a visible number or burst where it happened. */
+  // Nitro sound follows the tank: pitch rises, a coin ticks per 10% borrowed, a clunk when dry.
+  let lastStep = -1;
+  let dry = false;
+  const nitroSound = (f: Frame): void => {
+    const mine = f.blobs.find((b) => b.id === f.me);
+    if (!mine || !arena.held || f.match.phase !== "LIVE") return void ((lastStep = -1), (dry = false));
+    const fuel = mine.fuel ?? mine.pips / 3;
+    engineFuel(fuel);
+    const step = Math.floor((1 - fuel) / JUICE.COIN_TICK_STEP);
+    if (lastStep >= 0 && step > lastStep) (sfx("clink", 0.75), navigator.vibrate?.(6));
+    lastStep = step;
+    if (fuel <= 0.001 && !dry) {
+      dry = true;
+      sfx("clunk");
+      engine(false);
+      navigator.vibrate?.([40, 30, 40]);
+    }
+  };
+
   const juice = (e: GameEventMsg, me: string): void => {
     const at = (id: string): { x: number; y: number; r: number } | undefined => {
       const b = lastFrame?.blobs.find((x) => x.id === id);
@@ -175,6 +195,7 @@ export const play: Screen = (root, params) => {
     if (!f) return null;
     lastFrame = f;
     hud.update(f, now);
+    nitroSound(f);
     receipt?.frame(f.blobs, f.match.rateTier, now, dt, f.rateBps, f.match.phase === "LIVE" ? elapsedS(f.match) : undefined, f.food);
     if (f.match.phase === "ENDED") finish();
     // Dev-only hook so tests and agent-browser can read the drawn frame (stripped from builds).

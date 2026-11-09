@@ -3,7 +3,7 @@
 // (browser autoplay rule). Mute is a per-browser convenience in localStorage.
 import { JUICE } from "./render/juice";
 
-export type Sfx = "boost" | "repay" | "pop" | "spike" | "coin" | "tick" | "go" | "beat" | "denied";
+export type Sfx = "boost" | "repay" | "pop" | "spike" | "coin" | "tick" | "go" | "beat" | "denied" | "press" | "release" | "clink" | "clunk";
 
 const KEY = "margin.muted";
 let ctx: AudioContext | null = null;
@@ -41,7 +41,7 @@ export function setMuted(m: boolean): void {
 }
 
 /** Play one effect now. Silent until unlocked or while muted. */
-export function play(s: Sfx): void {
+export function play(s: Sfx, pitch = 1): void {
   if (muted || !ctx || ctx.state !== "running") return;
   const t = ctx.currentTime;
   switch (s) {
@@ -59,6 +59,10 @@ export function play(s: Sfx): void {
     case "spike":
       noise(t, 0.12, 4000, 1500, 0.35);
       break;
+    case "clink": // REPAY coin, pitch rises over a run of taps
+      tone(t, 1320 * pitch, 1320 * pitch, 0.07, "triangle", 0.12);
+      tone(t + 0.04, 1980 * pitch, 1980 * pitch, 0.09, "sine", 0.06);
+      break;
     case "coin":
       tone(t, 988, 988, 0.08, "square", 0.07);
       tone(t + 0.08, 1319, 1319, 0.16, "square", 0.07);
@@ -68,6 +72,17 @@ export function play(s: Sfx): void {
       break;
     case "go":
       for (const f of [523, 659, 784]) tone(t, f, f, 0.35, "triangle", 0.12);
+      break;
+    case "press": // whoosh up plus a low thump: the loan kicks in
+      noise(t, 0.22, 700, 3000, 0.3);
+      tone(t, 90, 45, 0.14, "sine", 0.4);
+      break;
+    case "release": // falling whoosh
+      noise(t, 0.25, 2600, 500, 0.22);
+      break;
+    case "clunk": // the tank runs dry: a hollow knock
+      tone(t, 180, 70, 0.18, "triangle", 0.25);
+      tone(t + 0.05, 95, 60, 0.12, "square", 0.06);
       break;
     case "denied":
       tone(t, 140, 110, 0.12, "square", 0.08);
@@ -81,7 +96,7 @@ export function play(s: Sfx): void {
 
 let engineNodes: { o: OscillatorNode; g: GainNode } | null = null;
 
-/** The nitro engine: a sawtooth that climbs in pitch while BOOST is held, fading out on release. */
+/** The nitro turbine: starts on press, fades on release. Pitch follows the tank via engineFuel. */
 export function engine(on: boolean): void {
   if (!ctx || ctx.state !== "running") return;
   const t = ctx.currentTime;
@@ -90,8 +105,7 @@ export function engine(on: boolean): void {
     const f = ctx.createBiquadFilter();
     const g = ctx.createGain();
     o.type = "sawtooth";
-    o.frequency.setValueAtTime(JUICE.ENGINE_HZ_FROM, t);
-    o.frequency.exponentialRampToValueAtTime(JUICE.ENGINE_HZ_TO, t + JUICE.ENGINE_CLIMB_S);
+    o.frequency.setValueAtTime(JUICE.ENGINE_HZ, t);
     f.type = "lowpass";
     f.frequency.value = 900;
     g.gain.setValueAtTime(0.0001, t);
@@ -107,6 +121,13 @@ export function engine(on: boolean): void {
     o.stop(t + 0.2);
     engineNodes = null;
   }
+}
+
+/** Turbine pitch from the tank: 1.0 when full, ENGINE_PITCH_EMPTY when dry (Mario Kart rev). */
+export function engineFuel(fuel: number): void {
+  if (!ctx || !engineNodes) return;
+  const k = 1 + (JUICE.ENGINE_PITCH_EMPTY - 1) * (1 - Math.max(0, Math.min(1, fuel)));
+  engineNodes.o.frequency.setTargetAtTime(JUICE.ENGINE_HZ * k, ctx.currentTime, 0.05);
 }
 
 function env(t: number, dur: number, peak: number): GainNode {

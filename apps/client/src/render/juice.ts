@@ -13,11 +13,12 @@ export const JUICE = {
   /** Warm-up practice inflate: grow and deflate rates (per second, eased). */
   INFLATE_GROW: 2.5,
   INFLATE_SHRINK: 6,
-  /** Engine tone while held: start and top pitch (Hz), climb time, volume. */
-  ENGINE_HZ_FROM: 90,
-  ENGINE_HZ_TO: 260,
-  ENGINE_CLIMB_S: 1.6,
+  /** Turbine while held: base pitch (Hz) and how far it rises as the tank empties (1.0 to 1.35). */
+  ENGINE_HZ: 110,
+  ENGINE_PITCH_EMPTY: 1.35,
   ENGINE_GAIN: 0.06,
+  /** A soft coin tick every this much of the tank borrowed (a cash register counting the loan). */
+  COIN_TICK_STEP: 0.1,
 
   // Floating numbers (+N on BOOST, minus on REPAY, bounty)
   FLOAT_TTL_S: 0.9,
