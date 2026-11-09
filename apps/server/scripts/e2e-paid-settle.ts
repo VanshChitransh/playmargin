@@ -53,7 +53,7 @@ console.log("open_match ok", matchId);
 const log: LogEntry[] = [];
 for (let t = 1; t <= MATCH_TICKS + 1 && w.phase !== "ENDED"; t++) {
   const a = t / 90;
-  const cmd: InputCmd = { seq: t, dirX: Math.cos(a), dirY: Math.sin(a), boost: t % 600 === 120, repay: t % 900 === 450, cashout: false };
+  const cmd: InputCmd = { seq: t, dirX: Math.cos(a), dirY: Math.sin(a), boost: t % 600 >= 120 && t % 600 < 180, repay: t % 900 === 450, cashout: false };
   step(w, new Map([["p1", cmd]]), t);
   await drainLog(w, log);
 }

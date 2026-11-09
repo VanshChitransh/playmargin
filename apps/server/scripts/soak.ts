@@ -22,7 +22,7 @@ async function play(i: number): Promise<void> {
   let t = 0;
   const iv = setInterval(() => {
     t++;
-    r.send("input", { seq: t, dirX: Math.cos(t / 9 + i), dirY: Math.sin(t / 9 + i), boost: t % 50 === 7, repay: t % 70 === 30, cashout: t % 300 === 200 });
+    r.send("input", { seq: t, dirX: Math.cos(t / 9 + i), dirY: Math.sin(t / 9 + i), boost: t % 100 < 20, repay: t % 70 === 30, cashout: t % 300 === 200 });
   }, 50);
   await new Promise<void>((res) => r.onLeave(() => res()));
   clearInterval(iv);

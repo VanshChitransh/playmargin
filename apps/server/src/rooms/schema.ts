@@ -13,6 +13,8 @@ export class BlobState extends Schema {
   @type("float32") radius = 0;
   @type("string") ring = "green";
   @type("uint8") pips = 0;
+  /** BOOST capacity left, 0 to 1 (the fuel ring). */
+  @type("float32") fuel = 0;
   @type("float32") equity = 0;
   @type("boolean") shielded = false;
   @type("boolean") cashingOut = false;

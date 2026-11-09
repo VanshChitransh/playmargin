@@ -32,12 +32,14 @@ describe("RateLimit", () => {
 });
 
 describe("InputQueue", () => {
-  it("merges taps until taken, then empties, and ignores closed players", () => {
+  it("merges taps, keeps BOOST as the latest held state, then empties, and ignores closed players", () => {
     const q = new InputQueue();
     q.open("a");
-    q.push("a", { ...ok, boost: true }, 0);
-    q.push("a", { ...ok, seq: 2, boost: false }, 0);
-    expect(q.take().get("a")).toMatchObject({ seq: 2, boost: true, dirX: 0.6 });
+    q.push("a", { ...ok, boost: true, repay: true }, 0);
+    q.push("a", { ...ok, seq: 2, boost: false, repay: false }, 0);
+    expect(q.take().get("a")).toMatchObject({ seq: 2, boost: false, repay: true, dirX: 0.6 });
+    q.push("a", { ...ok, seq: 3, boost: true }, 0);
+    expect(q.take().get("a")).toMatchObject({ boost: true });
     expect(q.take().has("a")).toBe(false);
     q.close("a");
     q.push("a", ok, 0);

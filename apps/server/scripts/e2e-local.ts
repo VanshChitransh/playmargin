@@ -37,17 +37,26 @@ const sdk = new Client(`ws://localhost:${port}`);
 const keys = [`ed25519:e2e${Date.now()}aaaaa`, `ed25519:e2e${Date.now()}bbbbb`];
 const rooms = await Promise.all(keys.map((guestKey) => sdk.joinOrCreate("match", { mode: "free", guestKey })));
 if (rooms[0]!.roomId !== rooms[1]!.roomId) fail("the two players landed in different rooms");
-await new Promise((r) => setTimeout(r, 300)); // first state patch
-const phases: string[] = [(rooms[0]!.state as { phase: string }).phase];
+const phases: string[] = [];
 rooms.forEach((r, i) => {
   r.onMessage("me", () => {});
   r.onMessage("commander", () => {});
   r.onMessage("ev", (e: { type: string; phase?: string }) => i === 0 && e.type === "phase" && phases.push(e.phase!));
 });
+await new Promise((r) => setTimeout(r, 300)); // first state patch
+phases.unshift((rooms[0]!.state as { phase: string }).phase);
+// BOOST is held: true in every message for 1 s out of 4. Fuel must be on the wire for the ring.
+let fuelSeen = false;
+let fuelDropped = false;
+rooms[0]!.onStateChange((st: { blobs: Map<string, { fuel?: number }> }) => {
+  const f = st.blobs.get(rooms[0]!.sessionId)?.fuel;
+  if (typeof f === "number") fuelSeen = true;
+  if (typeof f === "number" && f < 0.99) fuelDropped = true;
+});
 let t = 0;
 const iv = setInterval(() => {
   t++;
-  rooms.forEach((r, i) => r.send("input", { seq: t, dirX: Math.cos(t / 8 + i * 3), dirY: Math.sin(t / 8 + i * 3), boost: t % 40 === 3, repay: t % 60 === 20, cashout: false }));
+  rooms.forEach((r, i) => r.send("input", { seq: t, dirX: Math.cos(t / 8 + i * 3), dirY: Math.sin(t / 8 + i * 3), boost: t % 80 < 20, repay: t % 60 === 20, cashout: false }));
 }, 50);
 await Promise.all(rooms.map((r) => new Promise<void>((res) => r.onLeave(() => res()))));
 clearInterval(iv);
@@ -69,12 +78,16 @@ const checks = {
   }),
   replayEqualsStored: seats.every((s) => (replay.payouts.find((p) => p.id === s.blob)?.amount ?? 0) === (s.payout ?? 0)),
   logEntries: served.log.length,
+  fuelSeen,
+  heldBoostBorrowed: fuelDropped && served.log.some((e) => e.type === "BOOST"),
 };
 console.log(checks);
 if (checks.phases !== "WARMUP > COUNTDOWN > LIVE > ENDED") fail(`phases ${checks.phases}`);
 if (checks.status !== "settled") fail(`status ${checks.status}`);
 if (checks.seats !== 2) fail(`expected 2 seats, got ${checks.seats}`);
 if (!checks.ledgerExact) fail("credits ledger is not exact");
+if (!checks.fuelSeen) fail("BlobView.fuel never reached the client");
+if (!checks.heldBoostBorrowed) fail("holding BOOST never borrowed");
 if (!checks.replayEqualsStored) fail("settleVerified(log) differs from stored payouts");
 console.log("E2E OK");
 process.exit(0);

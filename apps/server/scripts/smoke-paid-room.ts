@@ -65,7 +65,7 @@ console.log({ unsigned, sameRoom: rooms[0]!.roomId === rooms[1]!.roomId, phase: 
 let t = 0;
 const iv = setInterval(() => {
   t++;
-  rooms.forEach((r, i) => r.send("input", { seq: t, dirX: Math.cos(t / 10 + i * 3), dirY: Math.sin(t / 10 + i * 3), boost: t % 40 === 5, repay: false, cashout: false }));
+  rooms.forEach((r, i) => r.send("input", { seq: t, dirX: Math.cos(t / 10 + i * 3), dirY: Math.sin(t / 10 + i * 3), boost: t % 40 < 10, repay: false, cashout: false }));
 }, 100);
 const matchId = rooms[0]!.roomId;
 let status = "";

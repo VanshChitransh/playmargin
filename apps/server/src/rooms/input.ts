@@ -60,10 +60,11 @@ export class InputQueue {
     const cmd = parseInput(msg);
     if (!cmd) return;
     const prev = this.pending.get(id);
-    // Taps are edge-triggered: OR them until a tick consumes them, so none is lost between ticks.
+    // BOOST is held state: the latest message wins (core's 250 ms expiry ends it if messages stop).
+    // REPAY and cash out are taps: OR them until a tick consumes them, so none is lost between ticks.
     this.pending.set(id, {
       cmd,
-      boost: cmd.boost || (prev?.boost ?? false),
+      boost: cmd.boost,
       repay: cmd.repay || (prev?.repay ?? false),
       cashout: cmd.cashout || (prev?.cashout ?? false),
     });
