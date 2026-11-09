@@ -102,7 +102,7 @@ export class MatchConnection {
     s.blobs.forEach((b) =>
       blobs.push({
         id: b.id, kind: b.kind, label: b.label, x: b.x, y: b.y, radius: b.radius,
-        ring: b.ring as Ring, pips: b.pips, equity: b.equity, shielded: b.shielded,
+        ring: b.ring as Ring, pips: b.pips, fuel: (b as { fuel?: number }).fuel, equity: b.equity, shielded: b.shielded,
         cashingOut: b.cashingOut, state: b.state, owe: b.id === me ? this.owe : 0,
       }),
     );
