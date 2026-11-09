@@ -92,9 +92,10 @@ export async function drawCertificate(d: CertData): Promise<Blob> {
     text(value, x, 960, "78px 'Lilita One'", C.ink, "center");
   };
   stat("LEVERAGE", `${d.leverage.toFixed(1)}x`, 240);
-  stat("RED FOR", `${Math.max(0, d.redS).toFixed(0)} s`, W / 2);
+  // A drone can pop a blob the instant it goes red: say "<1 s", never a bare "0 s".
+  stat("RED FOR", d.redS < 0.5 ? "<1 s" : `${Math.round(d.redS)} s`, W / 2);
   stat("GREED", `${greedScore(d.peakLeverage)}/100`, W - 240);
-  const hint = d.warnAtS !== null ? `Should have hit REPAY at ${clock(R.MATCH_S - d.warnAtS)}.` : "Never saw it coming.";
+  const hint = d.warnAtS !== null ? `Should have held REPAY at ${clock(R.MATCH_S - d.warnAtS)}.` : "Never saw it coming.";
   text(hint, W / 2, 1035, "500 34px Rubik", C.ink, "center");
 
   // Footer: line + QR to verify
