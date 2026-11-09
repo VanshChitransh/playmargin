@@ -86,14 +86,18 @@ export const landing: Screen = (root) => {
     .then((r) => (r.ok ? (r.json() as Promise<{ matches: number; players: number; agentPops: number }>) : null))
     .then((s) => {
       if (!s) return;
-      const parts = [
-        [s.matches, "matches played"],
-        [s.players, "players"],
-        [s.agentPops, "liquidations by AI agents"],
-      ].filter(([n]) => (n as number) > 0);
+      const parts = (
+        [
+          [s.matches, "match played", "matches played"],
+          [s.players, "player", "players"],
+          [s.agentPops, "liquidation by AI agents", "liquidations by AI agents"],
+        ] as const
+      )
+        .filter(([n]) => n > 0)
+        .map(([n, one, many]) => [n, n === 1 ? one : many] as const);
       const el = root.querySelector<HTMLElement>("[data-proof]");
       if (!el || !parts.length) return;
-      el.innerHTML = parts.map(([n, t]) => `<b class="font-display text-lg text-ink">${(n as number).toLocaleString()}</b> ${t}`).join(" · ");
+      el.innerHTML = parts.map(([n, t]) => `<b class="font-display text-lg text-ink">${n.toLocaleString()}</b> ${t}`).join(" · ");
       el.classList.remove("hidden");
     })
     .catch(() => {});

@@ -4,7 +4,9 @@
 a loan from a vault, and labelled AI liquidator drones pop anyone who borrows too much. Every match
 is a hash-chained log that settles on NEAR.
 
-<!-- TODO(Vansh): hero GIF here (real gameplay, at most 5 MB) -->
+[![MARGIN gameplay: BOOST borrows, a spike sends the blob red, REPAY saves it, then Drone-1 liquidates a greedy blob and the receipt itemises every number](docs/hero.gif)](docs/hero.mp4)
+
+<sub>Real play, nothing staged: offline practice with labelled bots, then the Judge Run with Drone-1, a labelled AI liquidator. Click for the mp4.</sub>
 <!-- TODO(Vansh): V1 demo video (your voice, at most 2:20) and V2 gameplay trailer, mp4 at most 10 MB each -->
 
 **Play:** TODO(Vansh) live URL · **Demo post on X:** TODO(Vansh) link · **Contract (testnet):**

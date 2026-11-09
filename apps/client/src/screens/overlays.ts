@@ -24,9 +24,11 @@ const onDark = (html: string): string => html.replace("<button", '<button style=
 /** The pop moment. Returns the element so the caller can remove it when Watch is pressed. */
 export function showDeath(root: HTMLElement, d: NonNullable<Outcome["death"]>, act: (a: "watch" | "again" | "share") => void): HTMLElement {
   const why = d.eaten ? `eaten by ${esc(d.by)}` : d.keeper ? "VAULT CLOSED YOUR LOAN" : `popped by ${esc(d.by)}`;
+  // The unit sits outside the mono span: a mono space reads as a double space next to the number.
+  const redS = Math.max(1, Math.round(d.redS));
   const greed =
     d.leverage >= 1.05
-      ? `You were <b class="num">${d.leverage.toFixed(1)}x</b>${d.redS >= 0.5 ? `, red for <b class="num">${d.redS.toFixed(0)} s</b>` : ""}.`
+      ? `You were <b class="num">${d.leverage.toFixed(1)}x</b>${d.redS >= 0.5 ? `, red for <b class="num">${redS}</b> second${redS === 1 ? "" : "s"}` : ""}.`
       : "No loan, just outsized.";
   const el = shell(
     root,
