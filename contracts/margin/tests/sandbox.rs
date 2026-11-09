@@ -211,6 +211,23 @@ async fn arena_lifecycle() -> testresult::TestResult<()> {
     let cb = json!({"account_id": a, "amount": "1000000"});
     e.call(&a, &m, "on_withdraw", cb, 0, false).await?;
     assert_eq!(e.margin_balance(&a).await?, "2000000");
+
+    // Revolving budget: repay then BOOST again, lifetime lent 4 > budget 3 is valid, but
+    // outstanding debt (lent - repaid) above the budget is refused.
+    for p in [&a, &b] {
+        e.call(p, &m, "enter_arena", json!({"stake": "1000000"}), 0, true).await?;
+    }
+    e.call(&s, &m, "open_match", json!({"match_id": "m3", "players": [a, b]}), 0, true).await?;
+    let revolve = |lent: &str, pay_a: &str| {
+        json!({"match_id": "m3", "payouts": [[a, pay_a], [b, "100000"]], "lent": lent,
+               "vault_repaid": "4000000", "interest_to_vault": "50000", "fees": "20000",
+               "reserve": "30000", "seq": 3, "head": "rev"})
+    };
+    e.call(&s, &m, "settle", revolve("7000001", "4800001"), 0, false).await?; // outstanding 3.000001
+    e.call(&s, &m, "settle", revolve("4000000", "1800000"), 0, true).await?;
+    assert_eq!(e.margin_balance(&a).await?, "2800000");
+    assert_eq!(e.view(&m, "vault", json!({})).await?["free"], "5140000");
+    assert_eq!(e.view(&m, "vault", json!({})).await?["locked"], "0");
     Ok(())
 }
 

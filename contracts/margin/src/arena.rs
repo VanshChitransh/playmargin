@@ -52,7 +52,9 @@ impl Contract {
 
     /// Settler, once per match. Mirrors core settle() (packages/core/src/settle.ts):
     /// sum(payouts) + vault_repaid + interest_to_vault + fees + reserve == stakes + lent,
-    /// with lent <= budget and vault_repaid <= lent. The vault always gets back its whole budget
+    /// with vault_repaid <= lent and outstanding debt (lent - vault_repaid) <= budget. The budget
+    /// revolves: players repay then BOOST again, so lifetime lent may exceed it. The vault always
+    /// gets back its whole budget
     /// plus interest and fees: bad debt (lent - vault_repaid) may only come from the house
     /// reserve, so a leaked settler key can never drain LP money, only one match's stakes.
     /// The server can always comply by trimming payouts.
@@ -74,8 +76,8 @@ impl Contract {
         require!(m.status == MatchStatus::Open, "match is not open");
         require!(payouts.len() <= MAX_PAYOUTS, "too many payouts");
         require!(head.len() <= MAX_HEAD_LEN, "head too long");
-        require!(lent.0 <= m.budget.0, "lent above the budget reserved at open");
         require!(vault_repaid.0 <= lent.0, "vault_repaid above lent");
+        require!(lent.0 - vault_repaid.0 <= m.budget.0, "outstanding debt above the budget reserved at open");
         let paid = payouts.iter().fold(0u128, |s, (_, a)| add(s, a.0));
         let out = [vault_repaid.0, interest_to_vault.0, fees.0, reserve.0].into_iter().fold(paid, add);
         require!(out == add(m.stakes.0, lent.0), "settle does not conserve value");
@@ -259,11 +261,21 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "lent above the budget")]
-    fn lent_over_budget_rejected() {
+    #[should_panic(expected = "outstanding debt above the budget")]
+    fn outstanding_over_budget_rejected() {
         let mut c = two_players();
         open(&mut c);
-        st(&mut c, vec![("a.near", 5 * USDC + 1)], [3 * USDC + 1, 3 * USDC + 1, 0, 0, 0]);
+        st(&mut c, vec![("a.near", 5 * USDC + 1)], [3 * USDC + 1, 0, 0, 0, 0]);
+    }
+
+    /// Revolving budget (S1 demo: lent 1097 vs budget 900): lent 4 > budget 3, all repaid, valid.
+    #[test]
+    fn revolving_budget_settles() {
+        let mut c = two_players();
+        open(&mut c);
+        st(&mut c, vec![("a.near", 1_800_000), ("b.near", 100_000)], [4 * USDC, 4 * USDC, 50_000, 20_000, 30_000]);
+        assert_eq!(c.balance_of(acc("a.near")).0, 1_800_000 + USDC);
+        assert_eq!(c.vault().locked.0, 0);
     }
 
     #[test]
