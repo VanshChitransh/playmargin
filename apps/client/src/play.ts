@@ -171,7 +171,7 @@ export const play: Screen = (root, params) => {
     receipt?.frame(f.blobs, f.match.rateTier, now, dt, f.rateBps, f.match.phase === "LIVE" ? elapsedS(f.match) : undefined, f.food);
     if (f.match.phase === "ENDED") finish();
     // Dev-only hook so tests and agent-browser can read the drawn frame (stripped from builds).
-    if (import.meta.env.DEV) (window as unknown as { __frame?: unknown }).__frame = f;
+    if (import.meta.env.DEV) Object.assign(window, { __frame: f, __arena: arena });
     return f;
   };
 
