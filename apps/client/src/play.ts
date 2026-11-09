@@ -99,7 +99,8 @@ export const play: Screen = (root, params) => {
     hud.speedLines(on && !controls.els.boost.classList.contains("blocked"));
   };
   const status = document.createElement("div");
-  status.className = "tag pointer-events-none fixed bottom-3 left-3 max-w-[55vw] text-muted";
+  // Phones: the clock pill carries an "offline" tag instead, so this line never crowds the bottom.
+  status.className = "tag pointer-events-none fixed bottom-3 left-3 max-w-[55vw] text-muted max-sm:hidden";
   status.textContent = "Connecting";
   root.appendChild(status);
 

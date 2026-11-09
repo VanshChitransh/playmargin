@@ -78,7 +78,10 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
         <span class="font-display text-5xl tabular-nums ${o.end > o.start ? "" : "text-liq"}">${o.end.toFixed(2)}</span>
       </div>
       <p class="mt-1 text-xs text-ink/60">${paid ? "Real dollars, paid to your balance when the match settles." : "Practice credits. Never cash, never bought."}</p>
-      <div class="mt-5 grid grid-cols-2 gap-3">${[btn("again", "Play again", true).replace("bg-paper", "bg-liq"), btn("share", o.death && !o.death.eaten ? "Certificate" : "Share", false)].map((b) => b.replace("px-5", "px-2")).join("")}</div>
+      <div class="mt-5 grid grid-cols-2 gap-3">${[
+        btn("again", "Play again", true).replace("bg-paper text-ink", "bg-ink text-paper").replace("<button", '<button style="box-shadow:6px 6px 0 var(--color-gold)"'),
+        btn("share", o.death && !o.death.eaten ? "Certificate" : "Share", false).replace("bg-navy text-paper", "bg-paper text-ink"),
+      ].map((b) => b.replace("px-5", "px-2")).join("")}</div>
       <div class="tag mt-4 flex justify-center gap-6"><button data-act="verify" class="underline">Verify this match</button><button data-act="home" class="underline">Home</button></div>
     </div>`,
     true,

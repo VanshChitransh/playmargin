@@ -18,7 +18,7 @@ const C = { gold: "#F5B83D", liq: "#E5484D", dim: "#1A2742", paper: "#EEF2FF" };
 
 export class Hud {
   private el: HTMLElement;
-  private q = <T extends HTMLElement>(s: string): T => this.el.querySelector<T>(`[data-h=${s}]`)!;
+  private q = <T extends HTMLElement>(s: string): T => (this.el.querySelector<T>(`[data-h=${s}]`) ?? document.querySelector<T>(`[data-h=${s}]`))!;
   private last = new Map<string, string>();
   private lbAt = 0;
   private bannerKey = "";
@@ -54,12 +54,13 @@ export class Hud {
       </div>
       <div data-h=center class="absolute inset-x-0 top-[14%] grid place-items-center text-center"></div>
       <div data-h=frame class="call-frame"></div>
+      <span data-h=off class="tag absolute left-3 top-12 mt-[max(0px,env(safe-area-inset-top))] hidden rounded-field bg-navy/90 px-2 py-0.5 text-[11px] text-gold">offline practice</span>
       <p data-h=cmd style="display:none" class="absolute left-0 top-12 m-3 hidden max-w-[min(22rem,60vw)] rounded-field bg-navy/90 px-2 py-1 text-xs text-agent max-sm:line-clamp-3 max-sm:max-w-[calc(100vw-180px)] max-sm:text-[11px]"></p>
       <button data-h=mute class="tag pointer-events-auto absolute left-0 top-0 m-3 mt-[max(12px,env(safe-area-inset-top))] rounded-field bg-navy/80 px-2 py-1 text-muted"></button>
       <div data-h=tap class="pointer-events-none absolute left-1/2 top-[calc(50%+64px)] hidden -translate-x-1/2"><span class="sticker rounded-field bg-paper px-3 py-1 font-display text-xl text-ink">${this.touch ? "TAP REPAY" : "TAP R"}</span></div>
       <div data-h=call class="tag absolute inset-x-0 bottom-28 hidden text-center"><span class="rounded-field bg-liq px-3 py-1 text-paper">Margin call: tap REPAY to get out</span></div>
-      <div data-h=money class="absolute bottom-0 right-28 flex flex-col items-end gap-1 p-4 pb-[max(20px,env(safe-area-inset-bottom))]">
-        <span data-h=owe class="num hidden rounded-field bg-navy/80 px-2 py-0.5 text-gold"></span>
+      <div data-h=money class="pointer-events-none hidden items-baseline gap-2 rounded-field bg-navy/90 px-2 py-0.5">
+        <span data-h=owe class="num text-gold"></span>
         <span data-h=drain class="num hidden text-xs text-liq"></span>
       </div>`;
     root.appendChild(this.el);
@@ -74,17 +75,24 @@ export class Hud {
     this.pipRing.className = "pip-ring";
     els.boost.classList.add("relative");
     els.boost.appendChild(this.pipRing);
-    this.coach = opts.coach === false ? { update: () => {}, close: () => {} } : coachMarks(root, this.touch);
+    // The loan chip sits at the top of the control column, so it stacks above REPAY and BOOST
+    // (and the cash-out button when it shows) instead of floating over the play area.
+    const money = this.q("money");
+    els.boost.parentElement?.prepend(money);
+    const noCoach = opts.coach === false || innerWidth < 640;
+    this.coach = noCoach ? { update: () => {}, close: () => {} } : coachMarks(root, this.touch);
   }
 
   destroy(): void {
     this.el.remove();
     this.pipRing.remove();
+    this.q("money")?.remove();
     this.coach.close();
   }
 
   update(f: Frame, now: number): void {
     this.el.classList.remove("invisible");
+    this.q("off").classList.toggle("max-sm:inline", this.offline);
     const m = f.match;
     const me = f.blobs.find((b) => b.id === f.me);
     this.clock(f);
@@ -127,7 +135,8 @@ export class Hud {
     this.set("owe", String(owe), () => {
       const o = this.q("owe");
       o.textContent = `owe ${owe}`;
-      o.classList.toggle("hidden", owe <= 0);
+      this.q("money").classList.toggle("hidden", owe <= 0);
+      this.q("money").classList.toggle("flex", owe > 0);
     });
     const drain = interestPerS(me.owe, m.rateTier, f.rateBps);
     const txt = drain.toFixed(drain < 1 ? 2 : 1); // small loans still show a moving number
