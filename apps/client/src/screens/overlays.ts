@@ -6,9 +6,10 @@ import type { Outcome } from "../game/receipt";
 const fmt = (n: number): string => (n >= 0 ? "+" : "−") + Math.abs(n).toFixed(2); // one format, so the column lines up
 const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-function shell(root: HTMLElement, inner: string): HTMLElement {
+function shell(root: HTMLElement, inner: string, grey = false): HTMLElement {
   const el = document.createElement("div");
-  el.className = "fixed inset-0 z-20 grid place-items-center bg-ink/85 p-4";
+  // Results: agar.io greys the frozen arena behind the card; the death moment stays dark.
+  el.className = `fixed inset-0 z-20 grid place-items-center overflow-y-auto p-4 ${grey ? "bg-ink/45 backdrop-grayscale" : "bg-ink/85"}`;
   el.innerHTML = inner;
   root.appendChild(el);
   return el;
@@ -45,16 +46,28 @@ export function showDeath(root: HTMLElement, d: NonNullable<Outcome["death"]>, a
 /** The bell: a receipt whose lines add up to the final number. */
 export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "home" | "verify" | "share") => void, paid = false): HTMLElement {
   const title = o.kind === "cashed" ? "CASHED OUT" : o.kind === "survived" ? "SURVIVED" : o.death?.eaten ? "EATEN" : "LIQUIDATED";
+  const dead = o.kind === "popped";
+  const s = o.stats;
+  const tile = (label: string, value: string): string =>
+    `<div class="rounded-field bg-ink/5 px-2 py-1.5"><div class="font-display text-2xl tabular-nums leading-none">${value}</div><div class="tag mt-1 text-[10px] text-ink/60">${label}</div></div>`;
+  const stats = `<div class="mt-4 grid grid-cols-3 gap-2 text-center">
+      ${tile("Food eaten", String(s.foodEaten))}
+      ${tile("Time alive", `${Math.floor(s.aliveS / 60)}:${String(s.aliveS % 60).padStart(2, "0")}`)}
+      ${tile("Blobs eaten", String(s.blobsEaten))}
+      ${tile("Top rank", `#${s.topRank}`)}
+      ${tile("Peak equity", s.peakEquity.toFixed(0))}
+      ${tile("Final rank", `#${o.rank}/${o.of}`)}
+    </div>`;
   const rows = o.lines
     .map((l) => `<div class="flex justify-between gap-6"><span>${esc(l.label)}</span><span class="num ${l.amount < 0 ? "text-liq" : ""}">${fmt(l.amount)}</span></div>`)
     .join("");
   const el = shell(
     root,
     `<div class="sticker w-full max-w-sm rounded-box bg-paper p-5 text-ink">
-      <div class="flex items-start justify-between">
-        <h2 class="font-display text-4xl">${title}</h2>
-        <span class="tag rounded-field bg-ink px-2 py-1 text-paper">#${o.rank}/${o.of}</span>
-      </div>
+      ${dead
+        ? `<div class="mb-2 text-center"><h2 class="stamp inline-block rounded-box border-[5px] border-liq px-4 py-1 font-display text-5xl text-liq">${title}</h2></div>`
+        : `<h2 class="font-display text-4xl">${title}</h2>`}
+      ${stats}
       <div class="mt-4 space-y-1 border-y-2 border-dashed border-ink/40 py-3 font-mono text-sm">
         <div class="flex justify-between"><span>Start</span><span class="num">${o.start.toFixed(2)}</span></div>
         ${rows}
@@ -64,9 +77,10 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
         <span class="font-display text-5xl tabular-nums ${o.end > o.start ? "" : "text-liq"}">${o.end.toFixed(2)}</span>
       </div>
       <p class="mt-1 text-xs text-ink/60">${paid ? "Real dollars, paid to your balance when the match settles." : "Practice credits. Never cash, never bought."}</p>
-      <div class="mt-5 grid grid-cols-[1.4fr_1fr_1fr] gap-3">${[btn("again", "Play again", true).replace("bg-paper", "bg-liq"), btn("verify", "Verify", false), btn("home", "Home", false)].map((b) => b.replace("px-5", "px-2").replace("text-xl", "text-lg")).join("")}</div>
-      ${o.death && !o.death.eaten ? `<button data-act="share" class="tag mt-4 underline">Get your Liquidation Certificate</button>` : ""}
+      <div class="mt-5 grid grid-cols-2 gap-3">${[btn("again", "Play again", true).replace("bg-paper", "bg-liq"), btn("share", o.death && !o.death.eaten ? "Certificate" : "Share", false)].map((b) => b.replace("px-5", "px-2")).join("")}</div>
+      <div class="tag mt-4 flex justify-center gap-6"><button data-act="verify" class="underline">Verify this match</button><button data-act="home" class="underline">Home</button></div>
     </div>`,
+    true,
   );
   wire(el, act);
   (el.querySelector("[data-act=again]") as HTMLElement).focus();

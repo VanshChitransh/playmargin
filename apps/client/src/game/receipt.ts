@@ -16,6 +16,8 @@ export interface Outcome {
   lines: Line[];
   rank: number;
   of: number;
+  /** agar.io-style match stats for the results screen. */
+  stats: Stats;
   /** Death details for the LIQUIDATED screen. */
   death?: {
     by: string;
@@ -31,7 +33,22 @@ export interface Outcome {
   };
 }
 
+export interface Stats {
+  foodEaten: number;
+  /** Seconds alive after GO. */
+  aliveS: number;
+  blobsEaten: number;
+  /** Best leaderboard place reached (1 = top). */
+  topRank: number;
+  peakEquity: number;
+}
+
+/** A pellet that vanished this close to my edge was eaten by me. */
+const FOOD_REACH = 12;
+
 export class Receipt {
+  private stats: Stats = { foodEaten: 0, aliveS: 0, blobsEaten: 0, topRank: 0, peakEquity: 0 };
+  private food = new Map<number, { x: number; y: number }>();
   private gains = new Map<string, number>();
   private spikes = 0;
   private fees = 0;
@@ -47,11 +64,26 @@ export class Receipt {
   constructor(private me: string, private start: number = R.ENTRY_FREE * R.START_MASS_RATIO) {}
 
   /** Feed every frame: remembers my last alive state and how long I have been red. */
-  frame(blobs: BlobView[], tier: RateTier, nowMs: number, dtS: number, rateBps?: number, elapsedS?: number): void {
+  frame(
+    blobs: BlobView[],
+    tier: RateTier,
+    nowMs: number,
+    dtS: number,
+    rateBps?: number,
+    elapsedS?: number,
+    food?: ReadonlyArray<{ id: number; x: number; y: number }>,
+  ): void {
     for (const b of blobs) this.labels.set(b.id, displayName(b));
     const me = blobs.find((b) => b.id === this.me);
+    if (food) this.countFood(food, me);
     if (!me || me.state !== "alive") return;
     this.lastMe = me;
+    if (elapsedS !== undefined) {
+      this.stats.aliveS += dtS;
+      this.stats.peakEquity = Math.max(this.stats.peakEquity, me.equity);
+      const rank = blobs.filter((b) => b.kind !== "drone" && b.state === "alive" && b.equity > me.equity).length + 1;
+      this.stats.topRank = this.stats.topRank ? Math.min(this.stats.topRank, rank) : rank;
+    }
     this.interest += interestPerS(me.owe, tier, rateBps) * dtS;
     if (me.equity > 0) this.peakLev = Math.max(this.peakLev, (me.equity + me.owe) / me.equity);
     if (me.ring === "green") this.warnAt = null;
@@ -71,14 +103,30 @@ export class Receipt {
         if (e.blob === this.me) this.spikes += e.damage;
         break;
       case "eat":
-        if (e.by === this.me) add(`Ate ${this.name(e.victim)}`, e.gained);
+        if (e.by === this.me) {
+          add(`Ate ${this.name(e.victim)}`, e.gained);
+          this.stats.blobsEaten++;
+        }
         if (e.victim === this.me) this.died(this.name(e.by), false, true);
         break;
       case "pop":
-        if (e.by === this.me) add(`Popped ${this.name(e.victim)}`, e.bounty);
+        if (e.by === this.me) {
+          add(`Popped ${this.name(e.victim)}`, e.bounty);
+          this.stats.blobsEaten++;
+        }
         if (e.victim === this.me) this.died(e.keeper || !e.by ? "the vault" : this.name(e.by), e.keeper, false);
         break;
     }
+  }
+
+  private countFood(food: ReadonlyArray<{ id: number; x: number; y: number }>, me: BlobView | undefined): void {
+    const now = new Map(food.map((f) => [f.id, { x: f.x, y: f.y }] as const));
+    if (me && me.state === "alive") {
+      for (const [id, p] of this.food) {
+        if (!now.has(id) && Math.hypot(p.x - me.x, p.y - me.y) <= me.radius + FOOD_REACH) this.stats.foodEaten++;
+      }
+    }
+    this.food = now;
   }
 
   private died(by: string, keeper: boolean, eaten: boolean): void {
@@ -119,6 +167,7 @@ export class Receipt {
       rank: Math.max(1, ranked.findIndex((b) => b.id === this.me) + 1),
       of: ranked.length,
       death: this.death,
+      stats: { ...this.stats, aliveS: Math.round(this.stats.aliveS), topRank: this.stats.topRank || Math.max(1, ranked.findIndex((b) => b.id === this.me) + 1) },
     };
   }
 

@@ -7,7 +7,9 @@ import { LocalMatch } from "./game/local";
 import { Receipt } from "./game/receipt";
 import { Hud } from "./hud/hud";
 import { elapsedS } from "./hud/logic";
-import { shareCertificate } from "./share/certificate";
+import { shareCertificate, verifyUrl } from "./share/certificate";
+import { shareLink } from "./share/link";
+import type { Outcome } from "./game/receipt";
 import { shareRoom } from "./net/room-code";
 import { Controls } from "./input/controls";
 import { MatchConnection, guestKey } from "./net/client";
@@ -151,7 +153,7 @@ export const play: Screen = (root, params) => {
     const o = receipt.outcome(lastFrame.blobs);
     overlay?.remove();
     // A beat after the bell so the last pop or cash-out is seen before the receipt covers it.
-    setTimeout(() => !left && (overlay = showResults(root, o, (a) => (a === "again" ? again() : a === "verify" ? void toVerify() : a === "share" ? void shareCertificate({ ...o.death!, matchId: src!.matchId }) : home()), wasPaid)), 900);
+    setTimeout(() => !left && (overlay = showResults(root, o, (a) => (a === "again" ? again() : a === "verify" ? void toVerify() : a === "share" ? void shareResult(o, src!.matchId) : home()), wasPaid)), 900);
   };
 
   const draw = (now: number): Frame | null => {
@@ -161,7 +163,7 @@ export const play: Screen = (root, params) => {
     if (!f) return null;
     lastFrame = f;
     hud.update(f, now);
-    receipt?.frame(f.blobs, f.match.rateTier, now, dt, f.rateBps, f.match.phase === "LIVE" ? elapsedS(f.match) : undefined);
+    receipt?.frame(f.blobs, f.match.rateTier, now, dt, f.rateBps, f.match.phase === "LIVE" ? elapsedS(f.match) : undefined, f.food);
     if (f.match.phase === "ENDED") finish();
     // Dev-only hook so tests and agent-browser can read the drawn frame (stripped from builds).
     if (import.meta.env.DEV) (window as unknown as { __frame?: unknown }).__frame = f;
@@ -231,4 +233,11 @@ function roomChip(root: HTMLElement, code: string): void {
     void shareRoom(code).then((r) => label(r === "copied" ? "Link copied" : r === "shared" ? "Sent" : "Copy failed")),
   );
   root.appendChild(b);
+}
+
+/** Share from the results screen: the certificate after a liquidation, else a one-line brag + verify link. */
+function shareResult(o: Outcome, matchId: string): void {
+  if (o.death && !o.death.eaten) return void shareCertificate({ ...o.death, matchId });
+  const what = o.kind === "cashed" ? `cashed out ${o.end.toFixed(2)}` : o.kind === "survived" ? `survived with ${o.end.toFixed(2)}` : "got eaten";
+  void shareLink(`I ${what} on MARGIN, rank #${o.rank} of ${o.of}. Get greedy. Get liquidated.`, verifyUrl(matchId));
 }

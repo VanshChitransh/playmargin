@@ -38,4 +38,15 @@ describe("Receipt", () => {
     expect(o.death).toMatchObject({ by: "big", eaten: true, keeper: false });
     expect(o.lines[0]!.label).toBe("Eaten");
   });
+
+  it("counts food I swallowed, blobs I ate and my best rank", () => {
+    const r = new Receipt("me");
+    const me = { id: "me", label: "me", kind: "human", state: "alive", x: 0, y: 0, radius: 50, equity: 90, owe: 0, ring: "green" } as never;
+    const big = { id: "b", label: "Agent-1", kind: "agent", state: "alive", x: 900, y: 0, radius: 60, equity: 120, owe: 0, ring: "green" } as never;
+    r.frame([me, big], "LOW", 0, 0.5, undefined, 1, [{ id: 1, x: 10, y: 0 }, { id: 2, x: 500, y: 0 }]);
+    r.frame([me, big], "LOW", 500, 0.5, undefined, 2, [{ id: 2, x: 500, y: 0 }]);
+    r.event({ type: "eat", by: "me", victim: "x", gained: 5 });
+    const s = r.outcome([me, big]).stats;
+    expect(s).toMatchObject({ foodEaten: 1, blobsEaten: 1, topRank: 2, peakEquity: 90, aliveS: 1 });
+  });
 });
