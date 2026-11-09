@@ -6,6 +6,7 @@ import type { Frame } from "../game/frame";
 import type { ControlsEls } from "../input/controls";
 import { boostBlocked, cashoutOpen, displayName, elapsedS, interestPerS, phaseName, pipGradient, ranking } from "./logic";
 import "./hud.css";
+import { isMuted, play as sfx, setMuted } from "../audio";
 
 const LB_MS = 1000 / R.LEADERBOARD_HZ;
 const ROW_PX = 22;
@@ -20,6 +21,7 @@ export class Hud {
   private pipRing: HTMLElement;
   private recharge: number[] = []; // ms timestamps each spent pip relights
   private prevPips: number = R.BOOST_PIPS;
+  private lastBeat = 0;
 
   constructor(root: HTMLElement, private els: ControlsEls, private onCashoutWindow: (open: boolean) => void) {
     this.el = document.createElement("div");
@@ -38,12 +40,20 @@ export class Hud {
       </div>
       <div data-h=center class="absolute inset-x-0 top-[14%] grid place-items-center text-center"></div>
       <div data-h=frame class="call-frame"></div>
+      <button data-h=mute class="tag pointer-events-auto absolute left-0 top-0 m-3 mt-[max(12px,env(safe-area-inset-top))] rounded-field bg-navy/80 px-2 py-1 text-muted"></button>
       <div data-h=call class="tag absolute inset-x-0 bottom-28 hidden text-center"><span class="rounded-field bg-liq px-3 py-1 text-paper">Margin call: tap REPAY or run</span></div>
       <div data-h=money class="absolute bottom-0 right-28 flex flex-col items-end gap-1 p-4 pb-[max(20px,env(safe-area-inset-bottom))]">
         <span data-h=owe class="num hidden rounded-field bg-navy/80 px-2 py-0.5 text-gold"></span>
         <span data-h=drain class="num hidden text-xs text-liq"></span>
       </div>`;
     root.appendChild(this.el);
+    const mute = this.q("mute");
+    const label = (): void => void (mute.textContent = isMuted() ? "Sound off" : "Sound on");
+    label();
+    mute.addEventListener("click", () => {
+      setMuted(!isMuted());
+      label();
+    });
     this.pipRing = document.createElement("span");
     this.pipRing.className = "pip-ring";
     els.boost.classList.add("relative");
@@ -74,6 +84,10 @@ export class Hud {
       this.q("frame").dataset.ring = ring;
       this.q("call").classList.toggle("hidden", ring !== "red");
     });
+    if (ring === "red" && now - this.lastBeat > 900) {
+      this.lastBeat = now;
+      sfx("beat");
+    }
     const cash = cashoutOpen(me, m);
     this.set("cash", String(cash), () => this.onCashoutWindow(cash));
     this.els.repay.classList.toggle("blocked", me.owe <= 0 || m.phase !== "LIVE");
@@ -130,9 +144,15 @@ export class Hud {
           <div class="mt-2 text-sm text-muted">Warm up: steer around. BOOST unlocks at GO.</div></div>`;
       });
     } else if (m.phase === "COUNTDOWN") {
-      this.set("center", `C${m.timeLeftS}`, () => this.flash(c, String(m.timeLeftS), "punch", C.paper, "font-display text-9xl num"));
+      this.set("center", `C${m.timeLeftS}`, () => {
+        this.flash(c, String(m.timeLeftS), "punch", C.paper, "font-display text-9xl num");
+        sfx("tick");
+      });
     } else if (m.phase === "LIVE" && elapsedS(m) < 1) {
-      this.set("center", "GO", () => this.flash(c, "GO!", "punch", C.gold, "font-display text-8xl"));
+      this.set("center", "GO", () => {
+        this.flash(c, "GO!", "punch", C.gold, "font-display text-8xl");
+        sfx("go");
+      });
     } else {
       this.set("center", "", () => (c.innerHTML = ""));
     }

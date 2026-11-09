@@ -12,6 +12,7 @@ import { ArenaRenderer } from "./render/arena";
 import { rerender, type Screen } from "./router";
 import { showDeath, showResults } from "./screens/overlays";
 import { C } from "./render/colors";
+import { play as sfx } from "./audio";
 
 interface Source {
   readonly me: string;
@@ -68,6 +69,7 @@ export const play: Screen = (root, params) => {
       case "boost":
       case "repay": {
         const p = e.blob === me ? at(me) : undefined;
+        if (p) sfx(e.type);
         if (p) arena.fx.floatText(p.x, p.y - p.r, `${e.type === "boost" ? "+" : "\u2212"}${num(e.amount)}`, e.type === "boost" ? C.gold : C.paper, z);
         break;
       }
@@ -75,20 +77,30 @@ export const play: Screen = (root, params) => {
         const p = at(e.blob);
         if (!p) break;
         arena.fx.shards(p.x, p.y, Math.max(4, Math.min(18, Math.round(e.damage / 2))), C.muted, p.r);
-        if (e.blob === me) arena.fx.floatText(p.x, p.y - p.r, `\u2212${num(e.damage)}`, C.liq, z);
+        if (e.blob === me) {
+          arena.fx.floatText(p.x, p.y - p.r, `\u2212${num(e.damage)}`, C.liq, z);
+          sfx("spike");
+        }
         break;
       }
       case "pop": {
         const p = at(e.victim);
         if (p) arena.fx.shards(p.x, p.y, 22, C.liq, p.r);
         if (e.victim === me) arena.hitStop(150);
+        if (e.victim === me || e.by === me) sfx("pop");
         const by = e.by === me ? at(me) : undefined;
-        if (by && e.bounty > 0) arena.fx.floatText(by.x, by.y - by.r, `+${num(e.bounty)}`, C.gold, z);
+        if (by && e.bounty > 0) {
+          arena.fx.floatText(by.x, by.y - by.r, `+${num(e.bounty)}`, C.gold, z);
+          sfx("coin");
+        }
         break;
       }
       case "eat": {
         const p = e.by === me ? at(me) : undefined;
-        if (p) arena.fx.floatText(p.x, p.y - p.r, `+${num(e.gained)}`, C.gold, z);
+        if (p) {
+          arena.fx.floatText(p.x, p.y - p.r, `+${num(e.gained)}`, C.gold, z);
+          sfx("coin");
+        }
         break;
       }
     }
