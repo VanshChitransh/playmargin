@@ -51,7 +51,7 @@ describe("FreeBot", () => {
     expect(bot).toBeGreaterThan(rnd * 1.3);
     expect(taps.boost).toBeGreaterThan(0);
     expect(taps.cashout).toBeGreaterThan(0);
-  });
+  }, 30_000); // 12 full matches: several seconds under a parallel suite
 
   it("is deterministic for the same seed", () => {
     const a = botMatch(9).w;
