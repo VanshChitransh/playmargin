@@ -54,7 +54,7 @@ blobs eat smaller ones. The full rulebook is mirrored as constants in
 [`packages/core/src/constants.ts`](packages/core/src/constants.ts).
 
 **The thesis, measured.** In a 900-match sim with one greedy player who holds BOOST to the cap
-(`npm run sweep`), the greedy player is liquidated in about 57% to 79% of matches, while a careful
+(`npm run sweep`), the greedy player is liquidated in about 55% to 80% of matches, while a careful
 newcomer who never borrows survives about 67% of matches and finishes at median rank 4 of 12
 (`npx tsx tools/sim/human.ts`). Safe play survives. Greed gets liquidated.
 
@@ -97,7 +97,7 @@ Every feature, why it is there, the code, and a testnet transaction: [`docs/NEAR
 - **Anyone can verify a match.** The Verify page replays the log in the browser with the same code
   as the server and shows the exact event if anything was changed (`apps/client/src/screens/verify.ts`).
 - **Tests:** 222 TypeScript tests (`npm test`) and 52 contract tests (`cargo test`, 3 in near-sandbox).
-- **Load:** 50 rooms of 12 on one server at 0.12 ms of CPU per room tick (`npm run soak`).
+- **Load:** 50 rooms of 12 on one server at about 0.1 ms of CPU per room tick (`npm run soak`).
 
 ### Honest status
 
@@ -144,8 +144,9 @@ npm run demo
 
 `npm run demo` plays one full paid match headless with the real engine and the real bots
 (6 bot-driven players + 2 liquidator drones), narrates it, then proves it (seed 109, about 10 s).
-You will see Drone-2 liquidate Player-5 at 20.6 s, Player-6 go red at 29.1 s and REPAY out, then
-go red again at 54.1 s and get liquidated by Drone-2 at 54.5 s. The last three lines are the proof
+You will see Drone-2 liquidate Player-5 at 20.6 s, Player-6 go red at 29.1 s and hold REPAY out of
+red at 29.5 s (a clutch save, with a hunter close), then go red again at 54.1 s and get liquidated by
+Drone-2 at 54.5 s. The last three lines are the proof
 (they are the same on every run, and change only if the rules change):
 
 ```
@@ -180,7 +181,7 @@ the room fills with labelled AI agents (🤖).
 
 | # | Do | See |
 |---|---|---|
-| 1 | `npm run demo` | A narrated paid match: BOOSTs (loans), eats, two players liquidated by Drone-2 (20.6 s and 54.5 s), one of them escaping red once with REPAY first, payouts and the drones' bounties, then `0 micro-units created or destroyed` and `settle == live` |
+| 1 | `npm run demo` | A narrated paid match: BOOSTs (loans), eats, two players liquidated by Drone-2 (20.6 s and 54.5 s), one of them escaping red once with a REPAY hold first ("REPAYS OUT OF RED"), payouts and the drones' bounties, then `0 micro-units created or destroyed` and `settle == live` |
 | 1b | `npm run e2e:local` | The strongest end-to-end proof: boots the real game server with a fresh database, two network clients play a full free match, then it checks the match settled, the credit ledger is exact for both players, and replaying the served log gives exactly the stored payouts. Ends with `E2E OK` (about 35 s). On the way it prints one expected error, `you are already in this match`: that is the test proving the server refuses a second seat for the same player |
 | 2 | `npm run sim -- --matches 500` | 500 full matches (2,940,000 ticks, about 177,000 logged money events) with the conservation check every tick, every hash chain verified, `0 micro-units created or destroyed` and `settle == live in 500/500` (1 to 3 minutes) |
 | 3 | `npm test` | The whole TypeScript suite passes: 222 tests in 44 files (engine, settle, bots, server, client logic), about 15 s |
@@ -189,10 +190,11 @@ the room fills with labelled AI agents (🤖).
 | 6 | Hold BOOST until the fuel ring is empty, then run into a big spike | Your ring turns red. Within a moment a blob or a drone touches you: "LIQUIDATED", and your receipt shows what the vault took back |
 | 7 | After any match, open the receipt's Verify link (`/#/verify/<id>`) | The browser replays the log with the same code as the server, checks every hash, and shows settle == what you were paid. Press "Tamper" and the exact broken event turns red |
 | 8 | Open `/#/judge` | Judge Run: a published seed (20261114), normal rules, Drone-1 hunting red blobs. Most first-timers get greedy |
-| 9 | `npm run sweep -- 300` | The balance table behind the rules, for the shipped settings: a greedy player holds BOOST to the cap in every match. Measured: 0.74 to 0.93 liquidations per match, the greedy player popped in 57% (practised) to 79% (first-timer) of matches. A few minutes |
+| 9 | `npm run sweep -- 300` | The balance table behind the rules, for the shipped settings: a greedy player holds BOOST to the cap in every match. Measured (900 per config): 0.74 to 0.93 liquidations per match, the greedy player popped in 57% (practised) to 79% (first-timer) of matches. A 300-match run lands within a few points of that. A few minutes |
 | 9b | `npx tsx tools/sim/human.ts 60` | Can a newcomer win? A careful never-BOOST newcomer bot against 11 agents: measured median rank 4 of 12, top 3 in about 35%, survives about 67% |
 | 9c | `npx tsx tools/sim/contacts.ts 40` | Do players meet? Rooms of 12 agents and no human: about 17 contacts per minute, a typical player's first contact at about 3.5 s. Liquidations here are rare (about 0.1 per match) because agents borrow carefully: greed is what brings liquidations (row 9) |
-| 10 | `npm run soak -- --rooms 50` | 50 rooms of 12 on the real server for one full match (about 100 s at any room count): CPU per room tick and match length under load. Measured 0.12 ms per room tick at 50 rooms and 0.24 ms at 10 (budget 4 ms). Matches last 90 s at 10 rooms and 92 to 93 s of wall time at 50 |
+| 10 | `npm run soak -- --rooms 50` | 50 rooms of 12 on the real server for one full match (about 100 s at any room count): CPU per room tick and match length under load. Measured about 0.1 ms per room tick at 50 rooms (0.09 to 0.12 across runs) and 0.24 ms at 10 (budget 4 ms). Matches last 90 s at 10 rooms and 92 to 93 s of wall time at 50 |
+| 10b | `npx tsx apps/server/scripts/playtest.ts walls` (needs Google Chrome installed) | Boots a fresh server and client, drives 7 real browser players into the 4 walls, a corner and each other, while a spectator socket checks every blob on every update. Prints `"breaches": 0` (no blob centre ever closer to a wall than 0.65 of its radius), the arena size (4800x4800), FPS per page, and saves screenshots to `playtest-out/` (about 1 minute) |
 | 11 | Put `NEAR_AI_API_KEY` in `.env`, then `npm run commander` (without a key it prints one line saying so and exits normally) | One live match with the AI commander on NEAR AI Cloud. Each new plan prints with its one-line rationale |
 
 ### 3. What needs keys

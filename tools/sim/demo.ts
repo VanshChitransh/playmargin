@@ -29,6 +29,9 @@ function narrate(w: World, e: LogEntry): void {
   switch (e.type) {
     case "BOOST":
       return say(w, e.tick, `${label(w, d.blob)} BOOST +${n(d.borrowed)} (owe ${n(w.blobs.get(d.blob)?.debt ?? 0)}, fee ${n(d.fee)})`);
+    case "REPAY":
+      if (w.blobs.get(d.blob)?.state === "cashed") return; // a cash-out repays its loan: the CASHOUT line says it
+      return say(w, e.tick, `${label(w, d.blob)} REPAY -${n(d.amount)} (owe ${n(w.blobs.get(d.blob)?.debt ?? 0)})`);
     case "SPIKE":
       return say(w, e.tick, `${label(w, d.blob)} hit a spike: -${n(d.damage)}`);
     case "EAT":
@@ -51,7 +54,10 @@ const { w, log, ticks } = await runMatch({
   seed, mode: "paid", players: 6, drones: 2,
   onTick: async (w, tick, events, logged) => {
     for (const e of logged) narrate(w, e);
-    for (const ev of events) if (ev.type === "lastCall") say(w, tick, "LAST CALL: BOOST closes in 5");
+    for (const ev of events) {
+      if (ev.type === "lastCall") say(w, tick, "LAST CALL: BOOST closes in 5");
+      if (ev.type === "clutchSave") say(w, tick, `${label(w, ev.blob)} REPAYS OUT OF RED${ev.clutch ? " (clutch: a hunter was close)" : ""}`);
+    }
     for (const b of w.blobs.values()) {
       if (b.kind === "drone" || b.state !== "alive" || w.goTick < 0) continue;
       const r = ring(b);
