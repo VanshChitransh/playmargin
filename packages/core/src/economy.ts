@@ -9,7 +9,6 @@ import { mulBps, mulDivUp } from "./units";
 
 const BPS = 10_000;
 const BOOST_LOCKOUT_T = C.sToTicks(C.R.BOOST_LOCKOUT_S);
-const REPAY_COOLDOWN_T = C.sToTicks(C.R.REPAY_COOLDOWN_S);
 /** Interest food lands at least this far from the payer, so nobody re-eats their own drain. */
 
 /** Match time in ticks since GO. */
@@ -68,6 +67,7 @@ export function canBoost(w: World, b: Blob, tick: number): boolean {
  */
 export function boostHold(w: World, b: Blob, tick: number): Micro {
   if (!canBoost(w, b, tick)) return 0;
+  flushRepay(w, b, tick); // at most one of pendingRepay / pendingBorrow is open, so log order matches state
   const perTick = Math.max(1, Math.floor((borrowBase(b) * C.NITRO_RATE_BPS) / (BPS * C.R.TICK_HZ)));
   const amt = Math.min(perTick, boostRoom(b), vaultLeft(w));
   b.mass += amt;
@@ -84,6 +84,7 @@ export function boostHold(w: World, b: Blob, tick: number): Micro {
  * fee: a blob still alive owes at most mass / 0.9 * 0.8, far above 1% of its loan. Returns Micro logged.
  */
 export function flushBoost(w: World, b: Blob, tick: number): Micro {
+  flushRepay(w, b, tick);
   const amt = b.pendingBorrow;
   if (amt === 0) return 0;
   const fee = mulDivUp(amt, C.BORROW_FEE_BPS, BPS);
@@ -97,8 +98,8 @@ export function flushBoost(w: World, b: Blob, tick: number): Micro {
   return amt;
 }
 
-function repayFromMass(w: World, b: Blob, amt: Micro, tick: number): Micro {
-  flushBoost(w, b, tick);
+/** Move up to amt from mass to the vault against the debt. Not logged: callers log or pend it. */
+function payDown(w: World, b: Blob, amt: Micro): Micro {
   const paid = Math.min(amt, b.debt, b.mass);
   if (paid <= 0) return 0;
   b.mass -= paid;
@@ -106,16 +107,38 @@ function repayFromMass(w: World, b: Blob, amt: Micro, tick: number): Micro {
   b.boostFees -= mulDivUp(b.boostFees, paid, b.debt);
   b.debt -= paid;
   w.vault.repaid += paid;
-  w.pendingLog.push({ type: "REPAY", tick, data: { blob: b.id, amount: paid } });
   return paid;
 }
 
-/** One REPAY tap: 15% of current debt from mass, 0.4 s cooldown, any ring. Returns Micro repaid. */
-export function repayTap(w: World, b: Blob, tick: number): Micro {
-  if (w.phase !== "LIVE" || b.state !== "alive" || b.debt === 0 || tick < b.repayReadyAt) return 0;
-  // A tiny debt would floor to 0 forever; take at least 1 Micro so REPAY always finishes.
-  const paid = repayFromMass(w, b, Math.max(1, mulBps(b.debt, C.REPAY_TAP_BPS)), tick);
-  if (paid > 0) b.repayReadyAt = tick + REPAY_COOLDOWN_T;
+function repayFromMass(w: World, b: Blob, amt: Micro, tick: number): Micro {
+  flushBoost(w, b, tick);
+  const paid = payDown(w, b, amt);
+  if (paid > 0) w.pendingLog.push({ type: "REPAY", tick, data: { blob: b.id, amount: paid } });
+  return paid;
+}
+
+/** Log the repayment built up by a REPAY hold (one REPAY entry, not 60 a second). Returns Micro logged. */
+export function flushRepay(w: World, b: Blob, tick: number): Micro {
+  const amt = b.pendingRepay;
+  if (amt === 0) return 0;
+  b.pendingRepay = 0;
+  w.pendingLog.push({ type: "REPAY", tick, data: { blob: b.id, amount: amt } });
+  return amt;
+}
+
+/**
+ * One tick of held REPAY: pays REPAY_HOLD_FRACTION of the current debt every REPAY_HOLD_WINDOW_S,
+ * compounded per tick (about 40% a second), from mass, any ring. Same speed as perfect mashing of
+ * the old 15% / 0.4 s tap, so holding is ergonomics, not balance. Pending until flushRepay, which
+ * runs on release, at payoff, and before anything settle checks against the debt. Returns Micro repaid.
+ */
+export function repayHold(w: World, b: Blob, tick: number): Micro {
+  if (w.phase !== "LIVE" || b.state !== "alive" || b.kind === "drone" || b.debt === 0) return 0;
+  if (b.pendingBorrow > 0) flushBoost(w, b, tick);
+  // A tiny debt would floor to 0 forever; take at least 1 Micro so a hold always finishes.
+  const paid = payDown(w, b, Math.max(1, Math.floor((b.debt * C.REPAY_HOLD_PPM_PER_TICK) / 1_000_000)));
+  b.pendingRepay += paid;
+  if (b.debt === 0) flushRepay(w, b, tick);
   return paid;
 }
 

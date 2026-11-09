@@ -3,14 +3,14 @@ import { describe, expect, it } from "vitest";
 import { MICRO } from "./constants";
 import {
   accrueInterest, boostHold, boostRoom, canBoost, cashOut, eat, flushBoost, fuel, hfBps, hitSpike, keeperCheck,
-  liquidate, matchRateBps, repayTap, ring, spikeDamage, zoneTick,
+  flushRepay, liquidate, matchRateBps, repayHold, ring, spikeDamage, zoneTick,
 } from "./economy";
 import { leak, makeBlob, makeWorld } from "./testkit";
 
 const u = (x: number) => Math.round(x * MICRO);
 
 describe("RULES worked check", () => {
-  it("80 -> hold BOOST to the cap -> spike -> 2 REPAY taps", () => {
+  it("80 -> hold BOOST to the cap -> spike -> hold REPAY 0.8 s", () => {
     const a = makeBlob();
     const w = makeWorld([a]);
     expect(ring(a)).toBe("green");
@@ -36,12 +36,17 @@ describe("RULES worked check", () => {
     expect(ring(a)).toBe("red");
     expect(keeperCheck(w, a, 10)).toBeNull(); // red, not dead
 
-    expect(repayTap(w, a, 20)).toBe(u(18));
-    expect([a.mass, a.debt]).toEqual([u(124.5), u(102)]);
-    expect(repayTap(w, a, 21)).toBe(0); // 0.4 s cooldown
-    expect(repayTap(w, a, 20 + 24)).toBe(u(15.3));
-    expect([a.mass, a.debt]).toEqual([u(109.2), u(86.7)]);
-    expect(hfBps(a)).toBe(10076); // 1.01
+    // Held REPAY compounds per tick to the old tap's pace: 0.4 s pays 15% (18), 0.8 s pays 27.75% (33.3).
+    const hold = (from: number, n: number) => { for (let t = from; t < from + n; t++) repayHold(w, a, t); };
+    hold(20, 24);
+    expect(a.debt / MICRO).toBeCloseTo(102, 2);
+    hold(44, 24);
+    expect(a.debt / MICRO).toBeCloseTo(86.7, 2);
+    expect((a.mass - a.debt) / MICRO).toBeCloseTo(22.5, 6); // repaying never changes equity
+    expect(w.pendingLog.filter((e) => e.type === "REPAY")).toHaveLength(0); // pending until release
+    expect(flushRepay(w, a, 68) / MICRO).toBeCloseTo(33.3, 2);
+    expect(w.pendingLog.filter((e) => e.type === "REPAY")).toHaveLength(1);
+    expect(Math.round(hfBps(a) / 10)).toBe(1008); // 1.01
     expect(ring(a)).toBe("yellow");
     expect(leak(w)).toBe(0);
   });
@@ -104,9 +109,23 @@ describe("BOOST (hold to nitro)", () => {
     const a = makeBlob();
     const w = makeWorld([a]);
     for (let t = 1; t <= 30; t++) boostHold(w, a, t);
-    repayTap(w, a, 31);
-    expect(w.pendingLog.map((e) => e.type)).toEqual(["BOOST", "REPAY"]);
+    repayHold(w, a, 31);
+    expect(w.pendingLog.map((e) => e.type)).toEqual(["BOOST"]);
     expect(a.pendingBorrow).toBe(0);
+    boostHold(w, a, 32); // borrowing again logs the open repayment first
+    expect(w.pendingLog.map((e) => e.type)).toEqual(["BOOST", "REPAY"]);
+    expect(leak(w)).toBe(0);
+  });
+
+  it("a held REPAY pays the debt off exactly and logs it at once", () => {
+    const a = makeBlob({ mass: u(100), debt: u(3) });
+    const w = makeWorld([a]);
+    let t = 1;
+    while (repayHold(w, a, t) > 0) t++;
+    expect(a.debt).toBe(0);
+    expect(a.pendingRepay).toBe(0);
+    const logged = w.pendingLog.filter((e) => e.type === "REPAY").reduce((s, e) => s + (e.data as { amount: number }).amount, 0);
+    expect(logged).toBe(u(3));
     expect(leak(w)).toBe(0);
   });
 });
@@ -119,10 +138,7 @@ describe("audit: borrow/repay cycles", () => {
     for (let cycle = 0; cycle < 120; cycle++) {
       while (boostHold(w, a, tick) > 0) tick++;
       flushBoost(w, a, tick++);
-      while (a.debt > 1) {
-        a.repayReadyAt = 0;
-        repayTap(w, a, tick++);
-      }
+      while (a.debt > 1) repayHold(w, a, tick++);
       expect(a.mass * 10_000).toBeLessThanOrEqual(25_200 * (a.mass - a.debt) + 10_000);
     }
     w.vault.budget = 10 * a.mass;

@@ -1,10 +1,10 @@
 // One tick of a match, in the fixed order from DEVELOPMENT C3 (RULES + EDGE-CASES).
 // Order matters: damage then keeper check, pops before eats (GR-03), largest eater first (GR-14).
-// `inputs` holds commands that arrived since the last tick: repay/cashout are taps, boost is held.
+// `inputs` holds commands that arrived since the last tick: cashout is a tap, boost and repay are held.
 import * as C from "./constants";
 import {
-  accrueInterest, boostHold, canBoost, cashOut, eat, flushBoost, hitSpike, keeperCheck, liquidate, matchT, outweighs,
-  repayTap, ring, zoneTick,
+  accrueInterest, boostHold, canBoost, cashOut, eat, flushBoost, flushRepay, hitSpike, keeperCheck, liquidate, matchT, outweighs,
+  repayHold, ring, zoneTick,
 } from "./economy";
 import { checkInvariant } from "./invariant";
 import { move, radius, speed } from "./motion";
@@ -42,14 +42,14 @@ function canStartCashout(w: World, b: Blob, tick: number): boolean {
   );
 }
 
-const REPAY_BUFFER_T = Math.round((C.R.REPAY_BUFFER_MS * C.R.TICK_HZ) / 1000);
+const REPAY_MIN_HOLD_T = T(C.R.REPAY_COOLDOWN_S);
 const BOOST_MIN_HOLD_T = T(C.R.BOOST_MIN_HOLD_S);
 const BURST_COOLDOWN_T = T(C.R.BOOST_BURST_COOLDOWN_S);
 const SPUTTER_T = T(C.R.BOOST_EMPTY_SPUTTER_S);
 const R_BURST = C.R.BOOST_BURST_MULT;
 
 // 1 + 3: store fresh inputs, apply taps, then zero any held input older than 250 ms and run held
-// BOOST off what is left, so a lost "release" message can't keep borrowing past 250 ms.
+// REPAY and BOOST off what is left, so a lost "release" message can't keep borrowing past 250 ms.
 function applyInputs(w: World, inputs: Map<string, InputCmd>, tick: number, ev: Ev): void {
   for (const [id, cmd] of inputs) {
     const b = w.blobs.get(id);
@@ -58,9 +58,6 @@ function applyInputs(w: World, inputs: Map<string, InputCmd>, tick: number, ev: 
     b.lastInputAt = tick;
     // Drones hold no stake: they only steer, so BOOST, REPAY and cash-out never apply to them.
     if (w.phase !== "LIVE" || b.kind === "drone") continue;
-    if (cmd.repay && !repay(w, b, tick, ev) && tick < b.repayReadyAt && b.repayReadyAt - tick <= REPAY_BUFFER_T) {
-      b.repayQueued = true; // mashing never drops a tap: it fires the moment the cooldown ends
-    }
     if (cmd.cashout && canStartCashout(w, b, tick)) {
       b.cashout = { startedAt: tick };
       ev.push({ type: "cashoutStart", blob: b.id });
@@ -71,10 +68,17 @@ function applyInputs(w: World, inputs: Map<string, InputCmd>, tick: number, ev: 
     b.dirX = cmd ? cmd.dirX : 0;
     b.dirY = cmd ? cmd.dirY : 0;
     if (w.phase !== "LIVE" || b.state !== "alive" || b.kind === "drone") continue;
-    if (b.repayQueued && tick >= b.repayReadyAt) {
-      b.repayQueued = false;
+    // REPAY wins over BOOST while both are held: paying back and borrowing in one breath is noise.
+    const repayPressed = cmd?.repay === true;
+    if (repayPressed && !b.repayHeld) b.repayMinUntil = tick + REPAY_MIN_HOLD_T;
+    b.repayHeld = repayPressed;
+    if (repayPressed || tick < b.repayMinUntil) {
+      b.boostHeld = cmd?.boost === true; // no burst from a BOOST already held when REPAY lets go
       repay(w, b, tick, ev);
+      continue;
     }
+    const repaid = flushRepay(w, b, tick);
+    if (repaid > 0) ev.push({ type: "repay", blob: b.id, amount: toUnits(repaid) });
     // A press holds for at least BOOST_MIN_HOLD_S, so a tap always borrows something you can see.
     const pressed = cmd?.boost === true;
     if (pressed && !b.boostHeld && canBoost(w, b, tick)) {
@@ -100,17 +104,14 @@ function applyInputs(w: World, inputs: Map<string, InputCmd>, tick: number, ev: 
 }
 
 /**
- * One REPAY tap plus its events. Leaving red on it is a "clutch save" (server-confirmed, never
- * predicted), flagged clutch when a bigger blob or a drone was within CLUTCH_RADIUS_PX. Returns
- * whether anything was repaid.
+ * One tick of held REPAY plus its events. Leaving red on it is a "clutch save" (server-confirmed,
+ * never predicted), flagged clutch when a bigger blob or a drone was within CLUTCH_RADIUS_PX.
  */
-function repay(w: World, b: Blob, tick: number, ev: Ev): boolean {
+function repay(w: World, b: Blob, tick: number, ev: Ev): void {
   const wasRed = ring(b) === "red";
   let amt = 0;
-  boostEvent(b, () => (amt = repayTap(w, b, tick)), ev);
-  if (amt <= 0) return false;
-  b.repayQueued = false; // a press that went through replaces any buffered one
-  ev.push({ type: "repay", blob: b.id, amount: toUnits(amt) });
+  boostEvent(w, b, () => (amt = repayHold(w, b, tick)), ev);
+  if (amt <= 0) return;
   if (wasRed && ring(b) !== "red") {
     const r = radius(b.mass);
     const clutch = live(w).some(
@@ -118,14 +119,16 @@ function repay(w: World, b: Blob, tick: number, ev: Ev): boolean {
     );
     ev.push({ type: "clutchSave", blob: b.id, clutch });
   }
-  return true;
 }
 
-/** Run fn and tell clients about any held loan it logged first, so "+N" shows every part of a long hold. */
-function boostEvent(b: Blob, fn: () => unknown, ev: Ev): void {
-  const pending = b.pendingBorrow;
+/** Run fn and tell clients about any held loan or repayment it logged, so every part of a long hold shows. */
+function boostEvent(w: World, b: Blob, fn: () => unknown, ev: Ev): void {
+  const [borrow, from] = [b.pendingBorrow, w.pendingLog.length];
   fn();
-  if (pending > 0 && b.pendingBorrow === 0) ev.push({ type: "boost", blob: b.id, amount: toUnits(pending) });
+  if (borrow > 0 && b.pendingBorrow === 0) ev.push({ type: "boost", blob: b.id, amount: toUnits(borrow) });
+  for (const e of w.pendingLog.slice(from)) {
+    if (e.type === "REPAY" && e.data.blob === b.id) ev.push({ type: "repay", blob: b.id, amount: toUnits(e.data.amount) });
+  }
 }
 
 function keeper(w: World, b: Blob, tick: number, ev: Ev): void {
@@ -277,7 +280,7 @@ export function step(w: World, inputs: Map<string, InputCmd>, tick: number): Gam
   // 5. interest, once per whole second
   if (t > 0 && t % T(C.R.INTEREST_ACCRUE_S) === 0) {
     for (const b of players(w)) {
-      boostEvent(b, () => accrueInterest(w, b, tick), ev);
+      boostEvent(w, b, () => accrueInterest(w, b, tick), ev);
       keeper(w, b, tick, ev);
     }
   }

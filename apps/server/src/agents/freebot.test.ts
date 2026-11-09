@@ -60,7 +60,7 @@ describe("FreeBot", () => {
   });
 
   // REPAY rarely fires in bot-only matches because bots stay green; this pins the habit.
-  it("REPAYs when red, thinks at most every 200 ms and taps for one tick only", () => {
+  it("holds REPAY when red until its next decision, at most every 200 ms", () => {
     const w = newWorld(1, "free", seeds(2));
     startMatch(w, 1);
     const me = w.blobs.get("agent-0")!;
@@ -71,7 +71,7 @@ describe("FreeBot", () => {
     const bot = new FreeBot(3);
     const cmds = Array.from({ length: 30 }, (_, i) => bot.decide(agentView(w, "agent-0")!, 2 + i));
     expect(cmds[0]!.repay).toBe(true);
-    expect(cmds.slice(1, 12).every((c) => !c.repay && !c.boost)).toBe(true);
-    expect(cmds.filter((c) => c.repay).length).toBeLessThanOrEqual(3);
+    // The view is frozen (no step), so the bot stays red and keeps holding, never boosting.
+    expect(cmds.slice(1, 12).every((c) => c.repay && !c.boost)).toBe(true);
   });
 });

@@ -42,7 +42,6 @@ export const R = {
   "BOOST_MIN_HOLD_S": 0.1,
   "BOOST_EMPTY_EASE_S": 0.1,
   "BOOST_EMPTY_SPUTTER_S": 0.3,
-  "REPAY_BUFFER_MS": 150,
   "CLUTCH_RADIUS_PX": 300,
   "BASE_SPEED_PX_S": 480,
   "SPEED_REF_RADIUS_PX": 58,
@@ -157,7 +156,12 @@ export const RATE_AT_KINK_BPS = bps(R.RATE_PER_MIN.at_kink);
 export const RATE_SLOPE_ABOVE_BPS = bps(R.RATE_PER_MIN.slope_above);
 export const INTEREST_FOOD_BPS = bps(R.INTEREST_SPLIT.food);
 export const INTEREST_VAULT_BPS = bps(R.INTEREST_SPLIT.vault);
-export const REPAY_TAP_BPS = bps(R.REPAY_TAP_FRACTION);
+/**
+ * Held REPAY pays REPAY_TAP_FRACTION of the debt per REPAY_COOLDOWN_S, compounded per tick: exactly
+ * the throughput of mashing the old tap (15% then a 0.4 s cooldown). A press holds at least
+ * REPAY_COOLDOWN_S, so one tap still pays one 15% chunk. Parts per million of debt, per tick.
+ */
+export const REPAY_HOLD_PPM_PER_TICK = Math.round((1 - (1 - R.REPAY_TAP_FRACTION) ** (1 / sToTicks(R.REPAY_COOLDOWN_S))) * 1_000_000);
 export const BOUNTY_BPS = bps(R.BOUNTY);
 export const LIQ_FEE_BPS = bps(R.LIQ_FEE);
 export const EAT_TRANSFER_BPS = bps(R.EAT_TRANSFER);

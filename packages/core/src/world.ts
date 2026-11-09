@@ -24,9 +24,9 @@ const startMass = (mode: Mode): Micro => mulBps(entryFor(mode), C.START_MASS_BPS
 
 function newBlob(p: PlayerSeed, x: number, y: number, mass: Micro): Blob {
   return {
-    id: p.id, kind: p.kind, label: p.label, accountId: p.accountId, x, y, dirX: 0, dirY: 0, vx: 0, vy: 0, boostHeld: false, boostMinUntil: 0, burst: 0, burstReadyAt: 0, sputterUntil: 0, repayQueued: false,
+    id: p.id, kind: p.kind, label: p.label, accountId: p.accountId, x, y, dirX: 0, dirY: 0, vx: 0, vy: 0, boostHeld: false, boostMinUntil: 0, burst: 0, burstReadyAt: 0, sputterUntil: 0, pendingRepay: 0, repayHeld: false,
     mass, debt: 0, boostFees: 0, payout: 0, pendingBorrow: 0, boostUntil: 0,
-    repayReadyAt: 0, shieldUntil: 0, spikeImmuneUntil: 0, redSince: null, lastThreatAt: -1e9,
+    repayMinUntil: 0, shieldUntil: 0, spikeImmuneUntil: 0, redSince: null, lastThreatAt: -1e9,
     cashout: null, state: "alive", lastInput: null, lastInputAt: -1e9,
   };
 }

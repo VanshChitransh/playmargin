@@ -43,12 +43,14 @@ export interface Blob {
   burstReadyAt: number;
   /** Tick the empty-tank sputter (slow ease down from boost speed) ends. */
   sputterUntil: number;
-  /** A REPAY press arrived within REPAY_BUFFER_MS of the cooldown end: fire it when the cooldown ends. */
-  repayQueued: boolean;
+  /** Repaid during the current REPAY hold, not yet logged (flushRepay). */
+  pendingRepay: Micro;
+  /** REPAY was held last tick (press detection for the minimum hold). */
+  repayHeld: boolean;
   /** Tick the BOOST speed ends: the tick after the last held tick that borrowed. */
   boostUntil: number;
-  /** Tick the next REPAY tap is allowed (0.4 s cooldown). */
-  repayReadyAt: number;
+  /** A REPAY press holds until this tick even if released sooner, so a tap pays one 15% chunk. */
+  repayMinUntil: number;
   shieldUntil: number;
   spikeImmuneUntil: number;
   /** Tick the blob turned red, for the 300 ms grace before a touch pops it. */
