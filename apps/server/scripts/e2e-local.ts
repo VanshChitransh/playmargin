@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Client } from "@colyseus/sdk";
-import { settleVerified, type LogEntry } from "@margin/core";
+import { R, SPIKE_RADIUS, settleVerified, type LogEntry } from "@margin/core";
 
 const fail = (msg: string): never => {
   console.error(`E2E FAIL: ${msg}`);
@@ -51,7 +51,11 @@ phases.unshift((rooms[0]!.state as { phase: string }).phase);
 // BOOST is held: true in every message for 1 s out of 4. Fuel must be on the wire for the ring.
 let fuelSeen = false;
 let fuelDropped = false;
-rooms[0]!.onStateChange((st: { blobs: Map<string, { fuel?: number }> }) => {
+const radii = new Set<string>();
+type Wire = { blobs: Map<string, { fuel?: number }>; food: Map<string, { radius: number }>; spikes: Map<string, { radius: number }> };
+rooms[0]!.onStateChange((st: Wire) => {
+  for (const f of st.food.values()) radii.add(`food:${f.radius}`);
+  for (const k of st.spikes.values()) radii.add(`spike:${k.radius}`);
   const f = st.blobs.get(rooms[0]!.sessionId)?.fuel;
   if (typeof f === "number") fuelSeen = true;
   if (typeof f === "number" && f < 0.99) fuelDropped = true;
@@ -82,6 +86,7 @@ const checks = {
   replayEqualsStored: seats.every((s) => (replay.payouts.find((p) => p.id === s.blob)?.amount ?? 0) === (s.payout ?? 0)),
   logEntries: served.log.length,
   fuelSeen,
+  radii: [...radii].sort().join(" "),
   heldBoostBorrowed: fuelDropped && served.log.some((e) => e.type === "BOOST"),
 };
 console.log(checks);
@@ -89,6 +94,8 @@ if (checks.phases !== "WARMUP > COUNTDOWN > LIVE > ENDED") fail(`phases ${checks
 if (checks.status !== "settled") fail(`status ${checks.status}`);
 if (checks.seats !== 2) fail(`expected 2 seats, got ${checks.seats}`);
 if (!checks.ledgerExact) fail("credits ledger is not exact");
+// The client draws food and spikes at exactly the core hitbox.
+if (checks.radii !== `food:${R.FOOD_RADIUS_PX} spike:${SPIKE_RADIUS}`) fail(`wire radii ${checks.radii}`);
 if (!checks.fuelSeen) fail("BlobView.fuel never reached the client");
 if (!checks.heldBoostBorrowed) fail("holding BOOST never borrowed");
 if (!checks.replayEqualsStored) fail("settleVerified(log) differs from stored payouts");

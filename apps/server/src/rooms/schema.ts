@@ -2,7 +2,7 @@
 // Only display fields (protocol.ts BlobView) cross the wire; debt never does. A player's own
 // "owe" number goes to that client alone as a private "me" message.
 import { ArraySchema, MapSchema, Schema, type } from "@colyseus/schema";
-import { blobView, matchView, radius, type World } from "@margin/core";
+import { SPIKE_RADIUS, blobView, foodView, matchView, type World } from "@margin/core";
 
 export class BlobState extends Schema {
   @type("string") id = "";
@@ -32,6 +32,8 @@ export class SpikeState extends Schema {
   @type("float32") y = 0;
   @type("boolean") big = false;
   @type("boolean") live = true;
+  /** Core hitbox radius in px, so the client draws exactly what hurts. */
+  @type("float32") radius = 0;
 }
 
 export class MatchState extends Schema {
@@ -73,8 +75,8 @@ export function syncWorld(state: MatchState, w: World): void {
   state.zoneX = w.zone.cx;
   state.zoneY = w.zone.cy;
   state.zoneR = w.zone.r;
-  syncById(state.food, w.food, FoodState, (s, f) => s.assign({ x: f.x, y: f.y, radius: radius(f.mass) }));
-  syncById(state.spikes, w.spikes, SpikeState, (s, k) => s.assign({ x: k.x, y: k.y, big: k.big, live: k.respawnAt === null }));
+  syncById(state.food, w.food, FoodState, (s, f) => s.assign({ x: f.x, y: f.y, radius: foodView(f).r }));
+  syncById(state.spikes, w.spikes, SpikeState, (s, k) => s.assign({ x: k.x, y: k.y, big: k.big, live: k.respawnAt === null, radius: SPIKE_RADIUS }));
 }
 
 function syncById<T extends { id: number }, S extends Schema>(
