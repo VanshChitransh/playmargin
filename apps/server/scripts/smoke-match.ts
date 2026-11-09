@@ -19,7 +19,10 @@ hostile.onLeave(() => (hostileDropped = true));
 
 const phases: Array<[string, number]> = [];
 const t0 = Date.now();
-honest.onMessage("ev", (ev: { type: string; phase?: string }) => {
+// Agents run on brains: count what they do (eat, boost, pop...) as proof they are playing.
+const agentEvents: Record<string, number> = {};
+honest.onMessage("ev", (ev: { type: string; phase?: string; blob?: string; by?: string | null }) => {
+  if ((ev.blob ?? ev.by ?? "").startsWith("agent-")) agentEvents[ev.type] = (agentEvents[ev.type] ?? 0) + 1;
   if (ev.type === "phase") phases.push([ev.phase!, Math.round((Date.now() - t0) / 1000)]);
 });
 for (const r of [garbage, flood, hostile]) r.onMessage("ev", () => {});
@@ -59,7 +62,7 @@ const report = {
 
 await new Promise<void>((resolve) => honest.onLeave(() => resolve()));
 timers.forEach(clearInterval);
-console.log(JSON.stringify({ phases, ...report, hostileDropped }, null, 1));
+console.log(JSON.stringify({ phases, ...report, hostileDropped, agentEvents }, null, 1));
 
 // Ledger: players in at GO paid 100 and got their settled payout back; the hostile client was
 // dropped during warm-up, so it was never charged.
@@ -75,6 +78,7 @@ const ok =
   report.honestDx > 0 &&
   report.floodDx <= report.honestDx + 1 &&
   hostileDropped &&
+  Object.keys(agentEvents).length > 0 &&
   balances[3] === 1000 &&
   balances.slice(0, 3).every((b) => Number.isFinite(b) && b >= 900 && b !== 1000);
 console.log(ok ? "SMOKE OK" : "SMOKE FAIL");

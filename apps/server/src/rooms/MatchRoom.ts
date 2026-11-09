@@ -8,27 +8,26 @@ import {
   R,
   TICK_MS,
   addPlayer,
-  drainLog,
   matchT,
-  matchView,
   newWorld,
   removePlayer,
-  settleVerified,
   startMatch,
   step,
   sToTicks,
   toUnits,
+  type Brain,
   type GameEventMsg,
-  type LogEntry,
   type Phase,
   type PlayerSeed,
   type World,
 } from "@margin/core";
+import { agentView, createBrain } from "../agents";
 import { sharedDb } from "../db";
 import { admitFree, chargeEntry, payFromSettle } from "./freeMatch";
 import { InputQueue } from "./input";
+import { MatchLog } from "./matchLog";
 import { agentFill, parseRoomKey, warmupNext, type RoomKey } from "./lobby";
-import { MatchState, syncBlobs, syncWorld } from "./schema";
+import { MatchState, syncState } from "./schema";
 
 const WARMUP_TICKS = sToTicks(R.WARMUP_S);
 const PAID_WAIT_TICKS = sToTicks(R.PAID_WAIT_S);
@@ -54,11 +53,11 @@ export class MatchRoom extends Room {
   private readonly seed = randomInt(2 ** 31);
   /** Warm-up world for ghosts; replaced at GO by one sized for the final head count. */
   private world!: World;
-  private log: LogEntry[] = [];
-  /** Hashing is async: every drain chains on the last one so seqs never interleave. */
-  private logChain: Promise<unknown> = Promise.resolve();
+  private log = new MatchLog();
   private settled = false;
   private inputs = new InputQueue();
+  /** Agent seats only (humans get null from createBrain and are never stored). */
+  private brains = new Map<string, Brain>();
   private lastMe = new Map<string, string>();
   /** Blob id (= sessionId) to credits user id, humans in free rooms only. */
   private users = new Map<string, string>();
@@ -156,7 +155,13 @@ export class MatchRoom extends Room {
     this.roomTick++;
     this.phaseTick++;
     const w = this.world;
-    const events = step(w, this.inputs.take(), this.roomTick);
+    const inputs = this.inputs.take();
+    // Agents see only their own screen (agentView) and answer like a client would.
+    for (const [id, brain] of this.brains) {
+      const view = agentView(w, id);
+      if (view) inputs.set(id, brain.decide(view, this.roomTick));
+    }
+    const events = step(w, inputs, this.roomTick);
     for (const ev of events) this.broadcast("ev", ev);
     switch (this.phase) {
       case "WARMUP": {
@@ -170,7 +175,7 @@ export class MatchRoom extends Room {
         if (this.phaseTick >= COUNTDOWN_TICKS) this.go();
         break;
       case "LIVE":
-        this.drainLog();
+        this.log.drain(w);
         if (this.key.mode === "free" && this.phaseTick === LATE_JOIN_TICKS) void this.lock();
         if (w.phase === "ENDED") {
           this.enter("ENDED", false); // core already sent the ENDED phase event
@@ -204,31 +209,22 @@ export class MatchRoom extends Room {
     const players = [...this.world.blobs.values()].map(({ id, kind, label, accountId }) => ({ id, kind, label, accountId }));
     this.world = newWorld(this.seed, this.key.mode, players, this.roomId);
     startMatch(this.world, this.roomTick);
-    this.state.arenaW = this.world.arena.w;
-    this.state.arenaH = this.world.arena.h;
+    for (const b of this.world.blobs.values()) {
+      const brain = createBrain(b, this.seed);
+      if (brain) this.brains.set(b.id, brain);
+    }
     this.autoDispose = false;
     if (this.key.mode === "free") void this.unlock(); // late joins for 15 s
-    this.drainLog();
+    this.log.drain(this.world);
     this.enter("LIVE");
   }
 
-  private drainLog(): void {
-    const w = this.world;
-    this.logChain = this.logChain.then(() => drainLog(w, this.log));
-  }
-
-  /** Replay the hash-chained log, check it against the live world, then pay out. */
+  /** Pay from the replayed log only; on any mismatch the match stays unpaid and loud. */
   private async settle(): Promise<void> {
     try {
-      await this.logChain;
-      const result = await settleVerified(this.log);
-      for (const p of result.payouts) {
-        const live = this.world.blobs.get(p.id)?.payout;
-        if (live !== p.amount) throw new Error(`settle != live for ${p.id}: ${p.amount} vs ${live}`);
-      }
+      const result = await this.log.settle(this.world);
       if (this.key.mode === "free") payFromSettle(sharedDb(), this.users, result, this.roomId);
     } catch (err) {
-      // Never pay from numbers that disagree with the log; the match stays unpaid and loud.
       console.error(`[settle] ${this.roomId} refused:`, err);
     } finally {
       this.settled = true;
@@ -249,18 +245,7 @@ export class MatchRoom extends Room {
       this.phase === "WARMUP" ? (this.key.mode === "paid" ? PAID_WAIT_TICKS : WARMUP_TICKS) - this.phaseTick
       : this.phase === "COUNTDOWN" ? COUNTDOWN_TICKS - this.phaseTick
       : 0;
-    const view = matchView(w);
-    this.state.timeLeftS = Math.max(0, Math.ceil(this.started ? view.timeLeftS : left / R.TICK_HZ));
-    this.state.tick = this.roomTick;
-    this.state.rateTier = view.rateTier;
-    this.state.arenaW = w.arena.w;
-    this.state.arenaH = w.arena.h;
-    if (this.state.leaderboard.join() !== view.leaderboard.join()) {
-      this.state.leaderboard.clear();
-      this.state.leaderboard.push(...view.leaderboard);
-    }
-    syncBlobs(this.state, w);
-    syncWorld(this.state, w);
+    syncState(this.state, w, this.roomTick, this.started ? null : left / R.TICK_HZ);
     for (const c of this.clients) {
       const b = w.blobs.get(c.sessionId);
       if (!b) continue;

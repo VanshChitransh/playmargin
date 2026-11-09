@@ -2,7 +2,7 @@
 // Only display fields (protocol.ts BlobView) cross the wire; debt never does. A player's own
 // "owe" number goes to that client alone as a private "me" message.
 import { ArraySchema, MapSchema, Schema, type } from "@colyseus/schema";
-import { blobView, radius, type World } from "@margin/core";
+import { blobView, matchView, radius, type World } from "@margin/core";
 
 export class BlobState extends Schema {
   @type("string") id = "";
@@ -93,4 +93,20 @@ function syncById<T extends { id: number }, S extends Schema>(
     fill(s, item);
   }
   for (const key of [...map.keys()]) if (!seen.has(key)) map.delete(key);
+}
+
+/** Everything the clients see, refreshed before each patch. preGoS = warm-up/3-2-1 seconds left. */
+export function syncState(state: MatchState, w: World, roomTick: number, preGoS: number | null): void {
+  const view = matchView(w);
+  state.timeLeftS = Math.max(0, Math.ceil(preGoS ?? view.timeLeftS));
+  state.tick = roomTick;
+  state.rateTier = view.rateTier;
+  state.arenaW = w.arena.w;
+  state.arenaH = w.arena.h;
+  if (state.leaderboard.join() !== view.leaderboard.join()) {
+    state.leaderboard.clear();
+    state.leaderboard.push(...view.leaderboard);
+  }
+  syncBlobs(state, w);
+  syncWorld(state, w);
 }
