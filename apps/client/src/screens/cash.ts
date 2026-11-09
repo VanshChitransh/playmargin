@@ -1,7 +1,7 @@
 // #/cash: the $1 match. Sign in, see your balance, PLAY $1 (S4 payToPlay: quick-play key, ticket,
 // then a paid seat), or Add funds from any chain through 1-Click dry quotes. Chain words stay out:
 // the player sees "balance", "ticket" and "Add funds", never keys or transactions.
-import { EXPLORER, NETWORK } from "../chain/config";
+import { NETWORK } from "../chain/config";
 import { originTokens, quoteDeposit, type OriginToken } from "../chain/addfunds";
 import { balanceOf, deposit, testnetFaucet, walletUsdc } from "../chain/funds";
 import { NeedFunds, payToPlay, type PaidStep } from "../chain/paid";
@@ -10,7 +10,7 @@ import { setPaidSeat } from "../play";
 import type { Screen } from "../router";
 import type { JoinOpts } from "@margin/core";
 
-const STEP: Record<PaidStep, string> = { "quick-play": "Approve quick play", ticket: "Buying ticket", ready: "Joining" };
+const STEP: Record<PaidStep, string> = { "quick-play": "Turning on quick play", ticket: "Buying ticket", ready: "Joining" };
 const usd = (base: bigint): string => (Number(base) / 1e6).toFixed(2);
 const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const btn = "sticker sticker-press rounded-box px-5 py-3 font-display text-xl disabled:opacity-50";
@@ -21,7 +21,7 @@ export const cash: Screen = (root) => {
     <div class="mx-auto max-w-xl">
       <a href="#/" class="tag">← MARGIN</a>
       <h1 class="outlined mt-3 font-display text-6xl text-paper">Play for $1</h1>
-      <p class="mt-2">Humans only. Winners split the pot by equity. ${NETWORK === "testnet" ? "<b>Test money on NEAR testnet.</b>" : ""}</p>
+      <p class="mt-2">Humans only. Winners split the pot by equity. ${NETWORK === "testnet" ? "<b>Test money for now, nothing real at stake.</b>" : ""}</p>
       <div data-c=body class="mt-6 space-y-4"></div>
       <p data-c=msg class="mt-4 font-bold" role="status"></p>
     </div>
@@ -56,9 +56,9 @@ export const cash: Screen = (root) => {
     if (!acc) {
       body.innerHTML = `<article class="sticker rounded-box bg-paper p-5">
         <h2 class="font-display text-3xl">Sign in to play for money</h2>
-        <p class="mt-1">Your winnings go to your own NEAR account. Practice stays free with no sign-in.</p>
+        <p class="mt-1">Winnings land in your own account, not ours. Practice stays free with no sign-in.</p>
         <div class="mt-4 flex flex-wrap gap-3">${EMAIL_LOGIN ? `<button data-c=email class="${btn} bg-liq text-paper">Log in with email</button>` : ""}
-        <button data-c=signin class="${btn} ${EMAIL_LOGIN ? "bg-paper" : "bg-liq text-paper"}">${EMAIL_LOGIN ? "Use a wallet" : "Sign in"}</button>
+        <button data-c=signin class="${btn} ${EMAIL_LOGIN ? "bg-paper" : "bg-liq text-paper"}">${EMAIL_LOGIN ? "Other sign-in options" : "Sign in"}</button>
         <a href="#/play" class="${btn} bg-paper">Practice free</a></div></article>`;
       body.querySelector("[data-c=signin]")!.addEventListener("click", () => signIn().catch((e: Error) => say(e.message)));
       body.querySelector("[data-c=email]")?.addEventListener("click", () => signInEmail().catch((e: Error) => say(e.message)));
@@ -66,7 +66,7 @@ export const cash: Screen = (root) => {
     }
     const [bal, inWallet] = await Promise.all([balanceOf(acc), walletUsdc(acc).catch(() => 0n)]);
     body.innerHTML = `<article class="sticker rounded-box bg-paper p-5">
-        <div class="flex items-baseline justify-between gap-3"><span class="tag truncate">${esc(acc)}</span>
+        <div class="flex items-baseline justify-between gap-3"><span class="tag truncate">Profile: ${esc(acc)}</span>
           <button data-c=out class="tag underline">Sign out</button></div>
         <div class="mt-2 font-display text-5xl"><span class="tabular-nums">$${usd(bal)}</span> <span class="text-2xl">balance</span></div>
         <div class="mt-4 flex flex-wrap gap-3">
@@ -75,8 +75,8 @@ export const cash: Screen = (root) => {
         </div></article>
       ${NETWORK === "testnet" ? `<article class="sticker rounded-box bg-paper p-5">
         <h2 class="font-display text-2xl">Test money</h2>
-        <p>In your wallet: <span class="num">$${usd(inWallet)}</span>. Get 10 test USDC, then move $1 into your balance.</p>
-        <div class="mt-3 flex flex-wrap gap-3"><button data-c=faucet class="${btn} bg-paper">Get test USDC</button>
+        <p>Test cash outside the game: <span class="num">$${usd(inWallet)}</span>. Get $10, then move $1 into your balance.</p>
+        <div class="mt-3 flex flex-wrap gap-3"><button data-c=faucet class="${btn} bg-paper">Get test cash</button>
         <button data-c=dep class="${btn} bg-paper" ${inWallet < 1_000_000n ? "disabled" : ""}>Move $1 in</button></div></article>` : ""}
       <div data-c=funds></div>`;
     const on = (k: string, f: (b: HTMLButtonElement) => Promise<void>): void => {
@@ -91,7 +91,6 @@ export const cash: Screen = (root) => {
     on("play", async (b) => {
       try {
         const entry = await payToPlay(acc!, (s) => (b.textContent = STEP[s]));
-        if (entry.ticketTx) say(`Ticket bought. ${EXPLORER}/txns/${entry.ticketTx}`);
         const accountId = acc!;
         // join = S4's NEP-413 proof, checked by S2's paid onAuth (not in core JoinOpts yet).
         setPaidSeat(() => ({ mode: "paid", accountId, ticketId: entry.ticketTx ?? "held", join: entry.join() }) as JoinOpts);
@@ -145,7 +144,7 @@ async function addFunds(box: HTMLElement, acc: string, say: (t: string) => void)
   const field = "mt-1 w-full rounded-field border-4 border-ink bg-paper px-3 py-2";
   box.innerHTML = `<form class="sticker space-y-3 rounded-box bg-paper p-5">
     <h2 class="font-display text-3xl">Add funds</h2>
-    <p>Pay from any chain. It arrives as USDC in your MARGIN balance.</p>
+    <p>Pay from any chain. It arrives as dollars in your MARGIN balance.</p>
     <label class="block">Pay with<select name=t class="${field}">${tokens
       .map((t, i) => `<option value=${i} ${t.symbol === "USDC" && t.blockchain === "base" ? "selected" : ""}>${esc(t.symbol)} on ${esc(t.blockchain)}</option>`)
       .join("")}</select></label>

@@ -89,7 +89,7 @@ function render(body: HTMLElement, d: Loaded, r: Report, note: string): void {
     <div class="flex flex-wrap gap-3">
       <button data-v=download class="sticker sticker-press rounded-box bg-paper px-4 py-2 font-display text-lg">Download log</button>
       <button data-v=tamper class="sticker sticker-press rounded-box bg-ink px-4 py-2 font-display text-lg text-paper">Tamper test</button>
-      ${explorer ? `<a href="${explorer}" target="_blank" rel="noopener" class="sticker sticker-press rounded-box bg-paper px-4 py-2 font-display text-lg">See the transaction</a>` : ""}
+      ${explorer ? `<a href="${explorer}" target="_blank" rel="noopener" class="sticker sticker-press rounded-box bg-paper px-4 py-2 font-display text-lg">✓ Verified → See proof</a>` : ""}
     </div>`;
 }
 

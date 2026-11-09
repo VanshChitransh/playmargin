@@ -139,7 +139,7 @@ export const play: Screen = (root, params) => {
     const o = receipt.outcome(lastFrame.blobs);
     overlay?.remove();
     // A beat after the bell so the last pop or cash-out is seen before the receipt covers it.
-    setTimeout(() => !left && (overlay = showResults(root, o, (a) => (a === "again" ? again() : a === "verify" ? void toVerify() : a === "share" ? void shareCertificate({ ...o.death!, matchId: src!.matchId }) : home()))), 900);
+    setTimeout(() => !left && (overlay = showResults(root, o, (a) => (a === "again" ? again() : a === "verify" ? void toVerify() : a === "share" ? void shareCertificate({ ...o.death!, matchId: src!.matchId }) : home()), wasPaid)), 900);
   };
 
   const draw = (now: number): Frame | null => {
