@@ -170,6 +170,16 @@ describe("forgeries a live room cannot produce (money-auditor C5)", () => {
     });
   }
 
+  it("refuses: an agent eats a human in the first 30 s (and accepts it at 30 s)", async () => {
+    const withAgent = (eatTick: number): PendingLog[] => [
+      ...open().map((e) => (e.type === "JOIN" && e.data.player.id === "b" ? { ...e, data: { player: { ...e.data.player, kind: "agent" as const } } } : e)),
+      { type: "EAT", tick: eatTick, data: { by: "b", victim: "a", debtRepaid: 0, badDebt: 0, gained: u(70), scattered: u(30) } },
+      cash("b", u(200)), end({ b: u(200) }),
+    ];
+    await expect(chain(withAgent(1 + 29 * 60)).then(settle)).rejects.toThrow(/first 30 s/);
+    await expect(chain(withAgent(1 + 30 * 60)).then(settle)).resolves.toBeDefined();
+  });
+
   it("settleVerified refuses a broken chain even when the books balance", async () => {
     const log = await chain([...open(), cash("a", u(100)), cash("b", u(100)), end({ a: u(100), b: u(100) })]);
     await expect(settleVerified(log)).resolves.toMatchObject({ seq: 7 });

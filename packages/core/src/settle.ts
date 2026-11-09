@@ -3,7 +3,7 @@
 // and refuses any log a live room could not have produced, wherever that is checkable without
 // food flows. What it cannot see (eat gains, bounty vs scatter, the leftover total) is protected by
 // the settler-signed head anchored on NEAR, so always pair it with verifyChain (settleVerified).
-import { BORROW_FEE_BPS, BORROW_FEE_VAULT_BPS, BOUNTY_BPS, INTEREST_FOOD_BPS, INTEREST_VAULT_BPS, LEVERAGE_CAP_BPS, LIQ_FEE_BPS } from "./constants";
+import { BORROW_FEE_BPS, BORROW_FEE_VAULT_BPS, BOUNTY_BPS, INTEREST_FOOD_BPS, INTEREST_VAULT_BPS, LEVERAGE_CAP_BPS, LIQ_FEE_BPS, R, sToTicks } from "./constants";
 import type { LogEntry } from "./events";
 import { verifyChain } from "./log";
 import type { BlobKind, Micro, SettleResult } from "./types";
@@ -32,6 +32,7 @@ export function settle(log: LogEntry[]): SettleResult {
   let lent: Micro = 0;
   let vaultRepaid: Micro = 0;
   let badDebt: Micro = 0;
+  let goTick = 0;
   let interestToVault: Micro = 0;
   let reserve: Micro = 0;
   let fees: Micro = 0;
@@ -61,6 +62,7 @@ export function settle(log: LogEntry[]): SettleResult {
       case "MATCH_START":
         if (matchId) fail(s, "second MATCH_START");
         matchId = e.data.matchId;
+        goTick = e.tick;
         break;
       case "JOIN": {
         const p = e.data.player;
@@ -116,6 +118,9 @@ export function settle(log: LogEntry[]): SettleResult {
       case "POP":
       case "KEEPER_POP": {
         const v = live(s, e.data.victim);
+        if (e.type === "EAT" && v.kind === "human" && blobs.get(e.data.by)?.kind === "agent" && e.tick - goTick < sToTicks(R.AGENT_NO_EAT_HUMAN_S)) {
+          fail(s, "an agent ate a human in the first 30 s");
+        }
         const repaid = m(s, e.data.debtRepaid, "debtRepaid");
         const lost = m(s, e.data.badDebt, "badDebt");
         if (repaid + lost !== v.debt) fail(s, `${e.type} closes ${repaid + lost} of debt ${v.debt}`);
