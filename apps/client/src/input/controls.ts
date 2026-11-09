@@ -3,6 +3,7 @@
 // Sends at most 30/s. BOOST is HELD state (hold-to-nitro): true in every command while Space
 // or the button is down. REPAY and cash-out stay edge taps. Any blur or tab switch sends a zero
 // command at once so nothing stays held (EDGE-CASES: stuck BOOST, plus the 250 ms server expiry).
+import { play as sfx } from "../audio";
 import nipplejs from "nipplejs";
 import type { InputCmd } from "@margin/core";
 import { dirFromPointer } from "./dir";
@@ -40,7 +41,7 @@ export class Controls {
       <div class="absolute right-0 bottom-0 flex flex-col items-end gap-3 p-4 pr-[max(16px,env(safe-area-inset-right))] pb-[max(16px,env(safe-area-inset-bottom))]">
         <button data-tap="cashout" class="pointer-events-auto btn btn-circle size-16 btn-accent hidden flex-col gap-0">CASH${key("E")}</button>
         <button data-tap="repay" class="pointer-events-auto btn btn-circle size-16 flex-col gap-0 border-2 border-ink bg-navy text-paper">REPAY${key("R")}</button>
-        <button data-tap="boost" class="pointer-events-auto btn btn-circle size-22 flex-col gap-0 border-4 border-ink bg-gold text-ink hover:bg-gold">BOOST${key("SPACE")}</button>
+        <button data-tap="boost" class="pointer-events-auto btn btn-circle size-22 flex-col gap-0 border-4 border-ink bg-gold text-ink hover:bg-gold"><svg class="lock absolute -top-2 -right-1 size-7 rounded-full border-2 border-ink bg-paper p-1" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z" fill="none" stroke="#070A12" stroke-width="2.5" stroke-linejoin="round"/></svg>BOOST${key("SPACE")}</button>
       </div>`;
     root.appendChild(layer);
     const q = (t: Tap): HTMLButtonElement => layer.querySelector(`[data-tap=${t}]`)!;
@@ -113,6 +114,8 @@ export class Controls {
   /** Nitro on or off; the change goes out at once, then every 33 ms while held. */
   private hold(on: boolean): void {
     if (this.boostHeld === on) return;
+    // Every press answers, even a refused one: a short "denied" buzz when BOOST is locked.
+    if (on && this.els.boost.classList.contains("blocked")) sfx("denied");
     this.boostHeld = on;
     this.els.boost.classList.toggle("holding", on);
     this.onHold?.(on);

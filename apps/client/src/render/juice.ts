@@ -38,6 +38,12 @@ export const JUICE = {
   REPAY_SQUASH: 0.06,
   REPAY_SQUASH_MS: 120,
 
+  // Red state (feel spec 2.2): heartbeat speeds up as the margin thins (health 1.0 to 0.9).
+  BEAT_SLOW_MS: 900,
+  BEAT_FAST_MS: 350,
+  /** The "TAP R" hint beside my blob, once per match. */
+  TAP_HINT_MS: 2500,
+
   // Before GO, other blobs are ghosts: overlap must never read as contact.
   GHOST_ALPHA: 0.35,
 } as const;

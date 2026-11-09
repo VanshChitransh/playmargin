@@ -8,6 +8,7 @@ import { boostBlocked, cashoutOpen, displayName, elapsedS, interestPerS, phaseNa
 import "./hud.css";
 import { isMuted, play as sfx, setMuted } from "../audio";
 import { coachMarks, type Coach } from "./coach";
+import { JUICE } from "../render/juice";
 
 const LB_MS = 1000 / R.LEADERBOARD_HZ;
 const ROW_PX = 22;
@@ -22,6 +23,7 @@ export class Hud {
   private bannerKey = "";
   private pipRing: HTMLElement;
   private lastBeat = 0;
+  private tapHinted = false;
 
   private coach: Coach;
   private touch = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
@@ -49,6 +51,7 @@ export class Hud {
       <div data-h=frame class="call-frame"></div>
       <p data-h=cmd style="display:none" class="absolute left-0 top-12 m-3 hidden max-w-[min(22rem,60vw)] rounded-field bg-navy/90 px-2 py-1 text-xs text-agent max-sm:line-clamp-3 max-sm:max-w-[calc(100vw-180px)] max-sm:text-[11px]"></p>
       <button data-h=mute class="tag pointer-events-auto absolute left-0 top-0 m-3 mt-[max(12px,env(safe-area-inset-top))] rounded-field bg-navy/80 px-2 py-1 text-muted"></button>
+      <div data-h=tap class="pointer-events-none absolute left-1/2 top-[calc(50%+64px)] hidden -translate-x-1/2"><span class="sticker rounded-field bg-paper px-3 py-1 font-display text-xl text-ink">${this.touch ? "TAP REPAY" : "TAP R"}</span></div>
       <div data-h=call class="tag absolute inset-x-0 bottom-28 hidden text-center"><span class="rounded-field bg-liq px-3 py-1 text-paper">Margin call: tap REPAY to get out</span></div>
       <div data-h=money class="absolute bottom-0 right-28 flex flex-col items-end gap-1 p-4 pb-[max(20px,env(safe-area-inset-bottom))]">
         <span data-h=owe class="num hidden rounded-field bg-navy/80 px-2 py-0.5 text-gold"></span>
@@ -99,7 +102,12 @@ export class Hud {
       this.q("call").classList.toggle("hidden", ring !== "red");
       this.els.repay.classList.toggle("urgent", ring === "red");
     });
-    if (ring === "red" && now - this.lastBeat > 900) {
+    // Heartbeat tempo follows health: 1.0 (just red) beats slowly, 0.9 (the vault's line) races.
+    const health = me.owe > 0 ? ((me.equity + me.owe) * 0.8) / me.owe : 2;
+    const k = Math.max(0, Math.min(1, (1 - health) / 0.1));
+    const beatMs = JUICE.BEAT_SLOW_MS - (JUICE.BEAT_SLOW_MS - JUICE.BEAT_FAST_MS) * k;
+    if (ring === "red" && !this.tapHinted) this.tapHint();
+    if (ring === "red" && now - this.lastBeat > beatMs) {
       this.lastBeat = now;
       sfx("beat");
     }
@@ -232,6 +240,14 @@ export class Hud {
     return `<ul class="mx-auto mt-3 flex max-w-sm flex-col items-center gap-1.5 text-sm">${lines
       .map((l) => `<li class="rounded-field bg-navy/85 px-3 py-1 text-paper">${l}</li>`)
       .join("")}<li class="text-xs text-ink/60">Try BOOST now: it is free practice until GO.</li></ul>`;
+  }
+
+  /** Once per match, the first time I go red: point at the one button that saves me. */
+  private tapHint(): void {
+    this.tapHinted = true;
+    const t = this.q("tap");
+    t.classList.remove("hidden");
+    setTimeout(() => t.classList.add("hidden"), JUICE.TAP_HINT_MS);
   }
 
   /** The agents' commander plan, shown so spectators see what the AI is up to. Null hides it. */
