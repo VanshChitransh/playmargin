@@ -1,16 +1,19 @@
-// The arena renderer: neon grid, zone with a red tint outside, food, spikes, blobs,
+// The arena renderer: light agar-style floor with a grid that runs past the edge, a soft
+// edge band, a red zone tint only once the zone shrinks, food, spikes, blobs,
 // and a camera that follows my blob and zooms out as it grows. Reads one Frame per
 // display frame from a source (synthetic now, interpolated server snapshots in U2).
 import { Application, Container, Graphics, Sprite, Text, Texture, TilingSprite } from "pixi.js";
 import type { Frame } from "../game/frame";
 import { BlobSprite } from "./blob";
-import { C } from "./colors";
+import { C, vivid } from "./colors";
 import { spikeWouldRedden } from "./danger";
 import { SPIKE_R, SpikeSprite, bakeSpikeTextures } from "./spike";
 import { boostBlocked, boostPreview } from "../hud/logic";
 import { FxLayer } from "./fx";
 
-const CELL = 64;
+const CELL = 50;
+/** Grid drawn this far past the arena so the camera never shows a void. */
+const BEYOND = 3000;
 /** Spikes further than this from my edge never warn: "within reach" (RULES, Spikes). */
 const WARN_REACH = 500;
 /** World px visible across the short screen side at start size. */
@@ -39,12 +42,13 @@ export class ArenaRenderer {
   private zoom = 1;
   private fps?: Text;
   private zoneKey = "";
+  private zoneMaxR = 0;
   private view = VIEW_AT_START;
 
   async mount(root: HTMLElement, source: FrameSource, opts: { fps?: boolean; fit?: HTMLElement; view?: number } = {}): Promise<void> {
     await this.app.init({
       resizeTo: opts.fit ?? window,
-      background: C.ink,
+      background: C.floor,
       antialias: true,
       autoDensity: true,
       resolution: Math.min(window.devicePixelRatio || 1, 2),
@@ -89,15 +93,16 @@ export class ArenaRenderer {
   private bake(): void {
     const cell = new Graphics()
       .rect(0, 0, CELL, CELL)
-      .fill(C.ink)
-      .moveTo(0, 0)
-      .lineTo(CELL, 0)
-      .moveTo(0, 0)
-      .lineTo(0, CELL)
-      .stroke({ width: 1, color: C.grid });
+      .fill(C.floor)
+      .moveTo(0, 0.5)
+      .lineTo(CELL, 0.5)
+      .moveTo(0.5, 0)
+      .lineTo(0.5, CELL)
+      .stroke({ width: 1, color: C.floorLine });
     this.grid = new TilingSprite({ texture: this.app.renderer.generateTexture(cell), width: 1, height: 1 });
     this.dot = this.app.renderer.generateTexture({
-      target: new Graphics().circle(0, 0, 16).fill(C.paper),
+      // White body with a grey rim: the tint makes it one vivid colour with a darker edge.
+      target: new Graphics().circle(0, 0, 16).fill(0xffffff).stroke({ width: 3, color: 0xb0b0b0 }),
       resolution: 2,
     });
     this.spikeTex = bakeSpikeTextures(this.app.renderer);
@@ -105,8 +110,9 @@ export class ArenaRenderer {
 
   private draw(f: Frame, tS: number): void {
     const meView = f.blobs.find((b) => b.id === f.me);
-    this.grid.width = f.arena.w;
-    this.grid.height = f.arena.h;
+    this.grid.position.set(-BEYOND, -BEYOND);
+    this.grid.width = f.arena.w + BEYOND * 2;
+    this.grid.height = f.arena.h + BEYOND * 2;
     this.drawZone(f);
     this.syncFood(f);
     this.syncSpikes(f, meView, tS);
@@ -117,23 +123,33 @@ export class ArenaRenderer {
 
   private drawZone(f: Frame): void {
     const z = f.match.zone;
-    const key = `${z.cx | 0},${z.cy | 0},${z.r | 0}`;
+    // The tint shows only once the zone is really closing (Squeeze), never in warm-up.
+    if (f.match.phase !== "LIVE") this.zoneMaxR = 0;
+    else this.zoneMaxR = Math.max(this.zoneMaxR, z.r);
+    const shrinking = f.match.phase === "LIVE" && z.r < this.zoneMaxR - 1 && z.r < Math.hypot(f.arena.w, f.arena.h);
+    const key = `${z.cx | 0},${z.cy | 0},${z.r | 0},${shrinking},${f.arena.w},${f.arena.h}`;
     if (key === this.zoneKey) return;
     this.zoneKey = key;
     this.zone.clear();
-    // A zone that covers the whole arena (warm-up, or no zone yet) draws no tint: cutting a
-    // hole bigger than the tint rect fails and would paint everything red.
-    if (z.r < Math.hypot(f.arena.w, f.arena.h)) {
+    // Soft edge band instead of a hard wall line: the floor just greys out past the arena.
+    this.zone
+      .rect(-BEYOND, -BEYOND, f.arena.w + BEYOND * 2, f.arena.h + BEYOND * 2)
+      .fill({ color: C.edge, alpha: 0.45 })
+      .rect(0, 0, f.arena.w, f.arena.h)
+      .cut();
+    for (let i = 1; i <= 3; i++) {
+      this.zone.rect(-i * 10, -i * 10, f.arena.w + i * 20, f.arena.h + i * 20).stroke({ width: 10, color: C.edge, alpha: 0.18 * (4 - i) });
+    }
+    if (shrinking) {
       const pad = Math.max(f.arena.w, f.arena.h);
       this.zone
         .rect(-pad, -pad, f.arena.w + pad * 2, f.arena.h + pad * 2)
-        .fill({ color: C.liq, alpha: 0.14 })
+        .fill({ color: C.liq, alpha: 0.12 })
         .circle(z.cx, z.cy, z.r)
         .cut()
         .circle(z.cx, z.cy, z.r)
         .stroke({ width: 4, color: C.liq, alpha: 0.7 });
     }
-    this.zone.rect(0, 0, f.arena.w, f.arena.h).stroke({ width: 3, color: C.muted, alpha: 0.5 });
   }
 
   private syncFood(f: Frame): void {
@@ -144,12 +160,12 @@ export class ArenaRenderer {
       if (!s) {
         s = new Sprite(this.dot);
         s.anchor.set(0.5);
-        s.tint = C.muted;
+        s.tint = vivid(fd.id);
         this.foods.set(fd.id, s);
         this.foodLayer.addChild(s);
       }
       s.position.set(fd.x, fd.y);
-      s.width = s.height = fd.r * 2;
+      s.width = s.height = fd.r * 2 * (1 + 0.08 * Math.sin(this.lastT * 3 + fd.id));
     }
     prune(this.foods, seen);
   }
@@ -195,7 +211,7 @@ export class ArenaRenderer {
     this.preview.clear();
     const p = me && !boostBlocked(me, f.match) ? boostPreview(me) : null;
     if (!me || !p) return;
-    this.preview.circle(me.x, me.y, p.next).stroke({ width: 2 / this.zoom, color: C.paper, alpha: 0.45 });
+    this.preview.circle(me.x, me.y, p.next).stroke({ width: 2 / this.zoom, color: C.ink, alpha: 0.4 });
     if (p.max - p.next < 1) return;
     const n = 40;
     for (let i = 0; i < n; i += 2) {
@@ -203,7 +219,7 @@ export class ArenaRenderer {
       const a1 = ((i + 1) / n) * Math.PI * 2;
       this.preview.moveTo(me.x + Math.cos(a0) * p.max, me.y + Math.sin(a0) * p.max).arc(me.x, me.y, p.max, a0, a1);
     }
-    this.preview.stroke({ width: 2 / this.zoom, color: C.paper, alpha: 0.25 });
+    this.preview.stroke({ width: 2 / this.zoom, color: C.ink, alpha: 0.25 });
   }
 
   private follow(x: number, y: number, r: number): void {

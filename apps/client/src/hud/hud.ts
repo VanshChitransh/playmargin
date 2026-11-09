@@ -28,9 +28,9 @@ export class Hud {
     this.el.className = "pointer-events-none fixed inset-0 select-none font-sans text-paper";
     this.el.innerHTML = `
       <div class="absolute top-0 inset-x-0 flex flex-col items-center pt-[max(10px,env(safe-area-inset-top))]">
-        <div class="flex items-center gap-2 self-start rounded-box bg-navy/80 px-3 py-1 max-sm:ml-[104px] max-sm:mt-[2px] sm:self-center">
-          <span data-h=phase class="text-xs font-medium tracking-widest text-muted"></span>
-          <span data-h=clock class="num text-xl font-bold"></span>
+        <div class="flex items-center gap-2 self-start rounded-box bg-navy/80 px-3 py-1 max-sm:ml-[102px] max-sm:mt-[2px] max-sm:gap-1 max-sm:px-2 sm:self-center">
+          <span data-h=phase class="text-xs font-medium tracking-widest text-muted max-sm:text-[10px] max-sm:tracking-normal"></span>
+          <span data-h=clock class="num text-xl font-bold max-sm:text-base"></span>
         </div>
         <div data-h=banner class="mt-3 px-3 text-center font-display text-3xl tracking-wide max-sm:mt-40 max-sm:text-2xl"></div>
       </div>
@@ -132,7 +132,7 @@ export class Hud {
       LOCK: ["BOOST LOCKED: REPAY OR CASH OUT", C.liq],
     };
     const [msg, color] = text[key]!;
-    this.flash(this.q("banner"), msg, "banner", color);
+    this.flash(this.q("banner"), msg, "banner", color, "outlined");
   }
 
   private center(f: Frame): void {
@@ -141,18 +141,18 @@ export class Hud {
     if (m.phase === "WARMUP") {
       const n = f.blobs.filter((b) => b.kind !== "drone").length;
       this.set("center", `W${n}/${m.timeLeftS}`, () => {
-        c.innerHTML = `<div><div class="num font-display text-7xl">${n}/${R.ROOM_SIZE}</div>
-          <div class="mt-1 text-muted">Finding players · starts in <span class="num">${m.timeLeftS}</span></div>
-          <div class="mt-2 text-sm text-muted">Warm up: steer around. BOOST unlocks at GO.</div></div>`;
+        c.innerHTML = `<div><div class="outlined font-display text-7xl tabular-nums text-paper">${n}/${R.ROOM_SIZE}</div>
+          <div class="mt-1 font-medium text-ink/70">Finding players · starts in <span class="num">${m.timeLeftS}</span></div>
+          <div class="mt-2 text-sm text-ink/60">Warm up: steer around. BOOST unlocks at GO.</div></div>`;
       });
     } else if (m.phase === "COUNTDOWN") {
       this.set("center", `C${m.timeLeftS}`, () => {
-        this.flash(c, String(m.timeLeftS), "punch", C.paper, "font-display text-9xl num");
+        this.flash(c, String(m.timeLeftS), "punch", C.paper, "outlined font-display text-9xl tabular-nums");
         sfx("tick");
       });
     } else if (m.phase === "LIVE" && elapsedS(m) < 1) {
       this.set("center", "GO", () => {
-        this.flash(c, "GO!", "punch", C.gold, "font-display text-8xl");
+        this.flash(c, "GO!", "punch", C.gold, "outlined font-display text-8xl");
         sfx("go");
       });
     } else {

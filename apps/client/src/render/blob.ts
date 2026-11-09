@@ -1,9 +1,10 @@
 // One blob: body + health ring + label. Ring state is shown by shape AND colour
 // (solid green, dashed yellow, pulsing red with a warning sign) so colour-blind
-// players read it too (inspiration.md principle 2). Agents are cyan, drones hollow hexes.
+// players read it too (inspiration.md principle 2). Bodies are agar-style: a vivid colour
+// per id, darker rim, name centred in white with a dark stroke. Drones are hollow hexes.
 import { Container, Graphics, Text } from "pixi.js";
 import type { BlobView, Ring } from "@margin/core";
-import { C } from "./colors";
+import { C, darken, vivid } from "./colors";
 import { displayName } from "../hud/logic";
 
 const RING_GAP = 4;
@@ -23,12 +24,11 @@ export class BlobSprite extends Container {
     const name = displayName(v);
     this.nameText = new Text({
       text: name,
-      style: { fontFamily: "Rubik", fontSize: 14, fontWeight: "500", fill: v.kind === "human" ? C.paper : C.agent },
+      style: { fontFamily: "Rubik", fontSize: 28, fontWeight: "700", fill: 0xffffff, stroke: { color: C.ink, width: 5, join: "round" } },
     });
     this.nameText.anchor.set(0.5);
     this.warnSign = new Text({ text: "⚠", style: { fontSize: 18, fill: C.liq } });
     this.warnSign.anchor.set(0.5);
-    this.body.alpha = isMe ? 0.95 : 0.8;
     this.addChild(this.shield, this.body, this.ring, this.nameText, this.warnSign);
   }
 
@@ -43,9 +43,11 @@ export class BlobSprite extends Container {
     }
     const r = v.radius + RING_GAP;
     const k = 1 / zoom;
-    this.nameText.scale.set(k);
+    // Name inside the blob, sized with it (agar.io), never under ~11 px on screen.
+    const ns = Math.max(v.radius * 0.38, 11 / zoom) / 28;
+    this.nameText.scale.set(ns);
     this.warnSign.scale.set(k);
-    this.nameText.position.set(0, r + 12 * k);
+    this.nameText.position.set(0, v.kind === "drone" ? r + 14 * k : 0);
     this.warnSign.visible = v.ring === "red" && v.kind !== "drone";
     this.warnSign.position.set(0, -r - 14 * k);
     this.shield.visible = v.shielded;
@@ -65,15 +67,15 @@ export class BlobSprite extends Container {
     this.shield.clear();
     if (v.kind === "drone") {
       // Drones cannot eat or be eaten, so they get no body and no ring.
-      this.body.poly(hex(r)).stroke({ width: 3, color: C.agent, alpha: 0.9 });
+      this.body.poly(hex(r)).fill({ color: C.agent, alpha: 0.18 }).stroke({ width: 4, color: C.navy });
       return;
     }
-    const fill = v.kind === "agent" ? C.agent : isMe ? C.paper : C.muted;
-    this.body.circle(0, 0, r).fill({ color: fill, alpha: 0.85 });
+    const fill = vivid(v.id);
+    this.body.circle(0, 0, r).fill(fill).stroke({ width: Math.max(3, r * 0.07), color: darken(fill) });
     const rr = r + RING_GAP;
     if (v.ring === "yellow") dashed(this.ring, rr, C.warn);
     else this.ring.circle(0, 0, rr).stroke({ width: v.ring === "red" ? RING_W + 2 : RING_W, color: v.ring === "red" ? C.liq : C.safe });
-    this.shield.circle(0, 0, rr + 6).stroke({ width: 2, color: C.paper, alpha: 0.35 });
+    this.shield.circle(0, 0, rr + 7).stroke({ width: 2, color: C.navy, alpha: 0.35 });
   }
 }
 
