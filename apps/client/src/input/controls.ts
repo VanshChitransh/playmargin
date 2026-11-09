@@ -5,7 +5,8 @@
 // command at once so nothing stays held (EDGE-CASES: stuck BOOST, plus the 250 ms server expiry).
 import { play as sfx } from "../audio";
 import nipplejs from "nipplejs";
-import type { InputCmd } from "@margin/core";
+import { R, type InputCmd } from "@margin/core";
+import { JUICE } from "../render/juice";
 import { dirFromPointer } from "./dir";
 
 const SEND_MS = 1000 / 30;
@@ -54,6 +55,7 @@ export class Controls {
           this.els.boost.setPointerCapture(e.pointerId); // a finger sliding off still counts until lifted
           return this.hold(true);
         }
+        if (t === "repay") return this.repay();
         this.tap(t);
       });
     }
@@ -91,6 +93,7 @@ export class Controls {
       const t: Tap | null = e.code === "KeyR" ? "repay" : e.code === "KeyE" ? "cashout" : null;
       if (!t) return;
       e.preventDefault();
+      if (t === "repay") return this.repay();
       this.tap(t);
     });
     this.listen(window, "keyup", (e) => e.code === "Space" && this.hold(false));
@@ -121,6 +124,47 @@ export class Controls {
     this.onHold?.(on);
     this.lastSent = 0;
     this.flush(false);
+  }
+
+  private lastRepay = -Infinity;
+  private repayQueued = false;
+
+  /** REPAY honours the 0.4 s cooldown: a press within 150 ms of its end is kept, not dropped. */
+  private repay(): void {
+    const cd = R.REPAY_COOLDOWN_S * 1000;
+    const left = cd - (performance.now() - this.lastRepay);
+    if (left <= 0) return this.fireRepay();
+    if (left <= JUICE.REPAY_BUFFER_MS && !this.repayQueued) {
+      this.repayQueued = true;
+      setTimeout(() => ((this.repayQueued = false), this.fireRepay()), left);
+    }
+  }
+
+  private fireRepay(): void {
+    this.lastRepay = performance.now();
+    this.tap("repay");
+    this.wipe();
+  }
+
+  /** Cooldown shown as a radial wipe over the REPAY button. */
+  private wipe(): void {
+    const b = this.els.repay;
+    let w = b.querySelector<HTMLElement>(".wipe");
+    if (!w) {
+      w = document.createElement("span");
+      w.className = "wipe pointer-events-none absolute inset-0 rounded-full";
+      b.classList.add("relative");
+      b.appendChild(w);
+    }
+    const el = w;
+    const t0 = performance.now();
+    const cd = R.REPAY_COOLDOWN_S * 1000;
+    const step = (): void => {
+      const k = Math.min(1, (performance.now() - t0) / cd);
+      el.style.background = k >= 1 ? "" : `conic-gradient(rgb(7 10 18 / 0.55) ${(1 - k) * 360}deg, transparent 0)`;
+      if (k < 1) requestAnimationFrame(step);
+    };
+    step();
   }
 
   private tap(t: Exclude<Tap, "boost">): void {

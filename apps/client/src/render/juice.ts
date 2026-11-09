@@ -56,6 +56,16 @@ export const JUICE = {
   BOOST_KICK_PX: 2,
   KICK_TAU_S: 0.05,
 
+  // REPAY per tap (feel spec 2.2)
+  /** Clink pitch over a run of taps (a tap within REPAY_RUN_MS of the last continues the run). */
+  REPAY_PITCH: [1, 1.12, 1.25],
+  REPAY_RUN_MS: 1200,
+  /** Coins that fly from my blob to the owe badge, and their flight time. */
+  REPAY_COINS: 5,
+  COIN_FLY_MS: 450,
+  /** A press this close to the end of the cooldown is kept and fires when it ends. */
+  REPAY_BUFFER_MS: 150,
+
   // Red state (feel spec 2.2): heartbeat speeds up as the margin thins (health 1.0 to 0.9).
   BEAT_SLOW_MS: 900,
   BEAT_FAST_MS: 350,

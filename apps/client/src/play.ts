@@ -103,6 +103,8 @@ export const play: Screen = (root, params) => {
   root.appendChild(status);
 
   /** Event to effect: every money moment gets a visible number or burst where it happened. */
+  let repayRun = 0;
+  let lastRepayAt = -Infinity;
   // Nitro sound follows the tank: pitch rises, a coin ticks per 10% borrowed, a clunk when dry.
   let lastStep = -1;
   let dry = false;
@@ -133,7 +135,13 @@ export const play: Screen = (root, params) => {
       // BOOST feel (engine sound, trail, ticking +N) comes from the held state, not this event.
       case "repay": {
         const p = e.blob === me ? at(me) : undefined;
-        if (p) sfx("repay");
+        if (p) {
+          const now = performance.now();
+          repayRun = now - lastRepayAt < JUICE.REPAY_RUN_MS ? repayRun + 1 : 0;
+          lastRepayAt = now;
+          sfx("clink", JUICE.REPAY_PITCH[Math.min(repayRun, JUICE.REPAY_PITCH.length - 1)]);
+          hud.coinsToOwe();
+        }
         if (p) arena.squashMe(me);
         if (p) arena.fx.floatText(p.x, p.y - p.r, `\u2212${num(e.amount)}`, C.paper, z);
         break;

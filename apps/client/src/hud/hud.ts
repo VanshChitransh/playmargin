@@ -9,6 +9,7 @@ import "./hud.css";
 import { isMuted, play as sfx, setMuted } from "../audio";
 import { coachMarks, type Coach } from "./coach";
 import { JUICE } from "../render/juice";
+import { reducedMotion } from "../render/motion";
 
 const LB_MS = 1000 / R.LEADERBOARD_HZ;
 const ROW_PX = 22;
@@ -240,6 +241,28 @@ export class Hud {
     return `<ul class="mx-auto mt-3 flex max-w-sm flex-col items-center gap-1.5 text-sm">${lines
       .map((l) => `<li class="rounded-field bg-navy/85 px-3 py-1 text-paper">${l}</li>`)
       .join("")}<li class="text-xs text-ink/60">Try BOOST now: it is free practice until GO.</li></ul>`;
+  }
+
+  /** REPAY: a few gold coins fly from my blob (screen centre) into the owe badge. */
+  coinsToOwe(): void {
+    if (reducedMotion) return;
+    const to = this.q("owe").getBoundingClientRect();
+    if (!to.width) return;
+    for (let i = 0; i < JUICE.REPAY_COINS; i++) {
+      const c = document.createElement("span");
+      c.className = "pointer-events-none fixed z-20 size-3 rounded-full border-2 border-ink bg-gold";
+      c.style.left = `${innerWidth / 2 + (Math.random() - 0.5) * 30}px`;
+      c.style.top = `${innerHeight / 2 + (Math.random() - 0.5) * 30}px`;
+      document.body.appendChild(c);
+      const dx = to.left + to.width / 2 - parseFloat(c.style.left);
+      const dy = to.top + to.height / 2 - parseFloat(c.style.top);
+      c.animate([{ transform: "translate(0,0) scale(1)" }, { transform: `translate(${dx}px, ${dy}px) scale(0.6)`, opacity: 0.4 }], {
+        duration: JUICE.COIN_FLY_MS,
+        delay: i * 40,
+        easing: "cubic-bezier(0.5, 0, 0.8, 0.4)",
+        fill: "forwards",
+      }).onfinish = () => c.remove();
+    }
   }
 
   /** Once per match, the first time I go red: point at the one button that saves me. */
