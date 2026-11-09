@@ -22,6 +22,7 @@ interface Source {
   send(cmd: InputCmd): void;
   onEvent(cb: (e: GameEventMsg) => void): () => void;
   leave?(): void;
+  onCommander?: (rationale: string | null) => void;
 }
 
 const JOIN_TIMEOUT_MS = 2500;
@@ -165,6 +166,7 @@ export const play: Screen = (root, params) => {
     src = s;
     status.textContent = s instanceof LocalMatch ? "Offline practice: real rules, local bots" : "";
     receipt = new Receipt(s.me);
+    s.onCommander = (r) => hud.commander(r);
     s.onEvent((e) => {
       receipt?.event(e);
       juice(e, s.me);

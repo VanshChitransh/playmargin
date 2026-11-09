@@ -40,6 +40,7 @@ export class Hud {
       </div>
       <div data-h=center class="absolute inset-x-0 top-[14%] grid place-items-center text-center"></div>
       <div data-h=frame class="call-frame"></div>
+      <p data-h=cmd class="absolute left-0 top-12 m-3 hidden max-w-[min(22rem,60vw)] rounded-field bg-navy/80 px-2 py-1 text-xs text-agent"></p>
       <button data-h=mute class="tag pointer-events-auto absolute left-0 top-0 m-3 mt-[max(12px,env(safe-area-inset-top))] rounded-field bg-navy/80 px-2 py-1 text-muted"></button>
       <div data-h=call class="tag absolute inset-x-0 bottom-28 hidden text-center"><span class="rounded-field bg-liq px-3 py-1 text-paper">Margin call: tap REPAY to get out</span></div>
       <div data-h=money class="absolute bottom-0 right-28 flex flex-col items-end gap-1 p-4 pb-[max(20px,env(safe-area-inset-bottom))]">
@@ -210,6 +211,13 @@ export class Hud {
     const fills = Array.from({ length: max }, (_, i) => (i < lit ? 1 : (spent[i - lit] ?? 0)));
     this.pipRing.style.background = pipGradient(fills, blocked ? "#8391B3" : C.gold, C.dim);
     this.els.boost.classList.toggle("blocked", blocked);
+  }
+
+  /** The agents' commander plan, shown so spectators see what the AI is up to. Null hides it. */
+  commander(text: string | null): void {
+    const c = this.q("cmd");
+    c.textContent = text ? `Commander: ${text}` : "";
+    c.classList.toggle("hidden", !text);
   }
 
   /** Re-run a CSS animation on el with new text. */

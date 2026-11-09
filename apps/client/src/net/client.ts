@@ -37,6 +37,7 @@ export class MatchConnection {
   private offset = Infinity;
   private room?: Room;
   private listeners = new Set<(e: GameEventMsg) => void>();
+  onCommander?: (rationale: string | null) => void;
 
   /** Join a match (free or paid); rejects if the server is unreachable or refuses the seat. */
   async join(opts: JoinOpts): Promise<void> {
@@ -50,6 +51,8 @@ export class MatchConnection {
       this.rateBps = m.ratePerMinBps;
     });
     this.room.onMessage("ev", (e: GameEventMsg) => this.listeners.forEach((l) => l(e)));
+    // The NEAR AI commander's one-line plan for the agents (S1 A6), null until the first plan.
+    this.room.onMessage("commander", (m: { rationale: string | null }) => this.onCommander?.(m.rationale));
   }
 
   /** The server uses the room id as the match id in the log and on chain. */
