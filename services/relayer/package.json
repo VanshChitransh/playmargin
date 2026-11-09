@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "../../node_modules/.bin/tsx server.ts",
+    "start": "../../node_modules/.bin/tsx --env-file-if-exists=../../.env server.ts",
     "smoke": "../../node_modules/.bin/tsx smoke.ts",
     "typecheck": "../../node_modules/.bin/tsc -p ."
   },

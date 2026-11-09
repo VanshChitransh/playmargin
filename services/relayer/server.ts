@@ -1,12 +1,14 @@
 // NEP-366 relayer: POST /relay {payload} wraps a player's signed enter_arena in a tx we pay gas
 // for, and returns the contract's EVENT_JSON logs so the game server sees the "enter" event
 // without an indexer. Pattern from near-api-examples meta-tx/server.ts, rewritten on near-kit.
+// Also proxies 1-Click Add funds (/tokens, /quote, /status) so the partner JWT stays server side.
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { Near, decodeSignedDelegateAction } from "near-kit";
 import { FileKeyStore } from "near-kit/keys/file";
+import * as oneclick from "./oneclick.ts";
 import { RateLimit, refuseReason, type Policy } from "./validate.ts";
 
 const NETWORK = process.env.NETWORK === "mainnet" ? "mainnet" : "testnet";
@@ -38,13 +40,13 @@ function reply(res: ServerResponse, status: number, body: object): void {
   res.end(JSON.stringify(body));
 }
 
-async function readJson(req: IncomingMessage): Promise<{ payload?: unknown }> {
+async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
   let raw = "";
   for await (const chunk of req) {
     raw += chunk;
     if (raw.length > 16_384) throw new Error("body too large");
   }
-  return JSON.parse(raw) as { payload?: unknown };
+  return JSON.parse(raw) as Record<string, unknown>;
 }
 
 type Outcome = {
@@ -82,6 +84,24 @@ async function relay(req: IncomingMessage, res: ServerResponse): Promise<void> {
   }
 }
 
+const quoteLimiter = new RateLimit(1_000);
+
+/** POST /quote {accountId, originAsset, amount, refundTo}: 1-Click quote into the contract. */
+async function quote(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  let body: Record<string, unknown>;
+  try {
+    body = await readJson(req);
+  } catch {
+    return reply(res, 400, { error: "bad json" });
+  }
+  const known = new Set((await oneclick.tokens()).map((t) => t.assetId));
+  const why = oneclick.quoteInputError(body, (id) => known.has(id));
+  if (why) return reply(res, 400, { error: why });
+  if (!quoteLimiter.allow(String(body.accountId), Date.now())) return reply(res, 429, { error: "slow down" });
+  const r = await oneclick.quote(body as unknown as oneclick.QuoteInput);
+  reply(res, r.status, r.body as object);
+}
+
 async function health(res: ServerResponse): Promise<void> {
   const balance = Number(await near.getBalance(RELAYER_ID));
   reply(res, 200, { relayer: RELAYER_ID, contract: policy.contractId, balance, alarm: balance < LOW_BALANCE });
@@ -91,5 +111,10 @@ createServer((req, res) => {
   if (req.method === "OPTIONS") return reply(res, 204, {});
   if (req.method === "POST" && req.url === "/relay") return void relay(req, res);
   if (req.method === "GET" && req.url === "/health") return void health(res).catch(() => reply(res, 502, {}));
+  const fail = () => reply(res, 502, { error: "1-Click unavailable" });
+  if (req.method === "GET" && req.url === "/tokens") return void oneclick.tokens().then((t) => reply(res, 200, t), fail);
+  if (req.method === "POST" && req.url === "/quote") return void quote(req, res).catch(fail);
+  const st = req.method === "GET" && req.url?.startsWith("/status?") ? new URL(req.url, "http://x").searchParams.get("depositAddress") : null;
+  if (st) return void oneclick.status(st).then((r) => reply(res, r.status, r.body as object), fail);
   reply(res, 404, { error: "not found" });
 }).listen(PORT, () => console.log(`relayer ${RELAYER_ID} -> ${policy.contractId} on :${PORT} (${NETWORK})`));
