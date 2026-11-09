@@ -3,6 +3,7 @@
 // and measures what a player sees. A spectator socket reads the exact world for the numbers.
 //
 //   npx tsx apps/server/scripts/playtest.ts play [strategy] [--cpu 4] [--w 1280 --h 800] [--mobile]
+//   npx tsx apps/server/scripts/playtest.ts runs [n=10] [strategy=food] [--par 5]   n fresh-server matches
 //   npx tsx apps/server/scripts/playtest.ts survival [n=10]        n staggered matches, no BOOST
 //   npx tsx apps/server/scripts/playtest.ts edges                   reload, late join, 2 tabs, credits, freeze
 // strategies: wander | food | flee | boost | redrepay | cashout. Output: playtest-out/<run>/ (json, png, mp4)
@@ -35,9 +36,10 @@ const freePort = () =>
   });
 
 /** Fresh server (own DB) + Vite client pointed at it. */
-async function boot() {
+async function boot(dir = OUT) {
+  mkdirSync(dir, { recursive: true });
   const [sp, cp] = [await freePort(), await freePort()];
-  const db = join(OUT, "server.sqlite");
+  const db = join(dir, "server.sqlite");
   const serverLog: string[] = [];
   const server = spawn(process.execPath, ["--import", "tsx", "src/index.ts"], {
     cwd: join(ROOT, "apps/server"),
@@ -98,8 +100,8 @@ async function steer(page: Page, w: number, h: number, dx: number, dy: number) {
 }
 
 /** One full match as a browser player with a strategy, measured through a spectator. */
-async function play(strategy: string, o: { w: number; h: number; cpu?: number; mobile?: boolean }) {
-  const env = await boot();
+async function play(strategy: string, o: { w: number; h: number; cpu?: number; mobile?: boolean }, dir = OUT, record = true) {
+  const env = await boot(dir);
   const browser = await chromium.launch({ executablePath: CHROME, headless: true, args: ["--use-angle=metal", "--enable-gpu"] });
   const { page, ctx, consoleLog } = await newPage(browser, { ...o, guest: `qa-${strategy}-${Date.now()}` });
   if (o.cpu) await (await ctx.newCDPSession(page)).send("Emulation.setCPUThrottlingRate", { rate: o.cpu });
@@ -115,8 +117,7 @@ async function play(strategy: string, o: { w: number; h: number; cpu?: number; m
   }
   if (!spec) throw new Error("could not spectate the player's room");
   // Film the same room from #/watch with S3's recorder (30 s mp4), in parallel.
-  const rec = spawn("bash", ["scripts/record.sh", "30", join(OUT, "watch.mp4"), `${env.web}/?clean=1#/watch`], { cwd: join(ROOT, "apps/client"), stdio: "ignore" });
-  procs.push(rec);
+  if (record) procs.push(spawn("bash", ["scripts/record.sh", "30", join(dir, "watch.mp4"), `${env.web}/?clean=1#/watch`], { cwd: join(ROOT, "apps/client"), stdio: "ignore" }));
   spec.onMessage("ev", () => {});
   spec.onMessage("commander", () => {});
   const st = () => spec!.state as unknown as St;
@@ -135,7 +136,7 @@ async function play(strategy: string, o: { w: number; h: number; cpu?: number; m
     if (s.phase === "LIVE" && !liveAt) liveAt = Date.now();
     const t = liveAt ? (Date.now() - liveAt) / 1000 : 0;
     const z = zoomFor(o.w, o.h, me.radius);
-    if (tick % 30 === 0) await page.screenshot({ path: join(OUT, `shot-${String(shot++).padStart(3, "0")}.png`) });
+    if (tick % 30 === 0) await page.screenshot({ path: join(dir, `shot-${String(shot++).padStart(3, "0")}.png`) });
     if (!liveAt || me.state !== "alive") {
       if (me.state !== "alive") m.final = me.state;
       continue;
@@ -172,18 +173,18 @@ async function play(strategy: string, o: { w: number; h: number; cpu?: number; m
     // Strategy: a direction for the mouse, plus BOOST / REPAY / cash out keys.
     const nearestFood = food.reduce((a, f) => (Math.hypot(f.x - me.x, f.y - me.y) < Math.hypot(a.x - me.x, a.y - me.y) ? f : a), food[0] ?? me);
     const threat = others.map(([, b]) => b).filter((b) => b.radius > me.radius * 1.1 || b.kind === "drone").sort((a, b) => Math.hypot(a.x - me.x, a.y - me.y) - Math.hypot(b.x - me.x, b.y - me.y))[0];
-    let dir: [number, number] = [nearestFood.x - me.x, nearestFood.y - me.y];
+    let aim: [number, number] = [nearestFood.x - me.x, nearestFood.y - me.y];
     // Like a person: steer around spikes that sit on the way (within 2 radii ahead).
     for (const k of s.spikes.values()) {
       const d = Math.hypot(k.x - me.x, k.y - me.y);
-      if (k.live && d < me.radius + k.radius + 70) dir = [dir[0] + ((me.x - k.x) / d) * 2, dir[1] + ((me.y - k.y) / d) * 2];
+      if (k.live && d < me.radius + k.radius + 70) aim = [aim[0] + ((me.x - k.x) / d) * 2, aim[1] + ((me.y - k.y) / d) * 2];
     }
     if (strategy === "wander") {
       if (tick % 20 === 0) wander += (Math.random() - 0.5) * 2;
-      dir = [Math.cos(wander), Math.sin(wander)];
+      aim = [Math.cos(wander), Math.sin(wander)];
     }
-    if ((strategy === "flee" || strategy === "cashout" || strategy === "redrepay") && threat && Math.hypot(threat.x - me.x, threat.y - me.y) < 450) dir = [me.x - threat.x, me.y - threat.y];
-    await steer(page, o.w, o.h, dir[0], dir[1]);
+    if ((strategy === "flee" || strategy === "cashout" || strategy === "redrepay") && threat && Math.hypot(threat.x - me.x, threat.y - me.y) < 450) aim = [me.x - threat.x, me.y - threat.y];
+    await steer(page, o.w, o.h, aim[0], aim[1]);
     const wantBoost = (strategy === "boost" && t > 3) || (strategy === "redrepay" && me.ring !== "red" && !m.repaid && t > 3);
     if (wantBoost !== holding) {
       holding = wantBoost;
@@ -202,7 +203,7 @@ async function play(strategy: string, o: { w: number; h: number; cpu?: number; m
   const me = [...st().blobs.values()].find((b) => b.kind === "human");
   m.final = m.final || me?.state || "?";
   await sleep(2000);
-  await page.screenshot({ path: join(OUT, "result.png") });
+  await page.screenshot({ path: join(dir, "result.png") });
   const fs = await frameStats(page);
   await spec.leave();
   await ctx.close();
@@ -210,14 +211,43 @@ async function play(strategy: string, o: { w: number; h: number; cpu?: number; m
   const avg = (a: number[]) => Math.round((a.reduce((x, y) => x + y, 0) / Math.max(1, a.length)) * 100) / 100;
   const bySize = new Map<number, number[]>();
   for (const s of m.speeds) bySize.set(Math.round(s.r / 10) * 10, [...(bySize.get(Math.round(s.r / 10) * 10) ?? []), s.pxs]);
-  Object.assign(report, {
+  // From the server's own log: spike hits and what ended the player, in seconds after GO.
+  const db = new DatabaseSync(env.db, { readOnly: true });
+  const q = (sql: string) => db.prepare(sql).all() as Array<Record<string, unknown>>;
+  const go = (q("SELECT json_extract(json,'$.tick') AS t FROM events WHERE json_extract(json,'$.type')='MATCH_START'")[0]?.t as number) ?? 0;
+  const human = "(SELECT blob_id FROM match_players)";
+  const spikeHits = q(`SELECT COUNT(*) AS n FROM events WHERE json_extract(json,'$.type')='SPIKE' AND json_extract(json,'$.data.blob') IN ${human}`)[0]!.n as number;
+  const death = q(`SELECT json_extract(json,'$.type') AS type, json_extract(json,'$.data.by') AS by, json_extract(json,'$.tick') AS t FROM events WHERE json_extract(json,'$.data.victim') IN ${human}`)[0];
+  const cashed = q(`SELECT json_extract(json,'$.tick') AS t FROM events WHERE json_extract(json,'$.type')='CASHOUT' AND json_extract(json,'$.data.blob') IN ${human}`)[0];
+  return {
+    spikeHits, death: death ? { type: death.type, by: death.by, atS: Math.round(((death.t as number) - go) / 60) } : null,
+    cashedAtS: cashed ? Math.round(((cashed.t as number) - go) / 60) : null,
     strategy, viewport: `${o.w}x${o.h}${o.mobile ? " mobile" : ""}`, cpuThrottle: o.cpu ?? 1, frames: fs,
     pelletsPerMP: avg(m.foodPerMP), pelletPctWidth: m.foodPct, spikePctWidth: m.spikePct,
     speedPxPerSByRadius: Object.fromEntries([...bySize].sort((a, b) => a[0] - b[0]).map(([r, v]) => [r, Math.round(avg(v))])),
     firstContactS: m.firstContactS, final: m.final, redSeconds: Math.round(m.redS), boosted: m.boosted, repaid: m.repaid, cashTried: m.cashTried,
     agents: { clumpShare: avg(m.clump), reversalsPerAgentPer100ms: avg(m.jitter), bigAgentsNearMeFirst20s: m.earlyHunters },
     console: consoleLog.slice(0, 30), serverErrors: env.serverLog.join("").split("\n").filter((l) => /error|Error/.test(l)).slice(0, 20),
-    noHorizontalScroll: true,
+  };
+}
+
+/** n independent food (or other strategy) matches, each on its own fresh server, `par` at a time. */
+async function runs(n: number, strategy: string, par: number) {
+  const all: Array<Awaited<ReturnType<typeof play>>> = [];
+  for (let i = 0; i < n; i += par) {
+    const wave = Array.from({ length: Math.min(par, n - i) }, (_, k) => play(strategy, { w: 1280, h: 800 }, join(OUT, `run-${i + k}`), false));
+    all.push(...(await Promise.all(wave)));
+  }
+  const died = all.filter((r) => r.death);
+  Object.assign(report, {
+    strategy, runs: n,
+    survivedToBell: all.filter((r) => !r.death).length,
+    deaths: died.map((r) => `${r.death!.type} by ${r.death!.by} at ${r.death!.atS}s`),
+    spikeHitsPerMatch: all.map((r) => r.spikeHits),
+    firstContactS: all.map((r) => r.firstContactS),
+    fps: all.map((r) => r.frames.fps),
+    console: [...new Set(all.flatMap((r) => r.console))].slice(0, 10),
+    serverErrors: [...new Set(all.flatMap((r) => r.serverErrors))].slice(0, 10),
   });
 }
 
@@ -333,7 +363,8 @@ async function edges() {
 
 const w = Number(flag("w", "1280"));
 const h = Number(flag("h", "800"));
-if (mode === "play") await play(argv[1] && !argv[1].startsWith("--") ? argv[1] : "food", { w, h, cpu: flag("cpu") ? Number(flag("cpu")) : undefined, mobile: !!flag("mobile") });
+if (mode === "play") Object.assign(report, await play(argv[1] && !argv[1].startsWith("--") ? argv[1] : "food", { w, h, cpu: flag("cpu") ? Number(flag("cpu")) : undefined, mobile: !!flag("mobile") }));
+else if (mode === "runs") await runs(Number(argv[1] ?? 10), argv[2] ?? "food", Number(flag("par", "5")));
 else if (mode === "survival") await survival(Number(argv[1] ?? 10));
 else if (mode === "edges") await edges();
 writeFileSync(join(OUT, "report.json"), JSON.stringify(report, null, 1));
