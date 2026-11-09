@@ -40,7 +40,7 @@ export class Controls {
       <div class="absolute right-0 bottom-0 flex flex-col items-end gap-3 p-4 pr-[max(16px,env(safe-area-inset-right))] pb-[max(16px,env(safe-area-inset-bottom))]">
         <button data-tap="cashout" class="pointer-events-auto btn btn-circle size-16 btn-accent hidden flex-col gap-0">CASH${key("E")}</button>
         <button data-tap="repay" class="pointer-events-auto btn btn-circle size-16 flex-col gap-0 border-2 border-ink bg-navy text-paper">REPAY${key("R")}</button>
-        <button data-tap="boost" class="pointer-events-auto btn btn-circle size-22 btn-primary flex-col gap-0">BOOST${key("SPACE")}</button>
+        <button data-tap="boost" class="pointer-events-auto btn btn-circle size-22 flex-col gap-0 border-4 border-ink bg-gold text-ink hover:bg-gold">BOOST${key("SPACE")}</button>
       </div>`;
     root.appendChild(layer);
     const q = (t: Tap): HTMLButtonElement => layer.querySelector(`[data-tap=${t}]`)!;

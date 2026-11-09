@@ -39,12 +39,12 @@ export class Hud {
         <div data-h=banner class="mt-3 px-3 text-center font-display text-3xl tracking-wide max-sm:mt-40 max-sm:text-2xl"></div>
       </div>
       <div class="absolute right-0 top-0 p-3 pr-[max(12px,env(safe-area-inset-right))] pt-[max(12px,env(safe-area-inset-top))]">
-        <ol data-h=lb class="relative w-36 rounded-box bg-navy/70 p-2 text-xs transition-[height] duration-300 sm:w-44 sm:text-sm" style="height:${ROW_PX + 16}px"></ol>
-        <div data-h=myrank class="mt-1 hidden w-36 rounded-box bg-navy/70 px-2 py-1 text-xs sm:w-44 sm:text-sm"></div>
+        <ol data-h=lb class="relative w-36 rounded-box bg-navy/90 p-2 text-xs transition-[height] duration-300 sm:w-44 sm:text-sm" style="height:${ROW_PX + 16}px"></ol>
+        <div data-h=myrank class="mt-1 hidden w-36 rounded-box bg-navy/90 px-2 py-1 text-xs sm:w-44 sm:text-sm"></div>
       </div>
       <div data-h=center class="absolute inset-x-0 top-[14%] grid place-items-center text-center"></div>
       <div data-h=frame class="call-frame"></div>
-      <p data-h=cmd class="absolute left-0 top-12 m-3 hidden max-w-[min(22rem,60vw)] rounded-field bg-navy/80 px-2 py-1 text-xs text-agent max-sm:line-clamp-3 max-sm:max-w-[calc(100vw-180px)] max-sm:text-[11px]"></p>
+      <p data-h=cmd class="absolute left-0 top-12 m-3 hidden max-w-[min(22rem,60vw)] rounded-field bg-navy/90 px-2 py-1 text-xs text-agent max-sm:line-clamp-3 max-sm:max-w-[calc(100vw-180px)] max-sm:text-[11px]"></p>
       <button data-h=mute class="tag pointer-events-auto absolute left-0 top-0 m-3 mt-[max(12px,env(safe-area-inset-top))] rounded-field bg-navy/80 px-2 py-1 text-muted"></button>
       <div data-h=call class="tag absolute inset-x-0 bottom-28 hidden text-center"><span class="rounded-field bg-liq px-3 py-1 text-paper">Margin call: tap REPAY to get out</span></div>
       <div data-h=money class="absolute bottom-0 right-28 flex flex-col items-end gap-1 p-4 pb-[max(20px,env(safe-area-inset-bottom))]">
