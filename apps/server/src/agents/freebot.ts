@@ -18,7 +18,7 @@ export interface Personality {
 }
 
 /** Global free-room agent skill (later per league). Tuned with tools/sim/human.ts. */
-export const AGENT_SKILL = 0.7;
+export const AGENT_SKILL = 0.6;
 /** The engine bars agents from eating humans this early; agents also don't BOOST before it, so their
  *  early growth matches a human who has not found BOOST yet. */
 const HUMAN_SAFE_T = sToTicks(R.AGENT_NO_EAT_HUMAN_S);

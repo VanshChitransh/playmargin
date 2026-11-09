@@ -57,11 +57,31 @@ export function newWorld(seed: number, mode: Mode, players: PlayerSeed[], matchI
 /** Spawn ring radius: spread out, but central (the zone pulls everyone in) and clear of every edge. */
 const spawnRing = (w: World): number => Math.min(w.arena.w * 0.35, C.R.SPAWN_RING_MAX_PX, w.arena.w / 2 - C.R.SPAWN_EDGE_MARGIN_PX);
 
+/**
+ * A point on the spawn ring that keeps blob radius + spike radius + SPIKE_CLEARANCE_PX from every
+ * live spike (16 tries, else the roomiest), so nobody joins touching a spike.
+ */
+function clearSpawn(w: World, mass: Micro): [number, number] {
+  const r = radius(mass);
+  let best: [number, number] = [w.zone.cx, w.zone.cy];
+  let bestRoom = -Infinity;
+  for (let i = 0; i < 16; i++) {
+    const a = rand(w) * Math.PI * 2;
+    const p: [number, number] = [w.zone.cx + Math.cos(a) * spawnRing(w), w.zone.cy + Math.sin(a) * spawnRing(w)];
+    let room = Infinity;
+    for (const s of w.spikes) {
+      if (s.respawnAt === null) room = Math.min(room, Math.hypot(s.x - p[0], s.y - p[1]) - (r + spikeRadius(s) + C.R.SPIKE_CLEARANCE_PX));
+    }
+    if (room >= 0) return p;
+    if (room > bestRoom) [best, bestRoom] = [p, room];
+  }
+  return best;
+}
+
 /** Join during warm-up (ghost, free to leave) or a late join in the first 15 s of a free match. */
 export function addPlayer(w: World, p: PlayerSeed, tick = w.tick): Blob {
   if (w.blobs.has(p.id)) throw new Error(`duplicate player ${p.id}`);
-  const a = rand(w) * Math.PI * 2;
-  const [x, y] = [w.zone.cx + Math.cos(a) * spawnRing(w), w.zone.cy + Math.sin(a) * spawnRing(w)];
+  const [x, y] = clearSpawn(w, startMass(w.mode));
   const b = newBlob(p, x, y, p.kind === "drone" ? 0 : startMass(w.mode));
   w.blobs.set(p.id, b);
   w.pendingLog.push({ type: "JOIN", tick, data: { player: p } });
@@ -93,27 +113,32 @@ function charge(w: World, b: Blob, tick: number): void {
 
 /**
  * Best-candidate blue noise: of up to 16 random spots in the play area, take the first that keeps
- * SPIKE_MIN_SPACING_PX from every other live spike and clears every live blob by a body length;
+ * SPIKE_MIN_SPACING_PX from every other live spike and keeps blob radius + spike radius +
+ * SPIKE_CLEARANCE_PX from every live blob;
  * if none does, the spot with the most room. Spikes spread evenly and never spawn on a player.
  */
 function placeSpike(w: World, s: Spike): void {
   const r = spikeRadius(s);
+  // Clearing players is the hard rule (nobody touches a spike at spawn); spacing between spikes is
+  // the soft one. Score = spacing room when players are clear, else a big penalty plus player room.
   let best: [number, number] = playPoint(w);
-  let bestRoom = -Infinity;
-  for (let i = 0; i < 16; i++) {
+  let bestScore = -Infinity;
+  for (let i = 0; i < 32; i++) {
     const [x, y] = i === 0 ? best : playPoint(w);
-    let room = Infinity;
+    let spacing = Infinity;
     for (const o of w.spikes) {
-      if (o !== s && o.respawnAt === null) room = Math.min(room, Math.hypot(o.x - x, o.y - y) - C.R.SPIKE_MIN_SPACING_PX);
+      if (o !== s && o.respawnAt === null) spacing = Math.min(spacing, Math.hypot(o.x - x, o.y - y) - C.R.SPIKE_MIN_SPACING_PX);
     }
+    let clear = Infinity;
     for (const b of w.blobs.values()) {
-      if (b.state === "alive") room = Math.min(room, Math.hypot(b.x - x, b.y - y) - (radius(b.mass) * 2 + r));
+      if (b.state === "alive") clear = Math.min(clear, Math.hypot(b.x - x, b.y - y) - (radius(b.mass) + r + C.R.SPIKE_CLEARANCE_PX));
     }
-    if (room >= 0) {
+    if (clear >= 0 && spacing >= 0) {
       best = [x, y];
       break;
     }
-    if (room > bestRoom) [best, bestRoom] = [[x, y], room];
+    const score = clear >= 0 ? spacing : clear - 1e6;
+    if (score > bestScore) [best, bestScore] = [[x, y], score];
   }
   [s.x, s.y] = best;
   s.respawnAt = null;
