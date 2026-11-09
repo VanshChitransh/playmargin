@@ -3,6 +3,7 @@
 import * as C from "./constants";
 import { equity } from "./economy";
 import { playPoint, refillFood } from "./food";
+import { radius } from "./motion";
 import { rand, randInt, seedRng } from "./rng";
 import type { Blob, Micro, Mode, PlayerSeed, Spike, World } from "./types";
 import { mulBps } from "./units";
@@ -84,8 +85,31 @@ function charge(w: World, b: Blob, tick: number): void {
   w.foodPool += entry - mass; // laid out as pellets by refillFood
 }
 
+/**
+ * Best-candidate blue noise: of up to 16 random spots in the play area, take the first that keeps
+ * SPIKE_MIN_SPACING_PX from every other live spike and clears every live blob by a body length;
+ * if none does, the spot with the most room. Spikes spread evenly and never spawn on a player.
+ */
 function placeSpike(w: World, s: Spike): void {
-  [s.x, s.y] = playPoint(w);
+  const r = spikeRadius(s);
+  let best: [number, number] = playPoint(w);
+  let bestRoom = -Infinity;
+  for (let i = 0; i < 16; i++) {
+    const [x, y] = i === 0 ? best : playPoint(w);
+    let room = Infinity;
+    for (const o of w.spikes) {
+      if (o !== s && o.respawnAt === null) room = Math.min(room, Math.hypot(o.x - x, o.y - y) - C.R.SPIKE_MIN_SPACING_PX);
+    }
+    for (const b of w.blobs.values()) {
+      if (b.state === "alive") room = Math.min(room, Math.hypot(b.x - x, b.y - y) - (radius(b.mass) * 2 + r));
+    }
+    if (room >= 0) {
+      best = [x, y];
+      break;
+    }
+    if (room > bestRoom) [best, bestRoom] = [[x, y], room];
+  }
+  [s.x, s.y] = best;
   s.respawnAt = null;
 }
 
