@@ -48,8 +48,8 @@ const p0 = await idle(player);
 await deposit(player, 2n * USDC, "");
 assert.equal(await idle(player), p0 + 2n * USDC, "deposit credited");
 
-// 3. Enter, open, settle. Pool = 1 stake + 1.5 budget = 2.5 USDC: player gets 0.7 back,
-// vault 1.5 + 0.25 interest, reserve 0.05. Resumes a ticket/match left by an aborted run.
+// 3. Enter, open, settle. Player borrowed 1 of the 1.5 budget and repaid it: stake 1 + lent 1
+// = 0.65 payout + 1 repaid + 0.25 interest + 0.05 fees + 0.05 reserve. Resumes a ticket/match left by an aborted run.
 type Ticket = { match_id: string | null };
 const ticket = await near.view<Ticket | null>(contract, "ticket_of", { account_id: player });
 if (!ticket) await call(player, contract, "enter_arena", { stake: String(USDC) });
@@ -59,16 +59,18 @@ const pBefore = await idle(player);
 const vBefore = BigInt((await near.view<{ free: string }>(contract, "vault", {}))!.free);
 await call(settler, contract, "settle", {
   match_id: matchId,
-  payouts: [[player, "700000"]],
-  vault_repaid: "1500000",
+  payouts: [[player, "650000"]],
+  lent: "1000000",
+  vault_repaid: "1000000",
   interest_to_vault: "250000",
+  fees: "50000",
   reserve: "50000",
   seq: 1,
   head: "e2e",
 });
-assert.equal(await idle(player), pBefore + 700_000n, "payout credited");
+assert.equal(await idle(player), pBefore + 650_000n, "payout credited");
 const vAfter = BigInt((await near.view<{ free: string }>(contract, "vault", {}))!.free);
-assert.equal(vAfter, vBefore + 1_500_000n + 250_000n, "vault whole plus interest");
+assert.equal(vAfter, vBefore + 1_500_000n + 300_000n, "budget back plus interest and fees");
 
 // 4. Withdraw everything back to the wallet.
 const w0 = await wallet(player);

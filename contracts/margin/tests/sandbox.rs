@@ -187,8 +187,9 @@ async fn arena_lifecycle() -> testresult::TestResult<()> {
     assert_eq!(e.view(&m, "vault", json!({})).await?["locked"], "3000000");
 
     let settle = |pay_a: &str| {
-        json!({"match_id": "m1", "payouts": [[a, pay_a], [b, "100000"]], "vault_repaid": "3000000",
-               "interest_to_vault": "70000", "reserve": "30000", "seq": 7, "head": "abc"})
+        json!({"match_id": "m1", "payouts": [[a, pay_a], [b, "100000"]], "lent": "1000000",
+               "vault_repaid": "1000000", "interest_to_vault": "50000", "fees": "20000",
+               "reserve": "30000", "seq": 7, "head": "abc"})
     };
     e.call(&s, &m, "settle", settle("1800001"), 0, false).await?; // over cap
     e.call(&a, &m, "settle", settle("1800000"), 0, false).await?; // not the settler
@@ -230,8 +231,9 @@ async fn reclaim_stuck_match() -> testresult::TestResult<()> {
     assert_eq!(e.margin_balance(&a).await?, "1000000");
     assert_eq!(e.view(&m, "vault", json!({})).await?["free"], "5000000");
 
-    let settle = json!({"match_id": "m2", "payouts": [[a, "2500000"]], "vault_repaid": "0",
-                        "interest_to_vault": "0", "reserve": "0", "seq": 1, "head": "x"});
+    let settle = json!({"match_id": "m2", "payouts": [[a, "2500000"]], "lent": "1500000",
+                        "vault_repaid": "1500000", "interest_to_vault": "0", "fees": "0", "reserve": "0",
+                        "seq": 1, "head": "x"});
     e.call(&s, &m, "settle", settle, 0, false).await?;
     Ok(())
 }

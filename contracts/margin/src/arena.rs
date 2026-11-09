@@ -50,18 +50,21 @@ impl Contract {
         self.matches.insert(match_id, m);
     }
 
-    /// Settler, once per match. Exact conservation:
-    /// sum(payouts) + vault_repaid + interest_to_vault + reserve == stakes + budget.
-    /// The vault is always made whole: a principal shortfall (game bad debt) may only be covered
-    /// by the house reserve. The server can always comply by trimming payouts, so a leaked settler
-    /// key can never drain LP money, only the stakes of one match.
+    /// Settler, once per match. Mirrors core settle() (packages/core/src/settle.ts):
+    /// sum(payouts) + vault_repaid + interest_to_vault + fees + reserve == stakes + lent,
+    /// with lent <= budget and vault_repaid <= lent. The vault always gets back its whole budget
+    /// plus interest and fees: bad debt (lent - vault_repaid) may only come from the house
+    /// reserve, so a leaked settler key can never drain LP money, only one match's stakes.
+    /// The server can always comply by trimming payouts.
     #[allow(clippy::too_many_arguments)]
     pub fn settle(
         &mut self,
         match_id: String,
         payouts: Vec<(AccountId, U128)>,
+        lent: U128,
         vault_repaid: U128,
         interest_to_vault: U128,
+        fees: U128,
         reserve: U128,
         seq: u64,
         head: String,
@@ -71,10 +74,11 @@ impl Contract {
         require!(m.status == MatchStatus::Open, "match is not open");
         require!(payouts.len() <= MAX_PAYOUTS, "too many payouts");
         require!(head.len() <= MAX_HEAD_LEN, "head too long");
-        require!(vault_repaid.0 <= m.budget.0, "vault_repaid above budget");
+        require!(lent.0 <= m.budget.0, "lent above the budget reserved at open");
+        require!(vault_repaid.0 <= lent.0, "vault_repaid above lent");
         let paid = payouts.iter().fold(0u128, |s, (_, a)| add(s, a.0));
-        let out = add(add(add(paid, vault_repaid.0), interest_to_vault.0), reserve.0);
-        require!(out == add(m.stakes.0, m.budget.0), "settle does not conserve value");
+        let out = [vault_repaid.0, interest_to_vault.0, fees.0, reserve.0].into_iter().fold(paid, add);
+        require!(out == add(m.stakes.0, lent.0), "settle does not conserve value");
 
         for p in &m.players {
             let t = self.tickets.remove(p).expect("ticket missing");
@@ -86,14 +90,15 @@ impl Contract {
             }
         }
 
+        let bad_debt = lent.0 - vault_repaid.0;
         self.reserve = add(self.reserve, reserve.0);
-        let shortfall = sub(m.budget.0, vault_repaid.0);
-        require!(shortfall <= self.reserve, "bad debt exceeds reserve: repay the vault from payouts");
-        self.reserve -= shortfall;
+        require!(bad_debt <= self.reserve, "bad debt exceeds reserve: repay the vault from payouts");
+        self.reserve -= bad_debt;
+        let back = [interest_to_vault.0, fees.0].into_iter().fold(m.budget.0, add);
         self.vault.locked = U128(sub(self.vault.locked.0, m.budget.0));
-        self.vault.free = U128(add(add(self.vault.free.0, m.budget.0), interest_to_vault.0));
-        if shortfall > 0 {
-            emit("bad_debt", format!(r#"{{"match_id":{},"from_reserve":"{shortfall}"}}"#, j(&match_id)));
+        self.vault.free = U128(add(self.vault.free.0, back));
+        if bad_debt > 0 {
+            emit("bad_debt", format!(r#"{{"match_id":{},"from_reserve":"{bad_debt}"}}"#, j(&match_id)));
         }
 
         m.status = MatchStatus::Settled;
@@ -191,10 +196,17 @@ mod tests {
         c.open_match("m1".into(), vec![acc("a.near"), acc("b.near")]);
     }
 
-    /// Stakes 2 + budget 3 = 5 USDC out: a 1.8, b 0.1, vault 3 back, 0.07 interest, 0.03 reserve.
+    /// settle(match, payouts, lent, vault_repaid, interest, fees, reserve) with seq 9, head "h".
+    fn st(c: &mut Contract, payouts: Vec<(&str, u128)>, n: [u128; 5]) {
+        let p = payouts.into_iter().map(|(a, v)| (acc(a), U128(v))).collect();
+        let [lent, rep, int, fee, res] = n.map(U128);
+        c.settle("m1".into(), p, lent, rep, int, fee, res, 9, "h".into());
+    }
+
+    /// Stakes 2 + lent 1 = 3 USDC out: a 1.8, b 0.1, vault repaid 1, interest 0.05, fees 0.02,
+    /// reserve 0.03. Vault ends with its 3 budget + 0.07.
     fn settle_ok(c: &mut Contract) {
-        let payouts = vec![(acc("a.near"), U128(1_800_000)), (acc("b.near"), U128(100_000))];
-        c.settle("m1".into(), payouts, U128(3 * USDC), U128(70_000), U128(30_000), 9, "h".into());
+        st(c, vec![("a.near", 1_800_000), ("b.near", 100_000)], [USDC, USDC, 50_000, 20_000, 30_000]);
     }
 
     #[test]
@@ -243,8 +255,23 @@ mod tests {
     fn settle_over_cap_rejected() {
         let mut c = two_players();
         open(&mut c);
-        let payouts = vec![(acc("a.near"), U128(1_800_001)), (acc("b.near"), U128(100_000))];
-        c.settle("m1".into(), payouts, U128(3 * USDC), U128(70_000), U128(30_000), 9, "h".into());
+        st(&mut c, vec![("a.near", 1_800_001), ("b.near", 100_000)], [USDC, USDC, 50_000, 20_000, 30_000]);
+    }
+
+    #[test]
+    #[should_panic(expected = "lent above the budget")]
+    fn lent_over_budget_rejected() {
+        let mut c = two_players();
+        open(&mut c);
+        st(&mut c, vec![("a.near", 5 * USDC + 1)], [3 * USDC + 1, 3 * USDC + 1, 0, 0, 0]);
+    }
+
+    #[test]
+    #[should_panic(expected = "vault_repaid above lent")]
+    fn repaid_over_lent_rejected() {
+        let mut c = two_players();
+        open(&mut c);
+        st(&mut c, vec![("a.near", USDC)], [USDC, 2 * USDC, 0, 0, 0]);
     }
 
     #[test]
@@ -278,9 +305,8 @@ mod tests {
         let mut c = two_players();
         c.reserve = 500_000;
         open(&mut c);
-        // Vault gets 2.6 of its 3 back: 0.4 shortfall, all covered by the 0.5 reserve.
-        let payouts = vec![(acc("a.near"), U128(2_400_000))];
-        c.settle("m1".into(), payouts, U128(2_600_000), U128(0), U128(0), 1, "h".into());
+        // Lent 1, repaid 0.6: 0.4 bad debt, covered by the 0.5 reserve.
+        st(&mut c, vec![("a.near", 2_400_000)], [USDC, 600_000, 0, 0, 0]);
         assert_eq!(c.vault().free.0, 10 * USDC);
         assert_eq!(c.reserve().0, 100_000);
     }
@@ -290,8 +316,7 @@ mod tests {
     fn settler_cannot_drain_vault() {
         let mut c = two_players();
         open(&mut c);
-        let payouts = vec![(acc("a.near"), U128(5 * USDC))];
-        c.settle("m1".into(), payouts, U128(0), U128(0), U128(0), 1, "h".into());
+        st(&mut c, vec![("a.near", 5 * USDC)], [3 * USDC, 0, 0, 0, 0]);
     }
 
     #[test]
