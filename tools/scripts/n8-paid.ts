@@ -18,7 +18,8 @@ const WS = process.env.GAME_WS ?? "ws://localhost:2671";
 const HTTP = WS.replace(/^ws/, "http");
 const RELAYER = process.env.VITE_RELAYER_URL ?? "http://localhost:3031";
 const { contract, usdc, settler } = IDS;
-const PLAYERS = [IDS.player, `e2e2.${contract}`];
+// Players are never sub-accounts of the contract: their funding would come out of its storage headroom.
+const PLAYERS = [IDS.player, process.env.PLAYER2_ID ?? "e2e2.playmargin.testnet"];
 const fin = { waitUntil: "FINAL" } as const;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const link = (h: string) => `https://testnet.nearblocks.io/txns/${h}`;

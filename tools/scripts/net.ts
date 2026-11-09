@@ -11,16 +11,18 @@ export type Network = "testnet" | "mainnet";
 
 /** playmargin.near (top-level name) or margin.vanshverse.near (sub-account, no new name). */
 const MAINNET_CONTRACT = process.env.CONTRACT_ID ?? "playmargin.near";
+/** Testnet takes the same overrides, so deploy day can be rehearsed on a fresh account. */
+const TESTNET_CONTRACT = process.env.CONTRACT_ID ?? "playmargin.testnet";
 
 export const NETWORK: Network = process.env.NETWORK === "mainnet" ? "mainnet" : "testnet";
 
 /** Account ids per network. Mainnet USDC is Circle's native NEP-141 token. */
 export const IDS = {
   testnet: {
-    contract: "playmargin.testnet",
-    owner: "owner.playmargin.testnet",
-    settler: "settler.playmargin.testnet",
-    relayer: "relayer.playmargin.testnet",
+    contract: TESTNET_CONTRACT,
+    owner: process.env.OWNER_ID ?? "owner.playmargin.testnet",
+    settler: process.env.SETTLER_ID ?? `settler.${TESTNET_CONTRACT}`,
+    relayer: process.env.RELAYER_ID ?? `relayer.${TESTNET_CONTRACT}`,
     usdc: "usdc.playmargin.testnet",
     // Own test player: other lanes test with player1, and shared tickets collide.
     player: process.env.PLAYER_ID ?? "e2e.playmargin.testnet",

@@ -2,7 +2,8 @@
 // account that already has code is left alone unless UPGRADE=1 (code-only redeploy, same state)
 // or MIGRATE=1 (redeploy + migrate() in one tx, for a state layout change). Never deletes or
 // recreates accounts. Build first: cargo near build non-reproducible-wasm --no-embed-abi.
-// Sub-account deposits are lean on mainnet (they only pay gas): SETTLER_NEAR, RELAYER_NEAR.
+// Sub-account deposits are lean on mainnet (they only pay gas): SETTLER_NEAR, RELAYER_NEAR. The
+// settler needs > 0.101 NEAR free at all times: NEAR reserves 100 Tgas at 10x the gas price.
 
 import { readFileSync } from "node:fs";
 import { ensureSubAccount } from "./keys.ts";
@@ -86,7 +87,7 @@ await deployMargin();
 await registerOnUsdc();
 await ensureOwner();
 await ensureEntryStake();
-await ensureSubAccount(IDS.settler, fund(process.env.SETTLER_NEAR, 2, 0.1));
+await ensureSubAccount(IDS.settler, fund(process.env.SETTLER_NEAR, 2, 0.25));
 // The relayer pays players' gas for enter_arena (services/relayer); its own account avoids
 // nonce clashes with the settler (EDGE-CASES NS-24).
 await ensureSubAccount(IDS.relayer, fund(process.env.RELAYER_NEAR, 1, 0.15));

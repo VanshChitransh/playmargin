@@ -3,8 +3,10 @@
 
 export type Network = "testnet" | "mainnet";
 
-// Optional chaining lets tools/scripts run these modules under tsx, where import.meta.env is absent.
-const env: Partial<ImportMetaEnv> = import.meta.env ?? {};
+// Under tsx (tools/scripts) import.meta.env is absent: fall back to process.env so a script can
+// point the shipped client code at another contract (VITE_CONTRACT_ID, VITE_RELAYER_URL).
+const proc = (globalThis as { process?: { env: Partial<ImportMetaEnv> } }).process;
+const env: Partial<ImportMetaEnv> = import.meta.env ?? proc?.env ?? {};
 
 export const NETWORK: Network = env.VITE_NETWORK === "mainnet" ? "mainnet" : "testnet";
 
