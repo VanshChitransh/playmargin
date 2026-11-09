@@ -2,8 +2,8 @@
 // never positions or money; the server answers with display-only views and events.
 import type { BlobKind, Mode, Phase, Ring } from "./types";
 
-/** Client to server, at most 30/s. boost is HELD state (send true every message while held, it
- *  expires after 250 ms), repay/cashout are edge-triggered taps. */
+/** Client to server, at most 30/s. boost and repay are HELD state (send true every message while
+ *  held, it expires after 250 ms; a press repays for at least 0.4 s), cashout is an edge-triggered tap. */
 export interface InputCmd {
   seq: number;
   dirX: number;
@@ -26,6 +26,7 @@ export type GameEventMsg =
   | { type: "lastCall"; tick: number }
   | { type: "boost"; blob: string; amount: number }
   | { type: "repay"; blob: string; amount: number }
+  /** A REPAY hold was logged (release, payoff, or once a second while held): amount repaid since the last one. */
   /** Left red on a REPAY (server-confirmed). clutch: a bigger blob or a drone was within 300 px. */
   | { type: "clutchSave"; blob: string; clutch: boolean }
   | { type: "spikeHit"; blob: string; big: boolean; damage: number }

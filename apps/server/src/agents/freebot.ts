@@ -41,6 +41,8 @@ export class FreeBot implements Brain {
   private held: { x: number; y: number } = { x: 0, y: 0 };
   /** BOOST is held from one decision to the next (200 to 400 ms of nitro), like a held key. */
   private boosting = false;
+  /** REPAY is held the same way: a decision to deleverage holds it until the next decision. */
+  private repaying = false;
   /** This decision, may a smaller human be prey? Otherwise the bot steers around humans, so it
    *  never eats one by drifting into it while chasing food. */
   private huntHumans = false;
@@ -58,9 +60,9 @@ export class FreeBot implements Brain {
     };
   }
 
-  /** Steer (and hold BOOST) every tick as last decided; think, and maybe tap, only every 200 to 400 ms. */
+  /** Steer (and hold BOOST or REPAY) every tick as last decided; think only every 200 to 400 ms. */
   decide(v: AgentView, tick: number): InputCmd {
-    const cmd: InputCmd = { seq: tick, dirX: this.held.x, dirY: this.held.y, boost: this.boosting, repay: false, cashout: false };
+    const cmd: InputCmd = { seq: tick, dirX: this.held.x, dirY: this.held.y, boost: this.boosting, repay: this.repaying, cashout: false };
     if (v.phase === "LIVE" && this.liveSince === null) {
       this.liveSince = tick;
       this.startEquity = equity(v.self);
@@ -84,10 +86,10 @@ export class FreeBot implements Brain {
     const turn = randRange(this.rng, -1, 1) * 0.6 * slow;
     dir = { x: dir.x * Math.cos(turn) - dir.y * Math.sin(turn), y: dir.x * Math.sin(turn) + dir.y * Math.cos(turn) };
     this.held = dir;
-    this.boosting = false;
+    this.boosting = this.repaying = false;
     cmd.dirX = dir.x;
     cmd.dirY = dir.y;
-    cmd.boost = false;
+    cmd.boost = cmd.repay = false;
     if (v.phase !== "LIVE" || this.liveSince === null) return cmd;
 
     const me = v.self;
@@ -97,7 +99,7 @@ export class FreeBot implements Brain {
     // wants size early; anyone boosts to catch prey. Not green means deleverage, never double down.
     const appetiteBps = 10_000 + Math.round(this.personality.greed * 15_000);
     // Careful bots deleverage at once; reckless ones hesitate, as panicking humans do.
-    if (state !== "green" && me.debt > 0 && rand(this.rng) < 0.3 + 0.6 * Math.min(1, this.personality.caution)) cmd.repay = true;
+    if (state !== "green" && me.debt > 0 && rand(this.rng) < 0.3 + 0.6 * Math.min(1, this.personality.caution)) this.repaying = cmd.repay = true;
     else if (state === "green" && fuel(me) > 0 && (me.kind !== "agent" || t >= HUMAN_SAFE_T) && (prey ? rand(this.rng) < this.personality.greed : leverageBps(me) < appetiteBps && rand(this.rng) < 0.25)) {
       this.boosting = cmd.boost = true;
     }

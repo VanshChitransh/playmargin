@@ -152,21 +152,36 @@ describe("step", () => {
     expect(a.burstReadyAt).toBe(1 + sToTicks(0.8)); // second press inside 0.8 s: no new burst
   });
 
-  it("REPAY pressed just before the cooldown ends is buffered, and leaving red is a clutch save", () => {
+  it("held REPAY escapes red at the old perfect-mashing pace, with a clutch save; release logs it", () => {
     const red = makeBlob({ id: "r", mass: u(142.5), debt: u(120), redSince: 0 });
     const w = makeWorld([red, makeBlob({ id: "big", mass: u(400), x: 700 })]);
-    const press = (t: number, repay: boolean) => {
-      const ev = step(w, new Map([["r", { seq: t, dirX: 0, dirY: 0, boost: false, repay, cashout: false }]]), t);
-      return ev;
-    };
-    press(1, true); // tap 1: 0.95 -> 0.98, still red
-    const t2 = 1 + sToTicks(0.4) - 5; // 83 ms early: buffered
-    press(t2, true);
-    expect(red.repayQueued).toBe(true);
-    let ev: ReturnType<typeof press> = [];
-    for (let t = t2 + 1; t <= 1 + sToTicks(0.4); t++) ev = press(t, false);
+    const press = (t: number, repay: boolean) =>
+      step(w, new Map([["r", { seq: t, dirX: 0, dirY: 0, boost: false, repay, cashout: false }]]), t);
+    let savedAt = 0;
+    for (let t = 1; t <= 60 && !savedAt; t++) {
+      const ev = press(t, true);
+      const save = ev.find((e) => e.type === "clutchSave");
+      if (!save) continue;
+      expect(save).toEqual({ type: "clutchSave", blob: "r", clutch: true });
+      savedAt = t;
+    }
+    // Debt 120 -> 90 (HF 1.0) at 15% per 0.4 s compounding: ln(0.75) / ln(0.85) * 24 = 42.5 ticks.
+    expect(savedAt).toBe(43);
+    expect(w.pendingLog.some((e) => e.type === "REPAY")).toBe(false); // still pending while held
+    const ev = press(savedAt + 1, false);
     expect(ev.some((e) => e.type === "repay")).toBe(true);
-    expect(ev.find((e) => e.type === "clutchSave")).toEqual({ type: "clutchSave", blob: "r", clutch: true });
+    expect(red.pendingRepay).toBe(0);
+  });
+
+  it("a REPAY tap (one message) still pays one 15% chunk over 0.4 s", () => {
+    const a = makeBlob({ id: "a", mass: u(200), debt: u(100) });
+    const w = makeWorld([a]);
+    const send = (t: number, repay: boolean) =>
+      step(w, new Map([["a", { seq: t, dirX: 0, dirY: 0, boost: false, repay, cashout: false }]]), t);
+    send(1, true);
+    for (let t = 2; t <= 1 + sToTicks(0.4) + 5; t++) send(t, false);
+    expect(a.debt / MICRO).toBeCloseTo(85, 2);
+    expect(w.pendingLog.filter((e) => e.type === "REPAY")).toHaveLength(1);
   });
 
   it("a drone holding bounty mass can't BOOST, REPAY or cash out (settle would refuse it)", () => {
