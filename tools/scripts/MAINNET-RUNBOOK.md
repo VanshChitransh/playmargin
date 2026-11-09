@@ -30,6 +30,9 @@ client reads it from there, and the owner can change it later with `set_entry_st
 
 The server reads the stake from `config().entry_stake` too (core 824ba80, server 94a4ec0), so
 switching the stake is one owner tx and no redeploy. Both 1 USDC and 0.10 USDC were rehearsed.
+Valid stakes are at least 0.1 USDC and divide 100000000 (100000, 200000, 250000, 500000, 1000000):
+the contract refuses anything else. **Never change the stake while paid rooms are live:** stop
+the server (or wait for an empty queue), change it, then restart, so no ticket straddles two stakes.
 
 ## 1. Pre-flight (free, no mainnet tx, about 2 min)
 
