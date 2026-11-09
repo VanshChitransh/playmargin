@@ -45,6 +45,8 @@ export interface Blob {
   sputterUntil: number;
   /** Repaid during the current REPAY hold, not yet logged (flushRepay). */
   pendingRepay: Micro;
+  /** Micro a tick the current REPAY hold pays: its starting debt / REPAY_CLEAR_S; 0 when not holding. */
+  repayPerTick: Micro;
   /** REPAY was held last tick (press detection for the minimum hold). */
   repayHeld: boolean;
   /** Tick the BOOST speed ends: the tick after the last held tick that borrowed. */

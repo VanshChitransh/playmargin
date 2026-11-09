@@ -12,9 +12,13 @@ import { mulBps } from "./units";
 /** Hitbox radius of a spike in px (drawn the same size): small and big, agar virus style. */
 export const spikeRadius = (s: Spike): number => (s.big ? C.R.SPIKE_RADIUS_BIG_PX : C.R.SPIKE_RADIUS_SMALL_PX);
 
-/** Arena side in px for n players: smaller rooms are tighter (2 humans = Duel). */
+/**
+ * Arena side in px for n players: smaller rooms are tighter (2 humans = Duel), and no room is wider
+ * than the food disc plus ARENA_EDGE_MARGIN_PX a side, so there is no dead, foodless ring at the walls.
+ */
 export function arenaSide(n: number): number {
-  return Math.round(C.R.ARENA_SIDE_PER_SQRT_PLAYER * Math.sqrt(Math.max(n, 2)));
+  const maxSide = 2 * (C.R.PLAY_RADIUS_PX + C.R.ARENA_EDGE_MARGIN_PX);
+  return Math.round(Math.min(maxSide, C.R.ARENA_SIDE_PER_SQRT_PLAYER * Math.sqrt(Math.max(n, 2))));
 }
 
 /** Entry in Micro for this room mode. */
@@ -24,7 +28,7 @@ const startMass = (mode: Mode): Micro => mulBps(entryFor(mode), C.START_MASS_BPS
 
 function newBlob(p: PlayerSeed, x: number, y: number, mass: Micro): Blob {
   return {
-    id: p.id, kind: p.kind, label: p.label, accountId: p.accountId, x, y, dirX: 0, dirY: 0, vx: 0, vy: 0, boostHeld: false, boostMinUntil: 0, burst: 0, burstReadyAt: 0, sputterUntil: 0, pendingRepay: 0, repayHeld: false,
+    id: p.id, kind: p.kind, label: p.label, accountId: p.accountId, x, y, dirX: 0, dirY: 0, vx: 0, vy: 0, boostHeld: false, boostMinUntil: 0, burst: 0, burstReadyAt: 0, sputterUntil: 0, pendingRepay: 0, repayPerTick: 0, repayHeld: false,
     mass, debt: 0, boostFees: 0, payout: 0, pendingBorrow: 0, boostUntil: 0,
     repayMinUntil: 0, shieldUntil: 0, spikeImmuneUntil: 0, redSince: null, lastThreatAt: -1e9,
     cashout: null, state: "alive", lastInput: null, lastInputAt: -1e9,

@@ -9,6 +9,7 @@ import { mulBps, mulDivUp } from "./units";
 
 const BPS = 10_000;
 const BOOST_LOCKOUT_T = C.sToTicks(C.R.BOOST_LOCKOUT_S);
+const REPAY_CLEAR_T = C.sToTicks(C.R.REPAY_CLEAR_S);
 /** Interest food lands at least this far from the payer, so nobody re-eats their own drain. */
 
 /** Match time in ticks since GO. */
@@ -127,16 +128,22 @@ export function flushRepay(w: World, b: Blob, tick: number): Micro {
 }
 
 /**
- * One tick of held REPAY: pays REPAY_RATE x own money per second from mass (BOOST borrows 1x), so
- * a full-cap loan clears in about 1 s, linear like the borrow. Any ring. Pending until flushRepay,
- * which runs on release, at payoff, and before anything settle checks against the debt. Returns Micro repaid.
+ * One tick of held REPAY: a hold clears the whole loan it started on in REPAY_CLEAR_S, linear, at
+ * any size and in any ring (the rate is fixed at hold start; step resets it on release). Mass pays.
+ * Pending until flushRepay, which runs on release, at payoff, and before anything settle checks
+ * against the debt. Returns Micro repaid.
  */
 export function repayHold(w: World, b: Blob, tick: number): Micro {
   if (w.phase !== "LIVE" || b.state !== "alive" || b.kind === "drone" || b.debt === 0) return 0;
   if (b.pendingBorrow > 0) flushBoost(w, b, tick);
-  const paid = payDown(w, b, Math.max(1, Math.floor((borrowBase(b) * C.REPAY_RATE_BPS) / (BPS * C.R.TICK_HZ))));
+  // max: the rate only ever rises, if the debt somehow grew mid-hold (it can't while repaying).
+  b.repayPerTick = Math.max(b.repayPerTick, Math.ceil(b.debt / REPAY_CLEAR_T));
+  const paid = payDown(w, b, b.repayPerTick);
   b.pendingRepay += paid;
-  if (b.debt === 0) flushRepay(w, b, tick);
+  if (b.debt === 0) {
+    flushRepay(w, b, tick);
+    b.repayPerTick = 0;
+  }
   return paid;
 }
 

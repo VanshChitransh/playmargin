@@ -78,6 +78,7 @@ function applyInputs(w: World, inputs: Map<string, InputCmd>, tick: number, ev: 
       repay(w, b, tick, ev);
       continue;
     }
+    b.repayPerTick = 0; // the next hold sizes its rate on the debt it starts on
     const repaid = flushRepay(w, b, tick);
     if (repaid > 0) ev.push({ type: "repay", blob: b.id, amount: toUnits(repaid) });
     // A press holds for at least BOOST_MIN_HOLD_S, so a tap always borrows something you can see.
