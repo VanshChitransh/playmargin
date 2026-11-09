@@ -4,6 +4,13 @@
 import { R, type BlobView, type GameEventMsg, type RateTier } from "@margin/core";
 import { displayName, interestPerS } from "../hud/logic";
 
+/** S1's server-confirmed save (core PR #13); declared here so the client works before and after it lands. */
+export interface ClutchSave {
+  type: "clutchSave";
+  blob: string;
+  clutch: boolean;
+}
+
 export interface Line {
   label: string;
   amount: number;
@@ -38,6 +45,9 @@ export interface Stats {
   /** Seconds alive after GO. */
   aliveS: number;
   blobsEaten: number;
+  /** Left red by REPAY; clutch = with a hunter within 300 px. */
+  saves: number;
+  clutches: number;
   /** Best leaderboard place reached (1 = top). */
   topRank: number;
   peakEquity: number;
@@ -47,7 +57,7 @@ export interface Stats {
 const FOOD_REACH = R.FOOD_RADIUS_PX + 12; // core eats when my edge touches the pellet edge
 
 export class Receipt {
-  private stats: Stats = { foodEaten: 0, aliveS: 0, blobsEaten: 0, topRank: 0, peakEquity: 0 };
+  private stats: Stats = { foodEaten: 0, aliveS: 0, blobsEaten: 0, topRank: 0, peakEquity: 0, saves: 0, clutches: 0 };
   /** Match clock (s) when I was first and last seen alive after GO: time alive survives dropped frames. */
   private aliveFrom: number | null = null;
   private food = new Map<number, { x: number; y: number }>();
@@ -96,7 +106,12 @@ export class Receipt {
     this.redS = this.redSince === null ? 0 : (nowMs - this.redSince) / 1000;
   }
 
-  event(e: GameEventMsg): void {
+  event(raw: GameEventMsg | ClutchSave): void {
+    if (raw.type === "clutchSave") {
+      if (raw.blob === this.me) (this.stats.saves++, raw.clutch && this.stats.clutches++);
+      return;
+    }
+    const e = raw;
     const add = (k: string, v: number): void => void this.gains.set(k, (this.gains.get(k) ?? 0) + v);
     switch (e.type) {
       case "boost":

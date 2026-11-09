@@ -67,6 +67,7 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
       ${dead
         ? `<div class="mb-2 text-center"><h2 class="stamp inline-block rounded-box border-[5px] border-liq px-4 py-1 font-display text-5xl text-liq">${title}</h2></div>`
         : `<h2 class="font-display text-4xl">${title}</h2>`}
+      ${s.clutches ? `<p class="tag mt-3 text-center"><span class="rounded-field bg-ink px-2 py-1 text-paper">\u2713 ${s.clutches} clutch save${s.clutches > 1 ? "s" : ""}</span></p>` : ""}
       ${stats}
       <div class="mt-4 space-y-1 border-y-2 border-dashed border-ink/40 py-3 font-mono text-sm">
         <div class="flex justify-between"><span>Start</span><span class="num">${o.start.toFixed(2)}</span></div>

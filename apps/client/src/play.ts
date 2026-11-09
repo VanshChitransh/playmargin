@@ -4,7 +4,7 @@
 import type { GameEventMsg, InputCmd, JoinOpts } from "@margin/core";
 import type { Frame } from "./game/frame";
 import { LocalMatch } from "./game/local";
-import { Receipt } from "./game/receipt";
+import { Receipt, type ClutchSave } from "./game/receipt";
 import { Hud } from "./hud/hud";
 import { elapsedS } from "./hud/logic";
 import { shareCertificate, verifyUrl } from "./share/certificate";
@@ -126,7 +126,7 @@ export const play: Screen = (root, params) => {
     }
   };
 
-  const juice = (e: GameEventMsg, me: string): void => {
+  const juice = (e: GameEventMsg | ClutchSave, me: string): void => {
     const at = (id: string): { x: number; y: number; r: number } | undefined => {
       const b = lastFrame?.blobs.find((x) => x.id === id);
       return b && { x: b.x, y: b.y, r: b.radius };
@@ -146,6 +146,16 @@ export const play: Screen = (root, params) => {
         }
         if (p) arena.squashMe(me);
         if (p) arena.fx.floatText(p.x, p.y - p.r, `\u2212${num(e.amount)}`, C.paper, z);
+        break;
+      }
+      case "clutchSave": {
+        const p = e.blob === me ? at(me) : undefined;
+        if (!p) break;
+        hud.saved(performance.now());
+        arena.hitStop(JUICE.SAVE_FREEZE_MS);
+        arena.fx.shards(p.x, p.y, JUICE.SAVE_SPARKS, C.ringSafe, p.r);
+        arena.fx.floatText(p.x, p.y - p.r - 20 / z, e.clutch ? "CLUTCH" : "SAVED", C.ringSafe, z * 0.7);
+        sfx("saved");
         break;
       }
       case "spikeHit": {

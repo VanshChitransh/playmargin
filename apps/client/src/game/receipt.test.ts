@@ -49,4 +49,11 @@ describe("Receipt", () => {
     const s = r.outcome([me, big]).stats;
     expect(s).toMatchObject({ foodEaten: 1, blobsEaten: 1, topRank: 2, peakEquity: 90, aliveS: 1 });
   });
+  it("counts my saves and clutch saves from the server event", () => {
+    const r = new Receipt("me");
+    r.event({ type: "clutchSave", blob: "me", clutch: false });
+    r.event({ type: "clutchSave", blob: "me", clutch: true });
+    r.event({ type: "clutchSave", blob: "other", clutch: true });
+    expect(r.outcome([]).stats).toMatchObject({ saves: 2, clutches: 1 });
+  });
 });

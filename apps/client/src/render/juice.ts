@@ -94,6 +94,13 @@ export const JUICE = {
   /** The "TAP R" hint beside my blob, once per match. */
   TAP_HINT_MS: 2500,
 
+  // Clutch save (feel spec 2.2): fired only on the server's clutchSave event, never predicted.
+  /** Freeze my picture this long so the save lands (visual only; the sim never pauses). */
+  SAVE_FREEZE_MS: 80,
+  /** How long the red frame and heartbeat stay silenced after a save. */
+  SAVE_CALM_MS: 1200,
+  SAVE_SPARKS: 18,
+
   // Before GO, other blobs are ghosts: overlap must never read as contact.
   GHOST_ALPHA: 0.35,
 } as const;

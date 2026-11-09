@@ -25,6 +25,7 @@ export class Hud {
   private pipRing: HTMLElement;
   private lastBeat = 0;
   private tapHinted = false;
+  private calmUntil = 0;
   private shownFuel = 1;
   private refill: { from: number; at: number } | null = null;
   private wasDry = false;
@@ -95,7 +96,10 @@ export class Hud {
     this.coach.update(m.phase, elapsedS(m), (me?.owe ?? 0) > 0, !!me && me.ring !== "green");
     if (!me) return;
     this.fuel(me, boostBlocked(me, m));
-    const ring = me.state === "alive" && m.phase === "LIVE" ? me.ring : "green";
+    // Right after a server-confirmed save the frame snaps off and the heartbeat cuts, even if
+    // the next snapshot is a beat late.
+    const raw = me.state === "alive" && m.phase === "LIVE" ? me.ring : "green";
+    const ring = now < this.calmUntil && raw === "red" ? "yellow" : raw;
     this.set("ring", ring, () => {
       // Android buzz on the way into red (iOS has no vibrate; the frame and label still show).
       const prev = this.last.get("ringPrev");
@@ -287,6 +291,15 @@ export class Hud {
       this.el.appendChild(box);
     }
     box.style.opacity = on ? String(JUICE.SPEED_LINE_ALPHA) : "0";
+  }
+
+  /** A save landed: drop the red kit now. */
+  saved(now: number): void {
+    this.calmUntil = now + JUICE.SAVE_CALM_MS;
+    this.lastBeat = now + JUICE.SAVE_CALM_MS;
+    this.q("frame").dataset.ring = "yellow";
+    this.q("call").classList.add("hidden");
+    this.els.repay.classList.remove("urgent");
   }
 
   /** REPAY: a few gold coins fly from my blob (screen centre) into the owe badge. */
