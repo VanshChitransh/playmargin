@@ -6,9 +6,8 @@ import type { Container } from "pixi.js";
 import { C } from "./colors";
 import type { FxLayer } from "./fx";
 import { reducedMotion } from "./motion";
+import { JUICE } from "./juice";
 
-const TICK_S = 0.3; // how often the "+N" ticks while borrowing
-const TRAIL_S = 0.05;
 
 export class NitroFeel {
   private inflate = 1;
@@ -22,7 +21,7 @@ export class NitroFeel {
     // Warm-up practice: grow toward the full-fuel size while held, ease back otherwise.
     const practice = held && phase === "WARMUP";
     const full = radius(Math.round(me.equity * R.LEVERAGE_CAP * MICRO)) / Math.max(me.radius, 1);
-    this.inflate += ((practice ? full : 1) - this.inflate) * Math.min(1, dt * (practice ? 2.5 : 6));
+    this.inflate += ((practice ? full : 1) - this.inflate) * Math.min(1, dt * (practice ? JUICE.INFLATE_GROW : JUICE.INFLATE_SHRINK));
     sprite.scale.set(this.inflate);
 
     if (phase !== "LIVE") {
@@ -34,13 +33,13 @@ export class NitroFeel {
     if (grew > 0) this.owed += grew;
     const borrowing = held && grew > 0;
     this.sinceTick += dt;
-    if (this.owed >= 1 && (this.sinceTick >= TICK_S || !held)) {
+    if (this.owed >= 1 && (this.sinceTick >= JUICE.NITRO_TICK_S || !held)) {
       fx.floatText(me.x, me.y - me.radius, `+${Math.round(this.owed)}`, C.gold, zoom);
       this.owed = 0;
       this.sinceTick = 0;
     }
     this.sinceTrail += dt;
-    if (borrowing && !reducedMotion && this.sinceTrail >= TRAIL_S) {
+    if (borrowing && !reducedMotion && this.sinceTrail >= JUICE.NITRO_TRAIL_S) {
       this.sinceTrail = 0;
       fx.ghost(me.x, me.y, me.radius, C.gold);
     }

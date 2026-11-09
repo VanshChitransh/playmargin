@@ -228,7 +228,7 @@ export class ArenaRenderer {
         this.blobs.set(v.id, s);
         this.blobLayer.addChild(s);
       }
-      s.update(v, tS, isMe, this.zoom);
+      s.update(v, tS, isMe, this.zoom, !isMe && (f.match.phase === "WARMUP" || f.match.phase === "COUNTDOWN"));
       s.zIndex = isMe ? 1e6 : v.radius; // small under big, me always on top
     }
     this.blobLayer.sortableChildren = true;

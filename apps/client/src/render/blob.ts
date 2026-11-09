@@ -7,6 +7,7 @@ import type { BlobView, Ring } from "@margin/core";
 import { C, darken, vivid } from "./colors";
 import { displayName } from "../hud/logic";
 import { reducedMotion } from "./motion";
+import { JUICE } from "./juice";
 
 const RING_GAP = 4;
 const RING_W = 4;
@@ -38,12 +39,15 @@ export class BlobSprite extends Container {
   }
 
   /** Sync to a view; tS is seconds since start (pulses), zoom keeps text a fixed screen size. */
-  update(v: BlobView, tS: number, isMe: boolean, zoom: number): void {
+  update(v: BlobView, tS: number, isMe: boolean, zoom: number, ghost = false): void {
     const moved = Math.hypot(v.x - this.prev.x, v.y - this.prev.y);
     this.prev = { x: v.x, y: v.y, speed: this.prev.speed * 0.85 + Math.min(moved, 20) * 0.15 };
     this.position.set(v.x, v.y);
     this.visible = v.state === "alive";
     if (!this.visible) return;
+    // Before GO nobody can touch: others are faint ghosts with no ring, so overlap never reads as contact.
+    this.alpha = ghost ? JUICE.GHOST_ALPHA : 1;
+    this.ring.visible = !ghost;
     // Redraw geometry only when it visibly changes; 12 blobs, but phones count.
     if (Math.abs(v.radius - this.drawn.r) > 0.5 || v.ring !== this.drawn.ring || v.kind !== this.drawn.kind) {
       this.redraw(v, isMe);

@@ -20,6 +20,7 @@ import { showAborted, showDeath, showResults } from "./screens/overlays";
 import { setLocalLog } from "./screens/verify";
 import { C } from "./render/colors";
 import { engine, play as sfx } from "./audio";
+import { JUICE } from "./render/juice";
 
 interface Source {
   readonly me: string;
@@ -129,7 +130,7 @@ export const play: Screen = (root, params) => {
       case "pop": {
         const p = at(e.victim);
         if (p) arena.fx.shards(p.x, p.y, 22, C.liq, p.r);
-        if (e.victim === me) arena.hitStop(150);
+        if (e.victim === me) arena.hitStop(JUICE.HIT_STOP_MS);
         if (e.victim === me || e.by === me) sfx("pop");
         const by = e.by === me ? at(me) : undefined;
         if (by && e.bounty > 0) {

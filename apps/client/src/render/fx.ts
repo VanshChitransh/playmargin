@@ -3,6 +3,7 @@
 // Texts keep a fixed screen size like names do; shards are hard-edged (brand: no glow).
 import { Container, Graphics, Text } from "pixi.js";
 import { C } from "./colors";
+import { JUICE } from "./juice";
 
 interface Fx {
   node: Container;
@@ -20,21 +21,21 @@ export class FxLayer extends Container {
   floatText(x: number, y: number, text: string, color: number, zoom: number): void {
     const t = new Text({
       text,
-      style: { fontFamily: ["Lilita One", "system-ui", "sans-serif"], fontSize: 30, fill: color, stroke: { color: C.ink, width: 6, join: "round" } },
+      style: { fontFamily: ["Lilita One", "system-ui", "sans-serif"], fontSize: JUICE.FLOAT_FONT_PX, fill: color, stroke: { color: C.ink, width: 6, join: "round" } },
     });
     t.anchor.set(0.5);
     t.position.set(x, y);
     t.scale.set(1 / zoom);
     this.addChild(t);
-    this.items.push({ node: t, life: 0, ttl: 0.9, vx: 0, vy: -90 / zoom, spin: 0 });
+    this.items.push({ node: t, life: 0, ttl: JUICE.FLOAT_TTL_S, vx: 0, vy: -JUICE.FLOAT_RISE_PX_S / zoom, spin: 0 });
   }
 
   /** A fading ring left behind a blob burning nitro (the trail). */
   ghost(x: number, y: number, r: number, color: number): void {
-    const g = new Graphics().circle(0, 0, r).stroke({ width: Math.max(3, r * 0.08), color, alpha: 0.55 });
+    const g = new Graphics().circle(0, 0, r).stroke({ width: Math.max(3, r * 0.08), color, alpha: JUICE.TRAIL_ALPHA });
     g.position.set(x, y);
     this.addChildAt(g, 0);
-    this.items.push({ node: g, life: 0, ttl: 0.35, vx: 0, vy: 0, spin: 0 });
+    this.items.push({ node: g, life: 0, ttl: JUICE.TRAIL_TTL_S, vx: 0, vy: 0, spin: 0 });
   }
 
   /** n hard-edged shards flying out of (x, y); more shards for a bigger hit. */

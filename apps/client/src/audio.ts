@@ -1,6 +1,8 @@
 // Sound effects synthesised with WebAudio: no audio files to license, download or cache,
 // and every effect starts in under a frame. The context unlocks on the first tap or key
 // (browser autoplay rule). Mute is a per-browser convenience in localStorage.
+import { JUICE } from "./render/juice";
+
 export type Sfx = "boost" | "repay" | "pop" | "spike" | "coin" | "tick" | "go" | "beat";
 
 const KEY = "margin.muted";
@@ -85,12 +87,12 @@ export function engine(on: boolean): void {
     const f = ctx.createBiquadFilter();
     const g = ctx.createGain();
     o.type = "sawtooth";
-    o.frequency.setValueAtTime(90, t);
-    o.frequency.exponentialRampToValueAtTime(260, t + 1.6);
+    o.frequency.setValueAtTime(JUICE.ENGINE_HZ_FROM, t);
+    o.frequency.exponentialRampToValueAtTime(JUICE.ENGINE_HZ_TO, t + JUICE.ENGINE_CLIMB_S);
     f.type = "lowpass";
     f.frequency.value = 900;
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.06, t + 0.08);
+    g.gain.exponentialRampToValueAtTime(JUICE.ENGINE_GAIN, t + 0.08);
     o.connect(f).connect(g).connect(ctx.destination);
     o.start(t);
     engineNodes = { o, g };
