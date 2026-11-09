@@ -10,7 +10,7 @@ import { elapsedS } from "./hud/logic";
 import { shareCertificate, verifyUrl } from "./share/certificate";
 import { shareLink } from "./share/link";
 import type { Outcome } from "./game/receipt";
-import { shareRoom } from "./net/room-code";
+import { isRoomCode, shareRoom } from "./net/room-code";
 import { Controls } from "./input/controls";
 import { ENDPOINT, MatchConnection, guestKey } from "./net/client";
 import { refusalWords } from "./net/refusal";
@@ -246,7 +246,19 @@ export const play: Screen = (root, params) => {
     if (left) arena.destroy();
   });
 
-  void connect(params.code, params.judge === "1").catch((e: Error) => {
+  // The code comes from the URL: only a well-formed one is used, and it is only ever set as text.
+  const code = params.code?.toUpperCase();
+  if (code !== undefined && !isRoomCode(code)) {
+    refusedCard(root, "That room link is broken. Ask your friend to send it again.");
+    return () => {
+      left = true;
+      controls.destroy();
+      hud.destroy();
+      status.remove();
+      if (mounted) arena.destroy();
+    };
+  }
+  void connect(code, params.judge === "1").catch((e: Error) => {
     if (e instanceof Refused) refusedCard(root, e.message);
     else status.textContent = `Could not join the paid match: ${e.message}. Your ticket stays on your account for the next one.`;
     return new Promise<never>(() => {});
@@ -260,7 +272,7 @@ export const play: Screen = (root, params) => {
         : params.judge === "1"
           ? "Judge Run: a 90 s scenario. Seeded map, normal rules, Drone-1 hunts red blobs. Most first-timers get greedy. Will you?"
           : "";
-    if (params.code && !(s instanceof LocalMatch)) roomChip(root, params.code);
+    if (code && !(s instanceof LocalMatch)) roomChip(root, code);
     receipt = new Receipt(s.me);
     if (import.meta.env.DEV) (window as unknown as { __receipt: Receipt }).__receipt = receipt;
     if (s instanceof MatchConnection) {
@@ -312,7 +324,10 @@ export const play: Screen = (root, params) => {
 function roomChip(root: HTMLElement, code: string): void {
   const b = document.createElement("button");
   b.className = "sticker sticker-press fixed bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-box bg-paper px-4 py-2 font-display text-lg text-ink";
-  const label = (t: string): void => void (b.innerHTML = `Room <span class="num">${code}</span> · ${t}`);
+  const num = document.createElement("span");
+  num.className = "num";
+  num.textContent = code;
+  const label = (t: string): void => void b.replaceChildren("Room ", num, ` · ${t}`);
   label("Invite a friend");
   b.addEventListener("click", () =>
     void shareRoom(code).then((r) => label(r === "copied" ? "Link copied" : r === "shared" ? "Sent" : "Copy failed")),

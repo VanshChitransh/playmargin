@@ -10,6 +10,9 @@ export function newRoomCode(rand: () => number = Math.random): string {
   return Array.from({ length: 4 }, () => LETTERS[Math.floor(rand() * LETTERS.length)]).join("");
 }
 
+/** The only codes the server accepts; anything else in a /#/r/ link is rejected before use. */
+export const isRoomCode = (c: string): boolean => /^[A-Z]{4}$/.test(c);
+
 export const roomLink = (code: string): string => `${location.origin}/#/r/${code}`;
 
 /** Share the room link (share sheet on phones, clipboard elsewhere). */

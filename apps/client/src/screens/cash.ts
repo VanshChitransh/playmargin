@@ -229,7 +229,7 @@ async function addFunds(box: HTMLElement, acc: string, say: Say): Promise<void> 
     q.innerHTML = `<div class="rounded-field bg-ink p-4 text-paper">
       <div>You send <span class="num">${esc(r.quote.amountInFormatted)} ${esc(t.symbol)}</span></div>
       <div class="font-display text-3xl text-gold">+$<span class="tabular-nums">${esc(Number(r.quote.amountOutFormatted).toFixed(2))}</span></div>
-      <div class="text-sm">At least <span class="num">$${min}</span>, about <span class="num">${r.quote.timeEstimate}</span> s</div>
+      <div class="text-sm">At least <span class="num">$${min}</span>, about <span class="num">${Number(r.quote.timeEstimate) || "?"}</span> s</div>
       ${r.dry || !r.quote.depositAddress
         ? `<p class="tag mt-2 text-muted">Preview price. Deposits open when mainnet goes live.</p>`
         : `<p class="mt-2">Send exactly that amount to</p><p class="num break-all font-bold">${esc(r.quote.depositAddress)}</p>
