@@ -54,7 +54,7 @@ blobs eat smaller ones. The full rulebook is mirrored as constants in
 [`packages/core/src/constants.ts`](packages/core/src/constants.ts).
 
 **The thesis, measured.** In a 900-match sim with one greedy player who holds BOOST to the cap
-(`npm run sweep`), the greedy player is liquidated in about 55% to 80% of matches, while a careful
+(`npm run sweep -- 900`), the greedy player is liquidated in about 55% to 80% of matches, while a careful
 newcomer who never borrows survives about 67% of matches and finishes at median rank 4 of 12
 (`npx tsx tools/sim/human.ts`). Safe play survives. Greed gets liquidated.
 
@@ -190,7 +190,7 @@ the room fills with labelled AI agents (🤖).
 | 6 | Hold BOOST until the fuel ring is empty, then run into a big spike | Your ring turns red. Within a moment a blob or a drone touches you: "LIQUIDATED", and your receipt shows what the vault took back |
 | 7 | After any match, open the receipt's Verify link (`/#/verify/<id>`) | The browser replays the log with the same code as the server, checks every hash, and shows settle == what you were paid. Press "Tamper" and the exact broken event turns red |
 | 8 | Open `/#/judge` | Judge Run: a published seed (20261114), normal rules, Drone-1 hunting red blobs. Most first-timers get greedy |
-| 9 | `npm run sweep -- 300` | The balance table behind the rules, for the shipped settings: a greedy player holds BOOST to the cap in every match. Measured (900 per config): 0.74 to 0.93 liquidations per match, the greedy player popped in 57% (practised) to 79% (first-timer) of matches. A 300-match run lands within a few points of that. A few minutes |
+| 9 | `npm run sweep -- 900` | The balance table behind the rules, for the shipped settings: a greedy player holds BOOST to the cap in every match. Measured: 0.74 to 0.93 liquidations per match, the greedy player popped in 57% (practised) to 79% (first-timer) of matches. About 5 minutes (`npm run sweep -- 300` is faster and lands within a few points) |
 | 9b | `npx tsx tools/sim/human.ts 60` | Can a newcomer win? A careful never-BOOST newcomer bot against 11 agents: measured median rank 4 of 12, top 3 in about 35%, survives about 67% |
 | 9c | `npx tsx tools/sim/contacts.ts 40` | Do players meet? Rooms of 12 agents and no human: about 17 contacts per minute, a typical player's first contact at about 3.5 s. Liquidations here are rare (about 0.1 per match) because agents borrow carefully: greed is what brings liquidations (row 9) |
 | 10 | `npm run soak -- --rooms 50` | 50 rooms of 12 on the real server for one full match (about 100 s at any room count): CPU per room tick and match length under load. Measured about 0.1 ms per room tick at 50 rooms (0.09 to 0.12 across runs) and 0.24 ms at 10 (budget 4 ms). Matches last 90 s at 10 rooms and 92 to 93 s of wall time at 50 |
