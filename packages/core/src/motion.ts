@@ -5,17 +5,17 @@ import { R } from "./constants";
 import type { Blob, Micro } from "./types";
 import { toUnits } from "./units";
 
-// Feel constants, not money: tune here during playtests (RULES lists BOOST speed as open).
+// Feel numbers live in R (constants.ts, mirrored in RULES.html) so a feel spec is one edit there.
 /** Speed in px/s of a blob at START mass with no boost. */
-export const BASE_SPEED_PX_S = 300;
+export const BASE_SPEED_PX_S = R.BASE_SPEED_PX_S;
 /** agar.io-clone slowBase: bigger blobs are slower by log base 4.5 of their mass. */
-const SLOW_BASE = 4.5;
+const SLOW_BASE = R.SPEED_SLOW_BASE;
 /** Start mass in units; the slow-down is anchored here so everyone starts at base speed. */
 const START_UNITS = R.ENTRY_FREE * R.START_MASS_RATIO;
 const START_LOG = Math.log(START_UNITS) / Math.log(SLOW_BASE);
-const CASHOUT_SPEED_MULT = 0.5;
+const CASHOUT_SPEED_MULT = R.CASHOUT_SPEED_MULT;
 /** Liquidator drones must out-run a red blob in its few hundred ms of red, at any bounty mass. */
-export const DRONE_SPEED_MULT = 1.6;
+export const DRONE_SPEED_MULT = R.DRONE_SPEED_MULT;
 
 /** Radius in px for a mass in Micro (agar.io-clone: 4 + sqrt(m) * 6). */
 export function radius(mass: Micro): number {
@@ -43,7 +43,7 @@ export function blobSpeed(b: Blob, tick: number): number {
  * big ones are heavy (agar feel, no twitch, no float). Drones are machines and turn sharply.
  */
 export function easeS(b: Blob): number {
-  return b.kind === "drone" ? 0.06 : 0.08 + radius(b.mass) / 1000;
+  return b.kind === "drone" ? R.DRONE_EASE_S : R.EASE_BASE_S + radius(b.mass) * R.EASE_PER_RADIUS_PX_S;
 }
 
 /** Ease velocity toward dir * speed, move by it, and keep the blob's centre inside the arena. */
