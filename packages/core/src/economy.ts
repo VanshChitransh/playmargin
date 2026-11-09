@@ -136,7 +136,7 @@ export function accrueInterest(w: World, b: Blob, tick: number): Micro {
   return amount;
 }
 
-/** Spike damage in Micro: 10% small / 20% big, x1.0 to x1.5 with leverage, never below HF 0.95 while owing. */
+/** Spike damage in Micro: 10% small / 20% big, x1.0 to x2.0 with leverage, never below HF 0.95 while owing. */
 export function spikeDamage(b: Blob, big: boolean): Micro {
   const lev = leverageBps(b);
   const span = C.LEVERAGE_CAP_BPS - BPS;

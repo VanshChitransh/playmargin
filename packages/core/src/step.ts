@@ -108,7 +108,7 @@ function zone(w: World, tick: number, ev: Ev): void {
   }
 }
 
-// 9: red for 300 ms and touched = popped by the heaviest toucher. Also marks cash-out threats.
+// 9: red for 150 ms and touched = popped by the heaviest toucher. Also marks cash-out threats.
 function pops(w: World, tick: number, ev: Ev): void {
   const all = live(w);
   for (const b of all) {
@@ -133,7 +133,8 @@ function pops(w: World, tick: number, ev: Ev): void {
   }
 }
 
-// 10: blob eats resolve heaviest eater first; red or shielded blobs eat food only (GR-03).
+// 10: blob eats resolve heaviest eater first; shielded blobs eat food only (GR-03), red blobs eat
+// nothing: REPAY is the only way out of red, or greedy players eat their way back (balance B, 9 Nov).
 function eats(w: World, tick: number, ev: Ev): void {
   const ps = players(w).sort(byMassDesc);
   for (const e of ps) {
@@ -146,7 +147,7 @@ function eats(w: World, tick: number, ev: Ev): void {
     }
   }
   // Hot loop (food x blobs every tick): radii once per tick, squared distances, no sqrt.
-  const eaters = players(w).sort(byMassDesc).map((b) => ({ b, r2: radius(b.mass) ** 2 }));
+  const eaters = players(w).filter((b) => ring(b) !== "red").sort(byMassDesc).map((b) => ({ b, r2: radius(b.mass) ** 2 }));
   w.food = w.food.filter((f) => {
     const e = eaters.find(({ b, r2 }) => (b.x - f.x) ** 2 + (b.y - f.y) ** 2 < r2);
     if (e) e.b.mass += f.mass;

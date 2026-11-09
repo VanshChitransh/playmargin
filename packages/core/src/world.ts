@@ -9,7 +9,6 @@ import { mulBps } from "./units";
 
 /** Spike hit radius in px (feel constant, tune in playtests). */
 export const SPIKE_RADIUS = 18;
-const SPIKES_PER_PLAYER = 2;
 
 /** Arena side in px for n players: smaller rooms are tighter (2 humans = Duel). */
 export function arenaSide(n: number): number {
@@ -110,7 +109,7 @@ export function startMatch(w: World, tick: number, ratePerMinBps: number = C.RAT
     b.shieldUntil = tick + shield;
     charge(w, b, tick);
   });
-  const n = Math.max(3, blobs.length) * SPIKES_PER_PLAYER;
+  const n = Math.max(3, blobs.length) * C.R.SPIKES_PER_PLAYER;
   for (let i = 0; i < n; i++) {
     const s: Spike = { id: w.nextId++, x: 0, y: 0, big: rand(w) * 10_000 < C.SPIKE_BIG_SHARE_BPS, respawnAt: null };
     placeSpike(w, s);
