@@ -25,7 +25,7 @@ export function showDeath(root: HTMLElement, d: NonNullable<Outcome["death"]>, a
   const why = d.eaten ? `eaten by ${esc(d.by)}` : d.keeper ? "VAULT CLOSED YOUR LOAN" : `popped by ${esc(d.by)}`;
   const greed =
     d.leverage >= 1.05
-      ? `You were <b class="num">${d.leverage.toFixed(1)}x</b>, red for <b class="num">${Math.max(0, d.redS).toFixed(0)} s</b>.`
+      ? `You were <b class="num">${d.leverage.toFixed(1)}x</b>${d.redS >= 0.5 ? `, red for <b class="num">${d.redS.toFixed(0)} s</b>` : ""}.`
       : "No loan, just outsized.";
   const el = shell(
     root,
