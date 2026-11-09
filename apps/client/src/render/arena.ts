@@ -71,7 +71,8 @@ export class ArenaRenderer {
       resolution: Math.min(window.devicePixelRatio || 1, 2),
     });
     root.appendChild(this.app.canvas);
-    this.view = opts.view ?? VIEW_AT_START;
+    // ?view=N zooms the camera in for recordings (world units across the long side).
+    this.view = opts.view ?? (Number(new URLSearchParams(location.search).get("view")) || VIEW_AT_START);
     this.bake();
     this.world.addChild(this.grid, this.zone, this.foodLayer, this.spikeLayer, this.blobLayer, this.preview, this.fx);
     this.app.stage.addChild(this.world);
