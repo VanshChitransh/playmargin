@@ -74,12 +74,31 @@ export function quoteRequest(q: QuoteInput, recipient: string, live: boolean, no
   };
 }
 
-/** Proxies a quote. Returns the upstream status + body so the client can show "no quote right now". */
+/** Only used for DRY quotes: 1-Click answers 500 unless the recipient exists on mainnet. */
+const DRY_RECIPIENT = "vanshverse.near";
+
+/**
+ * Who receives the quoted USDC on NEAR mainnet, or why quoting is off. Live quotes put real money
+ * in flight, so they need mainnet AND our deployed contract as recipient. Pure: unit-tested.
+ */
+export function quoteRecipient(env: Record<string, string | undefined>): { recipient: string; live: boolean } | { error: string } {
+  const live = env.ONECLICK_LIVE === "1";
+  if (!live) return { recipient: env.ONECLICK_RECIPIENT ?? DRY_RECIPIENT, live };
+  if (env.NETWORK !== "mainnet") return { error: "live quotes are mainnet only (unset ONECLICK_LIVE)" };
+  const recipient = env.ONECLICK_RECIPIENT ?? env.CONTRACT_ID;
+  if (!recipient) return { error: "set ONECLICK_RECIPIENT to the mainnet contract" };
+  return { recipient, live };
+}
+
+/** Proxies a quote. 4xx passes through ("no route", bad amount), anything else becomes a 503. */
 export async function quote(q: QuoteInput): Promise<{ status: number; body: unknown }> {
-  const recipient = process.env.ONECLICK_RECIPIENT ?? "playmargin.near";
-  const body = quoteRequest(q, recipient, process.env.ONECLICK_LIVE === "1", Date.now());
+  const to = quoteRecipient(process.env);
+  if ("error" in to) return { status: 503, body: { error: `quotes unavailable: ${to.error}` } };
+  const body = quoteRequest(q, to.recipient, to.live, Date.now());
   const r = await fetch(`${BASE}/quote`, { method: "POST", headers: headers(), body: JSON.stringify(body) });
-  return { status: r.status, body: await r.json().catch(() => ({})) };
+  const json = (await r.json().catch(() => ({}))) as Record<string, unknown>;
+  if (r.ok || (r.status >= 400 && r.status < 500)) return { status: r.status, body: json };
+  return { status: 503, body: { error: "No quote right now, try again in a minute", upstream: r.status } };
 }
 
 /** Execution status of a live deposit address. */

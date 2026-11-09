@@ -2,7 +2,7 @@
 // targets USDC on NEAR at our contract with the player in customRecipientMsg and a min-out.
 
 import { describe, expect, it } from "vitest";
-import { USDC_NEAR, quoteInputError, quoteRequest } from "./oneclick.ts";
+import { USDC_NEAR, quoteInputError, quoteRecipient, quoteRequest } from "./oneclick.ts";
 
 const known = (id: string) => id === "nep141:base-usdc";
 const ok = { accountId: "vansh.near", originAsset: "nep141:base-usdc", amount: "2000000", refundTo: "0x1111111111111111111111111111111111111111" };
@@ -22,5 +22,13 @@ describe("1-Click proxy", () => {
     expect(q).toMatchObject({ dry: true, destinationAsset: USDC_NEAR, recipient: "playmargin.near", slippageTolerance: 100 });
     expect(JSON.parse(String(q.customRecipientMsg))).toEqual({ for: "vansh.near" });
     expect((quoteRequest(ok, "playmargin.near", true, 0) as { dry: boolean }).dry).toBe(false);
+  });
+
+  it("dry quotes work with no config, live quotes only on mainnet into the contract", () => {
+    expect(quoteRecipient({})).toEqual({ recipient: "vanshverse.near", live: false });
+    expect(quoteRecipient({ NETWORK: "testnet", ONECLICK_RECIPIENT: "x.near" })).toEqual({ recipient: "x.near", live: false });
+    expect(quoteRecipient({ NETWORK: "testnet", ONECLICK_LIVE: "1" })).toEqual({ error: expect.stringMatching(/mainnet only/) });
+    expect(quoteRecipient({ NETWORK: "mainnet", ONECLICK_LIVE: "1" })).toEqual({ error: expect.stringMatching(/ONECLICK_RECIPIENT/) });
+    expect(quoteRecipient({ NETWORK: "mainnet", ONECLICK_LIVE: "1", CONTRACT_ID: "playmargin.near" })).toEqual({ recipient: "playmargin.near", live: true });
   });
 });
