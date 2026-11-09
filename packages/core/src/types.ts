@@ -49,7 +49,7 @@ export interface Blob {
   repayHeld: boolean;
   /** Tick the BOOST speed ends: the tick after the last held tick that borrowed. */
   boostUntil: number;
-  /** A REPAY press holds until this tick even if released sooner, so a tap pays one 15% chunk. */
+  /** A REPAY press holds until this tick even if released sooner, so a tap pays a visible chunk. */
   repayMinUntil: number;
   shieldUntil: number;
   spikeImmuneUntil: number;

@@ -152,7 +152,7 @@ describe("step", () => {
     expect(a.burstReadyAt).toBe(1 + sToTicks(0.8)); // second press inside 0.8 s: no new burst
   });
 
-  it("held REPAY escapes red at the old perfect-mashing pace, with a clutch save; release logs it", () => {
+  it("held REPAY escapes red, with a clutch save; release logs it", () => {
     const red = makeBlob({ id: "r", mass: u(142.5), debt: u(120), redSince: 0 });
     const w = makeWorld([red, makeBlob({ id: "big", mass: u(400), x: 700 })]);
     const press = (t: number, repay: boolean) =>
@@ -165,22 +165,22 @@ describe("step", () => {
       expect(save).toEqual({ type: "clutchSave", blob: "r", clutch: true });
       savedAt = t;
     }
-    // Debt 120 -> 90 (HF 1.0) at 15% per 0.4 s compounding: ln(0.75) / ln(0.85) * 24 = 42.5 ticks.
-    expect(savedAt).toBe(43);
+    // Debt 120 -> 90 (HF 1.0) at 1.5 x equity 22.5 a second = 0.5625 a tick: 53.3, so tick 54.
+    expect(savedAt).toBe(54);
     expect(w.pendingLog.some((e) => e.type === "REPAY")).toBe(false); // still pending while held
     const ev = press(savedAt + 1, false);
     expect(ev.some((e) => e.type === "repay")).toBe(true);
     expect(red.pendingRepay).toBe(0);
   });
 
-  it("a REPAY tap (one message) still pays one 15% chunk over 0.4 s", () => {
+  it("a REPAY tap (one message) still pays a 0.1 s chunk", () => {
     const a = makeBlob({ id: "a", mass: u(200), debt: u(100) });
     const w = makeWorld([a]);
     const send = (t: number, repay: boolean) =>
       step(w, new Map([["a", { seq: t, dirX: 0, dirY: 0, boost: false, repay, cashout: false }]]), t);
     send(1, true);
-    for (let t = 2; t <= 1 + sToTicks(0.4) + 5; t++) send(t, false);
-    expect(a.debt / MICRO).toBeCloseTo(85, 2);
+    for (let t = 2; t <= 1 + sToTicks(0.4); t++) send(t, false);
+    expect(a.debt).toBe(u(85)); // equity 100 x 1.5 x 0.1 s = 15
     expect(w.pendingLog.filter((e) => e.type === "REPAY")).toHaveLength(1);
   });
 

@@ -3,7 +3,7 @@
 import type { BlobKind, Mode, Phase, Ring } from "./types";
 
 /** Client to server, at most 30/s. boost and repay are HELD state (send true every message while
- *  held, it expires after 250 ms; a press repays for at least 0.4 s), cashout is an edge-triggered tap. */
+ *  held, it expires after 250 ms; a press repays for at least 0.1 s), cashout is an edge-triggered tap. */
 export interface InputCmd {
   seq: number;
   dirX: number;
