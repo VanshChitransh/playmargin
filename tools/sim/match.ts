@@ -1,7 +1,7 @@
 // One headless match driven by the real brains, shared by `npm run demo` and `npm run sim`.
 // Same engine, same order and same log as a live room; only the clock and the sockets are fake.
 import {
-  appendLog, newWorld, R, startMatch, step, type GameEventMsg, type InputCmd, type LogEntry, type Mode, type PlayerSeed, type World,
+  appendLog, newWorld, R, startMatch, step, type Blob, type Brain, type GameEventMsg, type InputCmd, type LogEntry, type Mode, type PlayerSeed, type World,
 } from "@margin/core";
 import { agentView, createBrain, FreeBot } from "../../apps/server/src/agents/index";
 
@@ -11,6 +11,8 @@ export interface MatchOpts {
   /** Players that are not drones; paid rooms play them as FreeBot-driven "humans". */
   players: number;
   drones: number;
+  /** Optional brain override per blob (balance sweep: a greedy player); null falls back to the default. */
+  brain?: (b: Blob) => Brain | null;
   /** Called after every tick with what clients would have seen. */
   onTick?: (w: World, tick: number, events: GameEventMsg[], logged: LogEntry[]) => void | Promise<void>;
 }
@@ -37,7 +39,7 @@ export function lineup(o: MatchOpts): PlayerSeed[] {
 /** Play a whole match from warm-up to the bell. Returns the world, its chained log and tick count. */
 export async function runMatch(o: MatchOpts): Promise<{ w: World; log: LogEntry[]; ticks: number }> {
   const w = newWorld(o.seed, o.mode, lineup(o), `${o.mode}-${o.seed}`);
-  const brains = new Map([...w.blobs.values()].map((b) => [b.id, createBrain(b, o.seed) ?? new FreeBot((o.seed ^ fnv(b.id)) >>> 0)]));
+  const brains = new Map([...w.blobs.values()].map((b) => [b.id, o.brain?.(b) ?? createBrain(b, o.seed) ?? new FreeBot((o.seed ^ fnv(b.id)) >>> 0)]));
   const log: LogEntry[] = [];
   let tick = 0;
   for (; w.phase !== "ENDED"; ) {
