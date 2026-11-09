@@ -38,6 +38,16 @@ export class FxLayer extends Container {
     this.items.push({ node: g, life: 0, ttl: JUICE.TRAIL_TTL_S, vx: 0, vy: 0, spin: 0 });
   }
 
+  /** A gold spark at (x, y) that flies into (tx, ty) over its life: borrowed money arriving. */
+  spark(x: number, y: number, tx: number, ty: number, size: number): void {
+    const g = new Graphics().circle(0, 0, size).fill(C.gold).stroke({ width: size * 0.4, color: C.ink, alpha: 0.6 });
+    g.position.set(x, y);
+    this.addChild(g);
+    const ttl = JUICE.SPARK_TTL_S;
+    // fx tick damps velocity by 0.92 per frame, so aim a little long to arrive.
+    this.items.push({ node: g, life: 0, ttl, vx: ((tx - x) / ttl) * 1.6, vy: ((ty - y) / ttl) * 1.6, spin: 0 });
+  }
+
   /** n hard-edged shards flying out of (x, y); more shards for a bigger hit. */
   shards(x: number, y: number, n: number, color: number, r: number): void {
     for (let i = 0; i < n; i++) {

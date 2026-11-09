@@ -243,6 +243,29 @@ export class Hud {
       .join("")}<li class="text-xs text-ink/60">Try BOOST now: it is free practice until GO.</li></ul>`;
   }
 
+  /** Edge speed lines while BOOST burns: started by the press, faded over 250 ms on release. */
+  speedLines(on: boolean): void {
+    if (reducedMotion) return;
+    let box = this.el.querySelector<HTMLElement>("[data-h=lines]");
+    if (!box) {
+      box = document.createElement("div");
+      box.dataset.h = "lines";
+      box.className = "speed-lines pointer-events-none absolute inset-0 overflow-hidden";
+      box.style.transition = `opacity ${JUICE.SPEED_LINE_FADE_MS}ms ease-out`;
+      const n = JUICE.SPEED_LINES;
+      box.innerHTML = Array.from({ length: n }, (_, i) => {
+        // Spread around the edges, pointing at the centre; only the outer ~18% of the screen.
+        const a = (i / n) * Math.PI * 2 + (i % 2) * 0.15;
+        const x = 50 + Math.cos(a) * 62;
+        const y = 50 + Math.sin(a) * 62;
+        const deg = (a * 180) / Math.PI;
+        return `<span style="left:${x}%;top:${y}%;transform:translate(-50%,-50%) rotate(${deg}deg);animation-delay:${(i % 4) * 60}ms"></span>`;
+      }).join("");
+      this.el.appendChild(box);
+    }
+    box.style.opacity = on ? String(JUICE.SPEED_LINE_ALPHA) : "0";
+  }
+
   /** REPAY: a few gold coins fly from my blob (screen centre) into the owe badge. */
   coinsToOwe(): void {
     if (reducedMotion) return;

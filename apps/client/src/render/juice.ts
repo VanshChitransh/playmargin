@@ -56,6 +56,15 @@ export const JUICE = {
   BOOST_KICK_PX: 2,
   KICK_TAU_S: 0.05,
 
+  // Borrowing visuals (feel spec 2.1)
+  /** Gold sparks that stream INTO my blob from behind (borrowed money arriving), per trail tick. */
+  SPARKS_PER_TICK: 2,
+  SPARK_TTL_S: 0.3,
+  /** Edge speed lines, started by the press: how many, how strong, and the fade on release. */
+  SPEED_LINES: 16,
+  SPEED_LINE_ALPHA: 0.25,
+  SPEED_LINE_FADE_MS: 250,
+
   // REPAY per tap (feel spec 2.2)
   /** Clink pitch over a run of taps (a tap within REPAY_RUN_MS of the last continues the run). */
   REPAY_PITCH: [1, 1.12, 1.25],

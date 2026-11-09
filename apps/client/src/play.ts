@@ -96,6 +96,7 @@ export const play: Screen = (root, params) => {
     hud.held = on;
     engine(on);
     sfx(on ? "press" : "release");
+    hud.speedLines(on && !controls.els.boost.classList.contains("blocked"));
   };
   const status = document.createElement("div");
   status.className = "tag pointer-events-none fixed bottom-3 left-3 max-w-[55vw] text-muted";

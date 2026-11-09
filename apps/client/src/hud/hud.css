@@ -47,3 +47,8 @@
 /* BOOST refused (red, shield, after 80 s, empty): a lock says why nothing happens. */
 [data-tap="boost"] .lock { display: none; }
 [data-tap="boost"].blocked .lock { display: block; }
+
+/* BOOST speed lines: thin ink streaks at the screen edges, drifting outward. */
+.speed-lines { opacity: 0; }
+.speed-lines span { position: absolute; width: 26vmax; height: 2px; background: linear-gradient(90deg, transparent, var(--color-ink)); animation: streak 0.3s linear infinite; }
+@keyframes streak { from { margin-left: -4vmax; } to { margin-left: 4vmax; } }
