@@ -1,0 +1,8 @@
+# Caddy terminates TLS (automatic Let's Encrypt) and proxies HTTP + WebSocket to Colyseus.
+# Install: sudo cp ops/Caddyfile /etc/caddy/Caddyfile && sudo systemctl reload caddy
+# DNS first: an A record api.playmargin.fun -> droplet IP (Cloudflare proxy OFF so Caddy can get a cert).
+api.playmargin.fun {
+	encode gzip
+	# Gasless relayer (S4, services/relayer) joins here at S10: handle /relay* { reverse_proxy localhost:3030 }
+	reverse_proxy localhost:2567
+}

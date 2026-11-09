@@ -1,0 +1,31 @@
+# systemd unit for the game server. Install: sudo cp ops/margin-server.service /etc/systemd/system/
+# Stop sends SIGTERM: the server drains (no new rooms, LIVE matches finish and settle, up to
+# 90 s + 5 s results), so TimeoutStopSec must cover a full match or systemd kills it mid-round.
+[Unit]
+Description=MARGIN game server (Colyseus + read API)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=margin
+Group=margin
+WorkingDirectory=/opt/margin/current/apps/server
+EnvironmentFile=/etc/margin/env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node --import tsx src/index.ts
+KillSignal=SIGTERM
+KillMode=mixed
+TimeoutStopSec=120
+Restart=always
+RestartSec=2
+
+# Hardening: the process can only write its database directory.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/margin
+
+[Install]
+WantedBy=multi-user.target
