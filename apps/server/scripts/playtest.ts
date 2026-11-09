@@ -118,10 +118,12 @@ async function play(strategy: string, o: { w: number; h: number; cpu?: number; m
   if (!spec) throw new Error("could not spectate the player's room");
   // Film the same room from #/watch with S3's recorder (30 s mp4), in parallel.
   if (record) procs.push(spawn("bash", ["scripts/record.sh", "30", join(dir, "watch.mp4"), `${env.web}/?clean=1#/watch`], { cwd: join(ROOT, "apps/client"), stdio: "ignore" }));
-  spec.onMessage("ev", () => {});
+  // Every game event the room broadcasts, by type (pops = liquidations seen, clutchSave, spikeHit...).
+  const evCounts: Record<string, number> = {};
+  spec.onMessage("ev", (e: { type: string }) => void (evCounts[e.type] = (evCounts[e.type] ?? 0) + 1));
   spec.onMessage("commander", () => {});
   const st = () => spec!.state as unknown as St;
-  const m = { firstContactS: null as number | null, speeds: [] as Array<{ r: number; pxs: number }>, foodPerMP: [] as number[], foodPct: 0, spikePct: 0, clump: [] as number[], jitter: [] as number[], earlyHunters: 0, redS: 0, boosted: false, repaid: false, cashTried: false, final: "" };
+  const m = { onScreen: [] as number[], firstContactS: null as number | null, speeds: [] as Array<{ r: number; pxs: number }>, foodPerMP: [] as number[], foodPct: 0, spikePct: 0, clump: [] as number[], jitter: [] as number[], earlyHunters: 0, redS: 0, boosted: false, repaid: false, cashTried: false, final: "" };
   let prev = new Map<string, { x: number; y: number; dx: number; dy: number }>();
   let wander = Math.random() * Math.PI * 2;
   let holding = false;
@@ -146,7 +148,9 @@ async function play(strategy: string, o: { w: number; h: number; cpu?: number; m
     const halfH = o.h / 2 / z;
     const inView = (p: { x: number; y: number }) => Math.abs(p.x - me.x) < halfW && Math.abs(p.y - me.y) < halfH;
     const food = [...s.food.values()];
-    m.foodPerMP.push([...food].filter(inView).length / ((o.w * o.h) / 1e6));
+    const visible = food.filter(inView).length;
+    m.foodPerMP.push(visible / ((o.w * o.h) / 1e6));
+    m.onScreen.push(visible);
     m.foodPct = Math.round(((2 * (food[0]?.radius ?? 0) * z) / o.w) * 1000) / 10;
     m.spikePct = Math.round(((2 * ([...s.spikes.values()][0]?.radius ?? 0) * z) / o.w) * 1000) / 10;
     const others = [...s.blobs.entries()].filter(([, b]) => b !== me && b.state === "alive");
@@ -173,7 +177,8 @@ async function play(strategy: string, o: { w: number; h: number; cpu?: number; m
     // Strategy: a direction for the mouse, plus BOOST / REPAY / cash out keys.
     const nearestFood = food.reduce((a, f) => (Math.hypot(f.x - me.x, f.y - me.y) < Math.hypot(a.x - me.x, a.y - me.y) ? f : a), food[0] ?? me);
     const threat = others.map(([, b]) => b).filter((b) => b.radius > me.radius * 1.1 || b.kind === "drone").sort((a, b) => Math.hypot(a.x - me.x, a.y - me.y) - Math.hypot(b.x - me.x, b.y - me.y))[0];
-    let aim: [number, number] = [nearestFood.x - me.x, nearestFood.y - me.y];
+    const fd = Math.hypot(nearestFood.x - me.x, nearestFood.y - me.y) || 1;
+    let aim: [number, number] = [(nearestFood.x - me.x) / fd, (nearestFood.y - me.y) / fd]; // unit, so spike push can win
     // Like a person: steer around spikes that sit on the way (within 2 radii ahead).
     for (const k of s.spikes.values()) {
       const d = Math.hypot(k.x - me.x, k.y - me.y);
@@ -222,6 +227,10 @@ async function play(strategy: string, o: { w: number; h: number; cpu?: number; m
   return {
     spikeHits, death: death ? { type: death.type, by: death.by, atS: Math.round(((death.t as number) - go) / 60) } : null,
     cashedAtS: cashed ? Math.round(((cashed.t as number) - go) / 60) : null,
+    events: evCounts,
+    pelletsOnScreen: Math.round(avg(m.onScreen)),
+    startSpeedPxS: m.speeds.slice(0, 50).length ? Math.round(avg(m.speeds.slice(5, 50).map((x) => x.pxs))) : null,
+    crossScreenS: m.speeds.length ? Math.round((o.w / Math.max(1, avg(m.speeds.slice(5, 50).map((x) => x.pxs)))) * 10) / 10 : null,
     strategy, viewport: `${o.w}x${o.h}${o.mobile ? " mobile" : ""}`, cpuThrottle: o.cpu ?? 1, frames: fs,
     pelletsPerMP: avg(m.foodPerMP), pelletPctWidth: m.foodPct, spikePctWidth: m.spikePct,
     speedPxPerSByRadius: Object.fromEntries([...bySize].sort((a, b) => a[0] - b[0]).map(([r, v]) => [r, Math.round(avg(v))])),
