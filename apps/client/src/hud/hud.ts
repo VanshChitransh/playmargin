@@ -41,7 +41,7 @@ export class Hud {
       <div data-h=center class="absolute inset-x-0 top-[14%] grid place-items-center text-center"></div>
       <div data-h=frame class="call-frame"></div>
       <button data-h=mute class="tag pointer-events-auto absolute left-0 top-0 m-3 mt-[max(12px,env(safe-area-inset-top))] rounded-field bg-navy/80 px-2 py-1 text-muted"></button>
-      <div data-h=call class="tag absolute inset-x-0 bottom-28 hidden text-center"><span class="rounded-field bg-liq px-3 py-1 text-paper">Margin call: tap REPAY or run</span></div>
+      <div data-h=call class="tag absolute inset-x-0 bottom-28 hidden text-center"><span class="rounded-field bg-liq px-3 py-1 text-paper">Margin call: tap REPAY to get out</span></div>
       <div data-h=money class="absolute bottom-0 right-28 flex flex-col items-end gap-1 p-4 pb-[max(20px,env(safe-area-inset-bottom))]">
         <span data-h=owe class="num hidden rounded-field bg-navy/80 px-2 py-0.5 text-gold"></span>
         <span data-h=drain class="num hidden text-xs text-liq"></span>
@@ -83,6 +83,7 @@ export class Hud {
       this.last.set("ringPrev", ring);
       this.q("frame").dataset.ring = ring;
       this.q("call").classList.toggle("hidden", ring !== "red");
+      this.els.repay.classList.toggle("urgent", ring === "red");
     });
     if (ring === "red" && now - this.lastBeat > 900) {
       this.lastBeat = now;

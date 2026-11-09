@@ -32,3 +32,6 @@
 .call-frame { position: fixed; inset: 0; pointer-events: none; border: 0 solid transparent; transition: border-width 150ms; }
 .call-frame[data-ring="yellow"] { border-width: 6px; border-color: var(--color-warn); animation: beat 1s ease-in-out infinite; }
 .call-frame[data-ring="red"] { border-width: 14px; border-color: var(--color-liq); animation: beat 0.45s ease-in-out infinite; }
+/* Red: REPAY is the only way out, so the button itself throbs and grows (shape + motion). */
+@keyframes urgent { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 var(--color-liq); } 50% { transform: scale(1.18); box-shadow: 0 0 0 8px var(--color-liq); } }
+.urgent { animation: urgent 0.45s ease-in-out infinite; }
