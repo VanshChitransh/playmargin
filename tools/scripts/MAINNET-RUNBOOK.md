@@ -80,7 +80,7 @@ It sends, in order (all signed by the contract account):
 
 | # | Tx | Measured |
 |---|---|---|
-| **[TX 2]** | deploy wasm + `new(owner, settler, usdc, entry_stake)` | 1.994 NEAR storage locked + ~0.016 gas |
+| **[TX 2]** | deploy wasm + `new(owner, settler, usdc, entry_stake)` | 2.05 NEAR storage locked + ~0.016 gas |
 | **[TX 3]** | `storage_deposit` on native USDC for the contract | 0.00125 |
 | **[TX 4]** | create `settler.$CONTRACT_ID` funded 0.25 NEAR (key saved locally) | 0.25 |
 | **[TX 5]** | create `relayer.$CONTRACT_ID` funded 0.15 NEAR (key saved locally) | 0.15 |
@@ -172,9 +172,9 @@ Never delete or recreate the accounts (name squatters watch for it). Recover val
 
 ## Wasm size
 
-199 KB after `--no-embed-abi` (saves 3 KB). `wasm-opt -Oz` saves 1 KB more, and the rest is
+205 KB (204,955 B, with A7 agents) after `--no-embed-abi` (saves 3 KB). `wasm-opt -Oz` saves 1 KB more, and the rest is
 near-sdk's JSON/format machinery that every method needs, so no cheap cut is left. 1 NEAR per
-100 KB means about 1.99 NEAR of refundable storage.
+100 KB means about 2.05 NEAR of refundable storage (1.99 before A7, as in the rehearsal below).
 
 ## Rehearsal (testnet, 9 Nov, about 18 min including two 90 s matches)
 
@@ -208,11 +208,11 @@ Contract `margin.vansh-rehearsal-11091618.testnet`. Testnet gas price is 1e8, th
 
 Gas per match is the same at 0.10 (settler about 0.0007 NEAR, relayer about 0.0002 per ticket).
 
-**Net cost of the whole day: 0.049 NEAR.** Peak NEAR needed at once: 2.7 (now 2.75 with the fixes).
+**Net cost of the whole day: 0.049 NEAR.** Peak NEAR needed at once: 2.7 (now 2.96 with the fixes and A7 drones).
 
 Mistakes the rehearsal caught (all fixed above):
 1. Settler funded 0.1 NEAR could not send `open_match` (`NotEnoughBalance`, 100 Tgas reserves 0.101 NEAR). Now 0.25.
-2. 2.3 NEAR left 0.038 NEAR of storage headroom, about 25 matches. Now 2.75.
+2. 2.3 NEAR left 0.038 NEAR of storage headroom, about 25 matches. Now 2.96 (2.75 before A7 drones).
 3. A 0.5 USDC vault seed cannot back a 1 USDC match (needs 1.5 x stake x players). Formula added.
 4. 0.10 USDC needed the server to read the stake from the contract. Fixed (94a4ec0) and re-run.
 6. Right after `UPGRADE=1` the script's next view hit a node still serving the old code

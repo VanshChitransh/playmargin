@@ -217,7 +217,7 @@ _To be written by S3: rendering, prediction and interpolation, screens, Verify p
 
 Every NEAR feature with a testnet transaction proving it: [`docs/NEAR.md`](NEAR.md).
 
-### Contract state (`contracts/margin`, near-sdk 5.30.1, about 199 KB)
+### Contract state (`contracts/margin`, near-sdk 5.30.1, 204,955 B, about 205 KB)
 
 | Field | Holds |
 |---|---|
@@ -227,6 +227,7 @@ Every NEAR feature with a testnet transaction proving it: [`docs/NEAR.md`](NEAR.
 | `vault` | `free` (backs new matches) and `locked` (budgets of open matches) |
 | `reserve` | house money (fees, dust). Pays bad debt first |
 | `anchors` | the single `"free"` key: hourly Merkle root of free matches |
+| raw keys `agent:<account>` | house agents (liquidator drones `drone-1..3`) set by the owner with `set_agents` (1 yoctoNEAR). Raw keys, not a field, so adding them needed no migration |
 | `owner`, `settler`, `usdc`, `entry_stake` | config, readable with `config()` |
 
 Invariant: USDC held by the contract = sum of balances + sum of tickets + vault.free +
@@ -256,6 +257,10 @@ sequenceDiagram
   budget revolves within a match. Bad debt is at most 10% of the budget and comes from the reserve.
   The vault always gets its full budget back plus interest and fees. With no survivor, the leftover
   pot rides in `interest_to_vault`.
+- Payouts go only to the match's players or to registered agents. All agent payouts in one match
+  (drone bounties) are capped at 12% of its stakes (`AGENT_PAYOUT_MAX_BPS`), and only the owner
+  registers agents (`set_agents`, 1 yoctoNEAR). The server clamps drones to the cap and moves the
+  excess to the reserve.
 - Escape hatch: `reclaim()` returns the stake 15 min after entering (or after `open_match`), and
   cancels a match the server never settled. `refund_ticket` lets the server refund no-shows early.
 
