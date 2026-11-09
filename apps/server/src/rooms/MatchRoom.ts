@@ -77,6 +77,9 @@ export class MatchRoom extends Room {
   private lastMe = new Map<string, string>();
   /** Blob id (= sessionId) to credits user id, humans in free rooms only. */
   private users = new Map<string, string>();
+  /** Guest users holding a seat here (claimed in onAuth): one seat per guest, so a second tab or a
+   *  reload during late join can't double-charge or seat the same user twice. */
+  private guests = new Set<string>();
   /** Paid accounts this room holds in seatedAccounts; released on leave before GO and on dispose. */
   private accounts = new Set<string>();
   /** Paid: open_match on chain, started at the 3-2-1. GO waits for it, a failure aborts the room. */
@@ -134,7 +137,12 @@ export class MatchRoom extends Room {
     if (k.mode !== this.key.mode) throw new Error(`mode mismatch: pass { mode: "${this.key.mode}" }`);
     if (this.key.roomCode && k.roomCode !== this.key.roomCode) throw new Error("wrong room code");
     // Free: the credits user id. Paid: the NEAR account holding a live ticket (one seat each).
-    if (this.key.mode === "free") return admitFree(sharedDb(), opts);
+    if (this.key.mode === "free") {
+      const userId = admitFree(sharedDb(), opts);
+      if (this.guests.has(userId)) throw new Error("you are already in this match");
+      this.guests.add(userId);
+      return userId;
+    }
     const paid = await admitPaid(opts);
     // Claimed synchronously after the last await, so two parallel joins can't both pass.
     if (seatedAccounts.has(paid.accountId)) throw new Error("this account is already in a match");
@@ -199,6 +207,7 @@ export class MatchRoom extends Room {
     const id = client.sessionId;
     this.inputs.close(id);
     if (this.started || this.paidLocked) return; // after GO (paid: after the 3-2-1) the blob stays
+    this.guests.delete(this.users.get(id) ?? "");
     this.users.delete(id);
     const acc = this.world.blobs.get(id)?.accountId;
     if (acc) (seatedAccounts.delete(acc), this.accounts.delete(acc));
@@ -235,7 +244,7 @@ export class MatchRoom extends Room {
       case "COUNTDOWN":
         if (this.phaseTick < COUNTDOWN_TICKS || this.opening === "pending") break;
         if (this.opening === "failed") this.abort();
-        else this.go();
+        else this.goOnce();
         break;
       case "LIVE":
         this.log.drain(w);
@@ -264,12 +273,24 @@ export class MatchRoom extends Room {
     this.enter("COUNTDOWN");
   }
 
+  /** go() charges entries, so it must never run twice: an unexpected throw closes the room instead. */
+  private goOnce(): void {
+    try {
+      this.go();
+    } catch (err) {
+      log.error("go_failed", { matchId: this.roomId, err });
+      this.enter("ENDED", false);
+      void this.disconnect();
+    }
+  }
+
   /** GO: charge, build the real world for this head count, seeded fair respawn. No vanishing after this. */
   private go(): void {
     // Entry is charged here and nowhere else; anyone who can no longer pay is sent home uncharged.
     for (const [id, userId] of this.users) {
       if (chargeEntry(sharedDb(), userId, this.roomId)) continue;
       this.users.delete(id);
+      this.guests.delete(userId);
       removePlayer(this.world, id);
       this.clients.getById(id)?.leave(4001, "not enough credits");
     }

@@ -37,6 +37,9 @@ const sdk = new Client(`ws://localhost:${port}`);
 const keys = [`ed25519:e2e${Date.now()}aaaaa`, `ed25519:e2e${Date.now()}bbbbb`];
 const rooms = await Promise.all(keys.map((guestKey) => sdk.joinOrCreate("match", { mode: "free", guestKey })));
 if (rooms[0]!.roomId !== rooms[1]!.roomId) fail("the two players landed in different rooms");
+// A second tab with the same guest must not get a second seat (it used to double-charge and freeze GO).
+const dupe = await sdk.joinOrCreate("match", { mode: "free", guestKey: keys[0] }).then(() => "joined", (e: Error) => e.message);
+if (!/already in this match/.test(dupe)) fail(`same guest joined twice: ${dupe}`);
 const phases: string[] = [];
 rooms.forEach((r, i) => {
   r.onMessage("me", () => {});
