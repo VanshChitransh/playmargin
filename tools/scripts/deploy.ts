@@ -47,7 +47,7 @@ async function deployMargin(): Promise<void> {
     tx = tx.functionCall(IDS.contract, "migrate", { entry_stake: ENTRY_STAKE });
   }
   const what = !has ? "deployed + initialised" : migrate ? "upgraded + migrated" : "upgraded";
-  console.log(`margin ${what}: ${txLink(await tx.send())}`);
+  console.log(`margin ${what}: ${txLink(await tx.send({ waitUntil: "FINAL" }))}`);
 }
 
 /** The contract must be registered on USDC to receive ft_transfer_call deposits. */
@@ -68,7 +68,7 @@ async function ensureOwner(): Promise<void> {
   const cfg = await near.view<{ owner: string }>(IDS.contract, "config", {});
   if (cfg?.owner === IDS.owner) return;
   if (NETWORK === "testnet") await ensureSubAccount(IDS.owner, "0.5 NEAR");
-  await near.call(IDS.contract, "set_owner", { owner: IDS.owner }, { signerId: cfg?.owner ?? IDS.contract, attachedDeposit: "1 yocto" });
+  await near.call(IDS.contract, "set_owner", { owner: IDS.owner }, { signerId: cfg?.owner ?? IDS.contract, attachedDeposit: "1 yocto", waitUntil: "FINAL" });
   console.log(`owner set to ${IDS.owner}`);
 }
 
@@ -76,7 +76,7 @@ async function ensureOwner(): Promise<void> {
 async function ensureEntryStake(): Promise<void> {
   const cfg = await near.view<{ owner: string; entry_stake: string }>(IDS.contract, "config", {});
   if (!cfg || cfg.entry_stake === ENTRY_STAKE) return;
-  await near.call(IDS.contract, "set_entry_stake", { entry_stake: ENTRY_STAKE }, { signerId: cfg.owner, attachedDeposit: "1 yocto" });
+  await near.call(IDS.contract, "set_entry_stake", { entry_stake: ENTRY_STAKE }, { signerId: cfg.owner, attachedDeposit: "1 yocto", waitUntil: "FINAL" });
   console.log(`entry stake set to ${ENTRY_STAKE}`);
 }
 

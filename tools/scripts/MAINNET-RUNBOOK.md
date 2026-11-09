@@ -20,7 +20,7 @@ About 2.7 NEAR comes back at cleanup (measured: 0.049 NEAR net for the whole reh
 ```
 export NETWORK=mainnet
 export CONTRACT_ID=playmargin.near        # or margin.vanshverse.near
-export ENTRY_STAKE=1000000                # 1 USDC (100000 = 0.10 USDC, see the blocker below)
+export ENTRY_STAKE=100000                 # 0.10 USDC (or 1000000 for 1 USDC). Both rehearsed
 export OWNER_ID=vanshverse.near           # payout wallet, never the contract account
 ```
 
@@ -28,9 +28,8 @@ Settler and relayer default to `settler.$CONTRACT_ID` and `relayer.$CONTRACT_ID`
 `SETTLER_ID`, `RELAYER_ID`). The stake is stored in the contract (`config().entry_stake`). The
 client reads it from there, and the owner can change it later with `set_entry_stake` (1 yocto).
 
-**Blocker for 0.10 USDC (S1/S2):** the server still prices paid pots with core's
-`ENTRY_PAID_USDC = 1`. Until it reads `config().entry_stake` (or core matches it), only 1 USDC
-works: a 0.10 ticket in a 1 USDC pot fails settle's exact equality.
+The server reads the stake from `config().entry_stake` too (core 824ba80, server 94a4ec0), so
+switching the stake is one owner tx and no redeploy. Both 1 USDC and 0.10 USDC were rehearsed.
 
 ## 1. Pre-flight (free, no mainnet tx, about 2 min)
 
@@ -114,7 +113,8 @@ answers with its balance and `"alarm":false`.
 ## 6. Seed the vault and play the first real match
 
 The vault must back every match that is open at the same time: **seed at least
-1.5 x stake x players**. 1 USDC stake, 2 players: 3 USDC. 0.10 stake, up to 3 players: 0.45 USDC.
+1.5 x stake x players**. 1 USDC stake, 2 players: 3 USDC. 0.10 stake, 2 players: 0.3 USDC
+(rehearsed), a full 12-player room at 0.10: 1.8 USDC.
 
 **[TX 6]** owner seeds the vault (amount in base units, 3000000 = 3 USDC, measured 6 s):
 
@@ -181,12 +181,28 @@ Contract `margin.vansh-rehearsal-11091618.testnet`. Testnet gas price is 1e8, th
 | 9 empty module | 5 s | [deploy](https://testnet.nearblocks.io/txns/3E4LxEjfT6VDeKf5aCFtdbNVsMgis9PbotApjpisrYWZ) | storage 199,980 B to 987 B |
 | 10 NEAR home | 10 s | [contract](https://testnet.nearblocks.io/txns/Bg56x1YL79F1mbQXjUAFWX3daQNnE8wRdhi8ENSR5MHq), settler, relayer | funder back to 9.951 |
 
+**0.10 USDC re-run** (same contract after `UPGRADE=1`, stake set by the deploy script's
+`set_entry_stake`, vault seed 0.3 USDC = 1.5 x 0.10 x 2, server from main 94a4ec0):
+
+| Step | Tx | Result |
+|---|---|---|
+| redeploy + stake 0.10 | [upgrade](https://testnet.nearblocks.io/txns/838neNYFYTwjaee5NXn2AF2VkrKnDGFP2jwzVkhfJjB2) | `config().entry_stake = 100000` |
+| vault seed 0.3 USDC | [seed](https://testnet.nearblocks.io/txns/EmSpz9sCLSin9HAAoQzhyhDxebk9dLdbu6YXGUSfgr4r) | free 300000 |
+| real match 1 | tickets [1](https://testnet.nearblocks.io/txns/9WpeJDAXpfhg5ypzPx6ZkwVvcwgCk44RhW49gqPsWkGu) [2](https://testnet.nearblocks.io/txns/C9yRFMC59iECtmD9yCBKHhbaj7WMmnshEQVCam4vdfk4), [settle](https://testnet.nearblocks.io/txns/gr6i6XNHWmndyTogiBUALWvJvbuPxxMUPuaLVM4gqPZ) | stakes 0.2, budget 0.3, lent 0.231 all repaid, no survivor |
+| real match 2 | tickets [1](https://testnet.nearblocks.io/txns/9NXLsQUZ8PTVKtN7PHsSiK3DkSyNk42K1nPNr2J9LebM) [2](https://testnet.nearblocks.io/txns/HFodKMtXrgy32DiCyv7isMmzp9kWuCDx7hfujKzrwSdb), [settle](https://testnet.nearblocks.io/txns/DGX4iipgXsv4hdnbg6aBKmoHfEJDa4xCq4MN4kKKehN3) | lent 0.217 all repaid, no survivor |
+| no-survivor settle | [settle](https://testnet.nearblocks.io/txns/6Gi2LHV3u31Yh8F7EcCEHkUDza1fK2wxAve9vqkyhTfW) | vault +0.196 (leftover + fees) |
+| stolen session key | none | refused (DepositWithFunctionCall, MethodNameMismatch, relayer 400) |
+
+Gas per match is the same at 0.10 (settler about 0.0007 NEAR, relayer about 0.0002 per ticket).
+
 **Net cost of the whole day: 0.049 NEAR.** Peak NEAR needed at once: 2.7 (now 2.75 with the fixes).
 
 Mistakes the rehearsal caught (all fixed above):
 1. Settler funded 0.1 NEAR could not send `open_match` (`NotEnoughBalance`, 100 Tgas reserves 0.101 NEAR). Now 0.25.
 2. 2.3 NEAR left 0.038 NEAR of storage headroom, about 25 matches. Now 2.75.
 3. A 0.5 USDC vault seed cannot back a 1 USDC match (needs 1.5 x stake x players). Formula added.
-4. 0.10 USDC needs the server to read the stake from the contract first. Marked as a blocker.
+4. 0.10 USDC needed the server to read the stake from the contract. Fixed (94a4ec0) and re-run.
+6. Right after `UPGRADE=1` the script's next view hit a node still serving the old code
+   (MethodNotFound). The deploy and owner txs now wait for FINAL.
 5. The "name is free" check prints an error, cleanup's "tiny contract" had no recipe, and the
    server's ready line is now JSON. All spelled out.
