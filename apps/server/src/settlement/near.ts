@@ -36,7 +36,9 @@ export class NearSettlement implements Settlement {
       return { network, hash: "" };
     }
     try {
-      return { network, hash: await this.chain.call("settle", toSettleArgs(result)) };
+      // Bad debt is paid from the contract reserve, so the args must fit the reserve it has now.
+      const reserve = BigInt((await this.chain.view<string>("reserve")) ?? "0");
+      return { network, hash: await this.chain.call("settle", toSettleArgs(result, { reserve })) };
     } catch (err) {
       const after = await this.chain.view<OnchainMatch>("match_of", { match_id: result.matchId });
       if (after?.status === "Settled" && after.head === head) return { network, hash: "" };

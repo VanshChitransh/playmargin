@@ -30,7 +30,8 @@ import { sharedDb, userForAccount } from "../db";
 import { settlementFor, sharedChain } from "../settlement";
 import { admitFree, chargeEntry } from "./freeMatch";
 import { admitPaid, refundTickets, seatedAccounts } from "./paidMatch";
-import { paidStakeBase, wrongStake } from "../settlement/stake";
+import { boundStake, paidStakeBase, wrongStake } from "../settlement/stake";
+import type { Chain } from "../settlement/chain";
 import { InputQueue } from "./input";
 import { clientIp, joinLimit, rooms } from "./guard";
 import { log, ticks } from "../obs";
@@ -89,6 +90,8 @@ export class MatchRoom extends Room {
   private opening: "none" | "pending" | "ok" | "failed" = "none";
   /** Paid: the contract's entry stake (USDC base units), read fresh at the 3-2-1. Free rooms ignore it. */
   private stakeBase = 1_000_000;
+  /** open_match landed: tickets are bound, so only reclaim (not refund_ticket) frees them. */
+  private bound = false;
   private key: RoomKey = { mode: "free", roomCode: null };
   private startNow = false;
   private joined = 0;
@@ -345,16 +348,20 @@ export class MatchRoom extends Room {
   private openOnChain(): void {
     this.opening = "pending";
     const chain = sharedChain();
-    const accounts = this.roster().flatMap((p) => (p.accountId ? [p.accountId] : []));
+    const accounts = this.staked();
     const ready = async () => {
       if (!chain) throw new Error("paid mode is off");
       // Fresh stake, and every ticket must carry it: a mixed-stake match can never settle.
       this.stakeBase = await paidStakeBase(chain, true);
       const wrong = await wrongStake(chain, accounts, this.stakeBase);
       if (wrong.length) throw new Error(`tickets with another stake: ${wrong.join(", ")}`);
+      await this.droneAccounts(chain);
       const preview = newWorld(this.seed, this.key.mode, this.roster(), this.roomId, this.stakeBase);
       startMatch(preview, 0);
       await this.log.reserve(preview);
+      this.bound = true;
+      // Settle at the stake open_match actually bound (a ticket can change after wrongStake).
+      this.stakeBase = await boundStake(chain, accounts, this.roomId);
     };
     ready().then(
       () => (this.opening = "ok"),
@@ -367,10 +374,28 @@ export class MatchRoom extends Room {
 
   /** open_match failed (vault low, ticket gone): nobody played, so refund every ticket and close. */
   private abort(): void {
-    const accounts = [...this.world.blobs.values()].flatMap((b) => (b.accountId ? [b.accountId] : []));
-    this.broadcast("aborted", { reason: "The match could not start on NEAR. Your stake is back in your balance." });
-    void refundTickets(accounts).finally(() => this.disconnect());
+    // Tickets bound to an open match only come back by reclaim after the deadline, not by refund.
+    const reason = this.bound
+      ? "The match could not start on NEAR. Reclaim your stake from your balance in 15 minutes."
+      : "The match could not start on NEAR. Your stake is back in your balance.";
+    this.broadcast("aborted", { reason });
+    void (this.bound ? Promise.resolve() : refundTickets(this.staked())).finally(() => this.disconnect());
     this.enter("ENDED", false);
+  }
+
+  /** NEAR accounts holding a ticket in this room (drone accounts hold none). */
+  private staked(): string[] {
+    return [...this.world.blobs.values()].flatMap((b) => (b.accountId && b.kind !== "drone" ? [b.accountId] : []));
+  }
+
+  /** A7: drone-N.<contract> earns its bounties on chain, but only once the contract registered it. */
+  private async droneAccounts(chain: Chain): Promise<void> {
+    for (const b of this.world.blobs.values()) {
+      if (b.kind !== "drone") continue;
+      const account = `${b.id}.${chain.cfg.contractId}`;
+      const ok = await chain.view<boolean>("is_agent", { account_id: account }).catch(() => false);
+      b.accountId = ok === true ? account : null; // unregistered: the bounty goes to the reserve
+    }
   }
 
   private roster(): PlayerSeed[] {
@@ -381,7 +406,7 @@ export class MatchRoom extends Room {
   private accountSeats(): Map<string, string> {
     const db = sharedDb();
     const seats = new Map<string, string>();
-    for (const b of this.world.blobs.values()) if (b.accountId) seats.set(b.id, userForAccount(db, b.accountId));
+    for (const b of this.world.blobs.values()) if (b.accountId && b.kind !== "drone") seats.set(b.id, userForAccount(db, b.accountId));
     return seats;
   }
 

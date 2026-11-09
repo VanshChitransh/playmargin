@@ -31,3 +31,19 @@ export async function wrongStake(chain: Chain, accounts: string[], base: number)
   const tickets = await Promise.all(accounts.map((a) => chain.view<Ticket | null>("ticket_of", { account_id: a })));
   return accounts.filter((_, i) => Number(tickets[i]?.stake ?? -1) !== base);
 }
+
+/**
+ * The stake open_match actually bound for `matchId`. A ticket can change between wrongStake and
+ * open_match (reclaim, then enter again at a new stake), so the room settles at what the chain holds.
+ * Throws on mixed stakes: that match can never settle, and the players reclaim after the deadline.
+ */
+export async function boundStake(chain: Chain, accounts: string[], matchId: string): Promise<number> {
+  const tickets = await Promise.all(accounts.map((a) => chain.view<Ticket | null>("ticket_of", { account_id: a })));
+  if (tickets.some((t) => t?.match_id !== matchId)) throw new Error(`a ticket is not bound to ${matchId}`);
+  const stakes = new Set(tickets.map((t) => Number(t?.stake)));
+  if (stakes.size !== 1) throw new Error(`mixed stakes bound to ${matchId}: ${[...stakes].join(", ")}`);
+  const base = Number(tickets[0]?.stake);
+  microPerBase(base);
+  if (base !== cached?.base) log.warn("stake_changed_at_open", { matchId, baseUnits: base });
+  return base;
+}

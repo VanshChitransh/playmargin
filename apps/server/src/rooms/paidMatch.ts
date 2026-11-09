@@ -73,7 +73,8 @@ export async function admitPaid(opts: unknown): Promise<{ accountId: string }> {
   if (!t) throw new Error("no ticket: enter the arena first");
   if (t.match_id) throw new Error("ticket already in a match");
   // A mixed-stake match can never settle on chain.
-  if (Number(t.stake) !== stake) throw new Error("your ticket is for an older stake: reclaim it and enter again");
+  // The cached stake can be up to 60 s old after set_entry_stake: re-read before refusing.
+  if (Number(t.stake) !== stake && Number(t.stake) !== (await paidStakeBase(chain, true))) throw new Error("your ticket is for an older stake: reclaim it and enter again");
   return { accountId };
 }
 
