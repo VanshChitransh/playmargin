@@ -44,7 +44,28 @@ export class MatchConnection {
   async join(opts: JoinOpts, judge = false): Promise<void> {
     // Server rooms: "judge" = the seeded Judge Run, "private" = filtered by roomCode, else "match".
     const name = judge ? "judge" : opts.roomCode ? "private" : "match";
-    this.room = await new Client(ENDPOINT).joinOrCreate(name, opts);
+    this.wire(await new Client(ENDPOINT).joinOrCreate(name, opts));
+  }
+
+  /**
+   * After a reload mid-match, take the same seat back (the server holds it with
+   * allowReconnection). Resolves false when there is no seat to resume.
+   */
+  async resume(): Promise<boolean> {
+    const token = seat.get();
+    if (!token) return false;
+    try {
+      this.wire(await new Client(ENDPOINT).reconnect(token));
+      return true;
+    } catch {
+      seat.clear(); // the match is over or the hold expired: join fresh
+      return false;
+    }
+  }
+
+  private wire(room: Room): void {
+    this.room = room;
+    seat.set(room.reconnectionToken);
     this.room.onStateChange((raw) => {
       const s = raw as RoomState;
       this.buffer.push({ at: this.stamp(s.tick), frame: this.toFrame(s) });
@@ -83,6 +104,7 @@ export class MatchConnection {
   }
 
   leave(): void {
+    seat.clear(); // leaving on purpose: a later reload must not pull me back in
     void this.room?.leave();
     this.listeners.clear();
   }
@@ -139,3 +161,28 @@ export function guestKey(): string {
     return crypto.randomUUID();
   }
 }
+
+/** This tab's seat token (sessionStorage: survives a reload, not a new tab). */
+const seat = {
+  get(): string | null {
+    try {
+      return sessionStorage.getItem("margin.seat");
+    } catch {
+      return null;
+    }
+  },
+  set(t: string): void {
+    try {
+      sessionStorage.setItem("margin.seat", t);
+    } catch {
+      /* private mode: a reload just joins a new room */
+    }
+  },
+  clear(): void {
+    try {
+      sessionStorage.removeItem("margin.seat");
+    } catch {
+      /* nothing stored */
+    }
+  },
+};

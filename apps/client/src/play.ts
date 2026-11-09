@@ -13,6 +13,7 @@ import type { Outcome } from "./game/receipt";
 import { shareRoom } from "./net/room-code";
 import { Controls } from "./input/controls";
 import { MatchConnection, guestKey } from "./net/client";
+import { refusalWords } from "./net/refusal";
 import { ArenaRenderer } from "./render/arena";
 import { rerender, type Screen } from "./router";
 import { showAborted, showDeath, showResults } from "./screens/overlays";
@@ -45,6 +46,11 @@ async function connect(roomCode?: string, judge = false): Promise<Source> {
   offlineWhy = "";
   const paid = paidSeat;
   paidSeat = null;
+  // Reloaded mid-match: take the held seat back before anything else.
+  if (!paid && !roomCode && !judge) {
+    const back = new MatchConnection();
+    if (await back.resume()) return back;
+  }
   // A paid seat never falls back to offline practice: the ticket is real, so the error must show.
   if (paid) {
     const conn = new MatchConnection();
@@ -59,14 +65,10 @@ async function connect(roomCode?: string, judge = false): Promise<Source> {
       return conn;
     } catch (e) {
       conn.leave();
-      console.warn("server unreachable, offline practice", e);
+      console.warn("join failed, offline practice", e);
       // The server said no (not just silence): tell the player why they are offline.
-      const msg = (e as Error).message ?? "";
-      offlineWhy = /credit/i.test(msg)
-        ? "Out of free credits for today, playing offline practice. Credits top up tomorrow."
-        : /full|restarting|too many/i.test(msg)
-          ? "Arenas are busy right now, playing offline practice."
-          : "";
+      const why = refusalWords((e as Error).message ?? "");
+      offlineWhy = why && `${why} Playing offline practice meanwhile.`;
     }
   }
   return new LocalMatch({ seed: (Date.now() >>> 0) % 1e9, withMe: true, bots: 11, warmupS: 8 });

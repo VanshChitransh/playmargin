@@ -1,0 +1,12 @@
+// Join refusals from the server, turned into game words for the status line.
+
+/**
+ * A join error in game words, or "" when the server simply did not answer (offline practice
+ * needs no excuse then). Unknown refusals show the server's own reason.
+ */
+export function refusalWords(message: string): string {
+  if (!message || /timeout|failed to fetch|fetch failed|networkerror|econnrefused|websocket|load failed/i.test(message)) return "";
+  if (/credit/i.test(message)) return "Out of free credits for today. Credits top up tomorrow.";
+  if (/full|restarting|too many|rate|429/i.test(message)) return "Arenas are busy right now. Try again in a minute.";
+  return `The server said: ${message}`;
+}
