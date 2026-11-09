@@ -118,6 +118,9 @@ export interface World {
   cashedOut: Micro;
   /** One rate per match, fixed before it starts from vault utilisation. */
   ratePerMinBps: number;
+  /** Paid rooms: the contract's entry stake in USDC base units (1 USDC = 1e6). The game itself is the
+   *  same at any stake (an entry is always ENTRY_PAID_MICRO); only the Micro to USDC rate follows it. */
+  stakeBase: number;
   blobs: Map<string, Blob>;
   food: Food[];
   /** Interest and zone food not yet big enough for a whole pellet: dropped one pellet at a time so
@@ -150,4 +153,6 @@ export interface SettleResult {
   fees: Micro;
   head: string;
   seq: number;
+  /** Paid rooms: entry stake in USDC base units from MATCH_START (absent = 1e6 = 1 USDC). */
+  stakeBase?: number;
 }
