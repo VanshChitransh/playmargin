@@ -6,6 +6,7 @@
 import { isValidAccountId, verifyNep413Signature } from "near-kit";
 import { log } from "../obs";
 import { sharedChain } from "../settlement";
+import { assertStakeMatches } from "../settlement/stake";
 import type { Chain } from "../settlement/chain";
 
 interface Ticket {
@@ -65,6 +66,7 @@ export const seatedAccounts = new Set<string>();
 export async function admitPaid(opts: unknown): Promise<{ accountId: string }> {
   const chain = sharedChain();
   if (!chain) throw new Error("paid mode is off on this server");
+  await assertStakeMatches(chain);
   const accountId = await verifyJoin(chain, (opts as { join?: unknown } | null)?.join);
   const t = await chain.view<Ticket | null>("ticket_of", { account_id: accountId });
   if (!t) throw new Error("no ticket: enter the arena first (1 USDC)");
