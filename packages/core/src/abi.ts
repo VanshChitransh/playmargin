@@ -16,18 +16,21 @@ export interface OpenMatchArgs {
 }
 
 /**
- * settle (settler only). Matches contracts/margin/src/arena.rs: the contract asserts
- * sum(payouts) + vault_repaid + interest_to_vault + reserve == stakes + budget and
- * vault_repaid <= budget. Build it with toSettleArgs, never by hand.
+ * settle (settler only), = contracts/margin/src/arena.rs settle. The contract asserts
+ * sum(payouts) + vault_repaid + interest_to_vault + fees + reserve == stakes + lent,
+ * lent <= budget reserved at open, vault_repaid <= lent. Build it with toSettleArgs, never by hand.
  */
 export interface SettleArgs {
   match_id: string;
   /** [account_id, amount] pairs. */
   payouts: Array<[string, U128]>;
-  /** Principal back plus the unused budget (budget - lent + repaid); less than budget only on bad debt. */
+  /** Principal the vault lent in this match. */
+  lent: U128;
+  /** Principal repaid; lent - vault_repaid is bad debt, covered by the contract reserve. */
   vault_repaid: U128;
-  /** Interest plus the vault share of borrow fees. */
   interest_to_vault: U128;
+  /** Vault share of borrow fees (the rest is inside reserve). */
+  fees: U128;
   /** Reserve share plus Micro-to-USDC rounding dust. */
   reserve: U128;
   seq: number;

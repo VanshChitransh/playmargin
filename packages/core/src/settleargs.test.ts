@@ -33,18 +33,24 @@ async function paidMatch(seed: number) {
 }
 
 describe("toSettleArgs", () => {
-  it("passes the contract's conservation check on 10 paid matches", async () => {
+  it("passes the contract's checks (arena.rs settle) on 10 paid matches", async () => {
+    let revolving = 0;
     for (let seed = 1; seed <= 10; seed++) {
       const { w, result } = await paidMatch(seed);
       const a = toSettleArgs(result);
       const stakes = 3n * 1_000_000n;
       const budget = (stakes * 15_000n) / 10_000n;
-      const out = a.payouts.reduce((s, [, v]) => s + BigInt(v), 0n) + BigInt(a.vault_repaid) + BigInt(a.interest_to_vault) + BigInt(a.reserve);
-      expect(out).toBe(stakes + budget);
-      expect(BigInt(a.vault_repaid) <= budget).toBe(true);
+      const out = a.payouts.reduce((s, [, v]) => s + BigInt(v), 0n) + BigInt(a.vault_repaid) + BigInt(a.interest_to_vault) + BigInt(a.fees) + BigInt(a.reserve);
+      expect(out).toBe(stakes + BigInt(a.lent));
+      // The budget revolves (repay then BOOST again), so total lent may pass it; bad debt never can.
+      expect(BigInt(a.lent) - BigInt(a.vault_repaid) <= budget).toBe(true);
+      if (BigInt(a.lent) > budget) revolving++;
+      expect(BigInt(a.vault_repaid) <= BigInt(a.lent)).toBe(true);
       expect(a.payouts.every(([acct]) => acct.endsWith(".testnet"))).toBe(true);
       expect(w.vault.budget).toBe(Number(budget) * 100);
     }
+    // At least one real match lends more than its budget in total: the contract must allow it.
+    expect(revolving).toBeGreaterThan(0);
   });
 
   it("refuses a payout with no account", () => {
