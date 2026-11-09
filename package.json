@@ -15,7 +15,9 @@
     "test": "vitest run --passWithNoTests",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "format": "prettier --write .",
-    "check:dashes": "! git grep -nIP '[\\x{2013}\\x{2014}]' -- . ':!package-lock.json'"
+    "check:dashes": "! git grep -nIP '[\\x{2013}\\x{2014}]' -- . ':!package-lock.json'",
+    "demo": "tsx tools/sim/demo.ts",
+    "sim": "tsx tools/sim/sim.ts"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
