@@ -8,7 +8,7 @@ import { mulBps, mulDiv, mulDivUp, toMicro, assertMicro } from "./units";
 
 function blob(over: Partial<Blob> = {}): Blob {
   return {
-    id: "a", kind: "human", label: "a", accountId: null, x: 500, y: 500, dirX: 1, dirY: 0, vx: 0, vy: 0, boostHeld: false, boostMinUntil: 0, burst: 0, burstReadyAt: 0, sputterUntil: 0, pendingRepay: 0, repayHeld: false,
+    id: "a", kind: "human", label: "a", accountId: null, x: 500, y: 500, dirX: 1, dirY: 0, vx: 0, vy: 0, boostHeld: false, boostMinUntil: 0, burst: 0, burstReadyAt: 0, sputterUntil: 0, pendingRepay: 0, repayPerTick: 0, repayHeld: false,
     mass: 80 * MICRO, debt: 0, boostFees: 0, payout: 0, lastInputAt: -1e9, pendingBorrow: 0, boostUntil: 0, repayMinUntil: 0,
     shieldUntil: 0, spikeImmuneUntil: 0, redSince: null, lastThreatAt: -1e9, cashout: null,
     state: "alive", lastInput: null, ...over,
@@ -101,10 +101,10 @@ describe("motion", () => {
     expect(e.x).toBe(500);
     const w = blob({ dirX: -1, dirY: 0 });
     move(w, 10, 100, { w: 1000, h: 1000 });
-    expect(w.x).toBe(radius(w.mass) * 0.85); // centre stops 0.85 radius from the wall
+    expect(w.x).toBe(radius(w.mass) * 0.65); // centre stops 0.65 radius from the wall
     expect(w.vx).toBe(0);
     const big = blob({ mass: 5000 * MICRO, x: 990, y: 990, dirX: 1, dirY: 1 });
     move(big, 1, 100, { w: 1000, h: 1000 });
-    expect([big.x, big.y]).toEqual([1000 - radius(big.mass) * 0.85, 1000 - radius(big.mass) * 0.85]); // corner
+    expect([big.x, big.y]).toEqual([1000 - radius(big.mass) * 0.65, 1000 - radius(big.mass) * 0.65]); // corner
   });
 });

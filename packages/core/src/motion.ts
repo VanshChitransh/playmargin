@@ -54,7 +54,7 @@ export function easeS(b: Blob, tick = 0): number {
 
 /**
  * Ease velocity toward dir * speed, move by it, and keep the centre at least WALL_INSET x the
- * current radius from every wall: only a thin slice (15% of the radius) presses past the wall
+ * current radius from every wall: up to 35% of the radius presses past the wall
  * line, where the client gently flattens it.
  */
 export function move(b: Blob, dtS: number, tick: number, arena: { w: number; h: number }): void {

@@ -45,7 +45,7 @@ agar.io where the mass is money. You start a 90 second match with 80 mass bought
 |---|---|---|
 | **Hold BOOST** to grow fast and move 1.5x | Borrow from the room's vault, 1x your equity per second, up to 2.5x leverage, 1% fee | `packages/core/src/economy.ts` (`boostHold`, `flushBoost`) |
 | Watch your **health ring** go green, yellow, red | Health factor = mass x 0.8 / debt. Interest drains mass every second | `economy.ts` (`hfBps`, `ring`, `accrueInterest`) |
-| **Hold REPAY** (pays 1.5x your own money a second, a full-cap loan clears in about 1 s) | Deleverage. In red, REPAY is the only way out | `economy.ts` (`repayHold`) |
+| **Hold REPAY** (a hold clears the whole loan in 0.8 s, a tap pays 1/8) | Deleverage. In red, REPAY is the only way out | `economy.ts` (`repayHold`) |
 | Get touched while red, or fall below HF 0.90 | **Liquidation**: the vault takes its loan back, the popper gets an 8% bounty | `economy.ts` (`liquidate`, `keeperCheck`) |
 | **Cash out** (45 to 80 s, a 4 s channel) or survive the bell | Close the position and keep your equity | `economy.ts` (`cashOut`) |
 
@@ -54,8 +54,8 @@ blobs eat smaller ones. The full rulebook is mirrored as constants in
 [`packages/core/src/constants.ts`](packages/core/src/constants.ts).
 
 **The thesis, measured.** In a 300-match sim with one greedy player who holds BOOST to the cap
-(`npm run sweep`), the greedy player is liquidated in about 50% to 76% of matches, while a careful
-newcomer who never borrows survives about 70% of matches and finishes at median rank 4 of 12
+(`npm run sweep`), the greedy player is liquidated in about 57% to 79% of matches, while a careful
+newcomer who never borrows survives about 67% of matches and finishes at median rank 4 of 12
 (`npx tsx tools/sim/human.ts`). Safe play survives. Greed gets liquidated.
 
 ### Who you play with
@@ -87,7 +87,7 @@ Every feature, why it is there, the code, and a testnet transaction: [`docs/NEAR
 
 - **Money is never created or destroyed.** `npm run sim -- --matches 500` plays 500 full matches,
   checks conservation every tick and replays every log: 0 micro-units leaked, settle equals the live
-  room in 500 of 500 (2,940,000 ticks, about 213,000 logged money events, fresh-clone run 9 Nov).
+  room in 500 of 500 (2,940,000 ticks, about 177,000 logged money events, fresh-clone run 9 Nov).
 - **One pure settle, refuses forged logs.** `packages/core/src/settle.test.ts` covers forgeries a live
   room cannot produce (borrow and walk away, skimmed interest, leftover paid twice, an agent eating
   a human in the first 30 s).
@@ -135,15 +135,15 @@ npm run demo
 ```
 
 `npm run demo` plays one full paid match headless with the real engine and the real bots
-(6 bot-driven players + 2 liquidator drones), narrates it, then proves it (seed 136, about 10 s).
-You will see Player-5 eat two players, hit a spike at 9.1 s with a big loan and go red, Drone-1
-liquidate Player-5 at 9.3 s, and Drone-2 liquidate Player-4 at 25.9 s. The last three lines are the proof (they are the same on every
-run, and change only if the rules change):
+(6 bot-driven players + 2 liquidator drones), narrates it, then proves it (seed 109, about 10 s).
+You will see Drone-2 liquidate Player-5 at 20.6 s, Player-6 go red at 29.1 s and REPAY out, then
+go red again at 54.1 s and get liquidated by Drone-2 at 54.5 s. The last three lines are the proof
+(they are the same on every run, and change only if the rules change):
 
 ```
-vault: lent 933.3, repaid 933.3, interest 196.6, fees 7.0 · reserve 10.3
-hash chain: 171 events, head 9568dac9f71f390c...
-5880 ticks · 0 micro-units created or destroyed · settle == live ✓ · 10.3 s
+vault: lent 1035.0, repaid 1035.0, interest 116.0, fees 7.8 · reserve 7.3
+hash chain: 238 events, head 90eb15d274d6dcf4...
+5880 ticks · 0 micro-units created or destroyed · settle == live ✓ · 10.4 s
 ```
 
 `npm install` takes about a minute. npm 11 may warn that some install scripts were skipped, and
@@ -172,18 +172,18 @@ the room fills with labelled AI agents (🤖).
 
 | # | Do | See |
 |---|---|---|
-| 1 | `npm run demo` | A narrated paid match: BOOSTs (loans), eats, two players liquidated by the drones (9.3 s and 25.9 s), payouts and the drones' bounties, then `0 micro-units created or destroyed` and `settle == live` |
+| 1 | `npm run demo` | A narrated paid match: BOOSTs (loans), eats, two players liquidated by Drone-2 (20.6 s and 54.5 s), one of them escaping red once with REPAY first, payouts and the drones' bounties, then `0 micro-units created or destroyed` and `settle == live` |
 | 1b | `npm run e2e:local` | The strongest end-to-end proof: boots the real game server with a fresh database, two network clients play a full free match, then it checks the match settled, the credit ledger is exact for both players, and replaying the served log gives exactly the stored payouts. Ends with `E2E OK` (about 35 s). On the way it prints one expected error, `you are already in this match`: that is the test proving the server refuses a second seat for the same player |
-| 2 | `npm run sim -- --matches 500` | 500 full matches (2,940,000 ticks, about 213,000 logged money events) with the conservation check every tick, every hash chain verified, `0 micro-units created or destroyed` and `settle == live in 500/500` (1 to 3 minutes) |
+| 2 | `npm run sim -- --matches 500` | 500 full matches (2,940,000 ticks, about 177,000 logged money events) with the conservation check every tick, every hash chain verified, `0 micro-units created or destroyed` and `settle == live in 500/500` (1 to 3 minutes) |
 | 3 | `npm test` | The whole TypeScript suite passes: 200 tests in 42 files (engine, settle, bots, server, client logic), about 15 s |
 | 4 | `cd contracts/margin && cargo test` | 38 contract unit tests and 3 near-sandbox integration tests pass. Slow: about 7 minutes, most of it downloading and running near-sandbox |
 | 5 | `npm run dev`, open http://localhost:1234, press **Practice free** | A 90 s match: steer with the mouse, hold Space = BOOST (borrow, like nitro: the fuel ring empties as you borrow), hold R = REPAY, E = cash out. Watch your ring go green, yellow, red |
 | 6 | Hold BOOST until the fuel ring is empty, then run into a big spike | Your ring turns red. Within a moment a blob or a drone touches you: "LIQUIDATED", and your receipt shows what the vault took back |
 | 7 | After any match, open the receipt's Verify link (`/#/verify/<id>`) | The browser replays the log with the same code as the server, checks every hash, and shows settle == what you were paid. Press "Tamper" and the exact broken event turns red |
 | 8 | Open `/#/judge` | Judge Run: a published seed (20261114), normal rules, Drone-1 hunting red blobs. Most first-timers get greedy |
-| 9 | `npm run sweep -- 300` | The balance table behind the rules, for the shipped settings: a greedy player holds BOOST to the cap in every match. Measured: 0.75 to 1.05 liquidations per match, the greedy player popped in 49% (practised) to 76% (first-timer) of matches. A few minutes |
-| 9b | `npx tsx tools/sim/human.ts 60` | Can a newcomer win? A careful never-BOOST newcomer bot against 11 agents: measured median rank 4 of 12, top 3 in about 45%, survives about 70% |
-| 9c | `npx tsx tools/sim/contacts.ts 40` | Do players meet on the big map? Rooms of 12 agents and no human: about 14 contacts per minute, a typical player's first contact at about 3 s. Liquidations here are rare (about 0.1 per match) because agents borrow carefully: greed is what brings liquidations (row 9) |
+| 9 | `npm run sweep -- 300` | The balance table behind the rules, for the shipped settings: a greedy player holds BOOST to the cap in every match. Measured: 0.74 to 0.93 liquidations per match, the greedy player popped in 57% (practised) to 79% (first-timer) of matches. A few minutes |
+| 9b | `npx tsx tools/sim/human.ts 60` | Can a newcomer win? A careful never-BOOST newcomer bot against 11 agents: measured median rank 4 of 12, top 3 in about 35%, survives about 67% |
+| 9c | `npx tsx tools/sim/contacts.ts 40` | Do players meet on the big map? Rooms of 12 agents and no human: about 17 contacts per minute, a typical player's first contact at about 3.5 s. Liquidations here are rare (about 0.1 per match) because agents borrow carefully: greed is what brings liquidations (row 9) |
 | 10 | `npm run soak -- --rooms 50` | 50 rooms of 12 on the real server for one full match (about 100 s at any room count): CPU per room tick and match length under load. Measured 0.17 ms per room tick at 50 rooms and 0.23 ms at 10 (budget 4 ms), every match 90 s |
 | 11 | Put `NEAR_AI_API_KEY` in `.env`, then `npm run commander` (without a key it prints one line saying so and exits normally) | One live match with the AI commander on NEAR AI Cloud. Each new plan prints with its one-line rationale |
 

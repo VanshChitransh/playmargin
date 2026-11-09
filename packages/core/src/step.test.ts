@@ -165,22 +165,22 @@ describe("step", () => {
       expect(save).toEqual({ type: "clutchSave", blob: "r", clutch: true });
       savedAt = t;
     }
-    // Debt 120 -> 90 (HF 1.0) at 1.5 x equity 22.5 a second = 0.5625 a tick: 53.3, so tick 54.
-    expect(savedAt).toBe(54);
+    // The hold clears 120 in 0.8 s (2.5 a tick): debt 90 (HF 1.0) after 12 ticks.
+    expect(savedAt).toBe(12);
     expect(w.pendingLog.some((e) => e.type === "REPAY")).toBe(false); // still pending while held
     const ev = press(savedAt + 1, false);
     expect(ev.some((e) => e.type === "repay")).toBe(true);
     expect(red.pendingRepay).toBe(0);
   });
 
-  it("a REPAY tap (one message) still pays a 0.1 s chunk", () => {
+  it("a REPAY tap (one message) pays a 0.1 s chunk, 1/8 of the loan", () => {
     const a = makeBlob({ id: "a", mass: u(200), debt: u(100) });
     const w = makeWorld([a]);
     const send = (t: number, repay: boolean) =>
       step(w, new Map([["a", { seq: t, dirX: 0, dirY: 0, boost: false, repay, cashout: false }]]), t);
     send(1, true);
     for (let t = 2; t <= 1 + sToTicks(0.4); t++) send(t, false);
-    expect(a.debt).toBe(u(85)); // equity 100 x 1.5 x 0.1 s = 15
+    expect(a.debt).toBe(u(100) - 6 * Math.ceil(u(100) / 48)); // 6 ticks of 100 / 48
     expect(w.pendingLog.filter((e) => e.type === "REPAY")).toHaveLength(1);
   });
 

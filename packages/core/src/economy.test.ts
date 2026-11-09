@@ -36,11 +36,10 @@ describe("RULES worked check", () => {
     expect(ring(a)).toBe("red");
     expect(keeperCheck(w, a, 10)).toBeNull(); // red, not dead
 
-    // Held REPAY pays 1.5x own money a second, linear: (22.5 + 1.2 fees) x 1.5 / 60 = 0.5925 a tick
-    // (fees shrink with the loan, so a touch less). Red ends at debt 90 (HF 1.0): 51 ticks, 0.85 s.
+    // A hold clears the whole loan in 0.8 s: 120 / 48 = 2.5 a tick. Red ends at debt 90 (HF 1.0): 12 ticks.
     let t = 20;
     while (ring(a) === "red") repayHold(w, a, t++);
-    expect(t - 20).toBe(51);
+    expect(t - 20).toBe(12);
     expect(a.debt).toBeLessThanOrEqual(u(90));
     expect(a.mass - a.debt).toBe(u(22.5)); // repaying never changes equity
     expect(w.pendingLog.filter((e) => e.type === "REPAY")).toHaveLength(0); // pending until release
@@ -116,12 +115,12 @@ describe("BOOST (hold to nitro)", () => {
     expect(leak(w)).toBe(0);
   });
 
-  it("a full-cap loan clears in 1 s of held REPAY", () => {
-    const a = makeBlob({ mass: u(200), debt: u(120) }); // equity 80: 2 units a tick
+  it("a hold clears the whole loan in 0.8 s, whatever its size", () => {
+    const a = makeBlob({ mass: u(200), debt: u(120) }); // 2.5 units a tick
     const w = makeWorld([a]);
     let t = 1;
     while (repayHold(w, a, t) > 0) t++;
-    expect(t - 1).toBe(60);
+    expect(t - 1).toBe(48);
     expect(a.debt).toBe(0);
     expect(leak(w)).toBe(0);
   });

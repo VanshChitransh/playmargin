@@ -23,6 +23,7 @@ export const R = {
   "ARENA_SIDE_PER_SQRT_PLAYER": 2600,
   "SPAWN_RING_MAX_PX": 1200,
   "PLAY_RADIUS_PX": 1800,
+  "ARENA_EDGE_MARGIN_PX": 600,
   "SPAWN_EDGE_MARGIN_PX": 300,
   "LT": 0.8,
   "HF_GREEN": 1.15,
@@ -43,7 +44,7 @@ export const R = {
   "BOOST_EMPTY_EASE_S": 0.1,
   "BOOST_EMPTY_SPUTTER_S": 0.3,
   "CLUTCH_RADIUS_PX": 300,
-  "WALL_INSET_RADII": 0.85,
+  "WALL_INSET_RADII": 0.65,
   "BASE_SPEED_PX_S": 480,
   "SPEED_REF_RADIUS_PX": 58,
   "SPEED_SIZE_EXP": 0.45,
@@ -75,7 +76,7 @@ export const R = {
     "vault": 0.15,
     "reserve": 0.05
   },
-  "REPAY_RATE_EQUITY_PER_S": 1.5,
+  "REPAY_CLEAR_S": 0.8,
   "REPAY_MIN_HOLD_S": 0.1,
   "RED_GRACE_MS": 150,
   "BOUNTY": 0.08,
@@ -157,7 +158,6 @@ export const RATE_AT_KINK_BPS = bps(R.RATE_PER_MIN.at_kink);
 export const RATE_SLOPE_ABOVE_BPS = bps(R.RATE_PER_MIN.slope_above);
 export const INTEREST_FOOD_BPS = bps(R.INTEREST_SPLIT.food);
 export const INTEREST_VAULT_BPS = bps(R.INTEREST_SPLIT.vault);
-export const REPAY_RATE_BPS = bps(R.REPAY_RATE_EQUITY_PER_S);
 export const BOUNTY_BPS = bps(R.BOUNTY);
 export const LIQ_FEE_BPS = bps(R.LIQ_FEE);
 export const EAT_TRANSFER_BPS = bps(R.EAT_TRANSFER);
