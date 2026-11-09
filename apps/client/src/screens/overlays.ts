@@ -22,7 +22,7 @@ const onDark = (html: string): string => html.replace("<button", '<button style=
 
 /** The pop moment. Returns the element so the caller can remove it when Watch is pressed. */
 export function showDeath(root: HTMLElement, d: NonNullable<Outcome["death"]>, act: (a: "watch" | "again" | "share") => void): HTMLElement {
-  const why = d.keeper ? "VAULT CLOSED YOUR LOAN" : `popped by ${esc(d.by)}`;
+  const why = d.eaten ? `eaten by ${esc(d.by)}` : d.keeper ? "VAULT CLOSED YOUR LOAN" : `popped by ${esc(d.by)}`;
   const greed =
     d.leverage >= 1.05
       ? `You were <b class="num">${d.leverage.toFixed(1)}x</b>, red for <b class="num">${Math.max(0, d.redS).toFixed(0)} s</b>.`
@@ -30,12 +30,12 @@ export function showDeath(root: HTMLElement, d: NonNullable<Outcome["death"]>, a
   const el = shell(
     root,
     `<div class="text-center">
-      <div class="stamp inline-block rounded-box border-[6px] border-liq px-6 py-2 font-display text-6xl text-liq sm:text-7xl">LIQUIDATED</div>
+      <div class="stamp inline-block rounded-box border-[6px] border-liq px-6 py-2 font-display text-6xl text-liq sm:text-7xl">${d.eaten ? "EATEN" : "LIQUIDATED"}</div>
       <p class="tag mt-6 text-paper">${why}</p>
       <p class="mt-2 text-lg text-paper">${greed}</p>
-      <p class="mt-1 text-sm text-muted">Tap REPAY earlier, or run before you go red.</p>
+      <p class="mt-1 text-sm text-muted">${d.eaten ? "A blob 15% bigger eats you on touch. Run, or grow first." : "Tap REPAY earlier, or run before you go red."}</p>
       <div class="mt-6 flex justify-center gap-4">${onDark(btn("again", "Play again", true))}${onDark(btn("watch", "Watch", false))}</div>
-      <button data-act="share" class="tag mt-5 text-paper underline">Get your Liquidation Certificate</button>
+      ${d.eaten ? "" : `<button data-act="share" class="tag mt-5 text-paper underline">Get your Liquidation Certificate</button>`}
     </div>`,
   );
   wire(el, act);
@@ -44,7 +44,7 @@ export function showDeath(root: HTMLElement, d: NonNullable<Outcome["death"]>, a
 
 /** The bell: a receipt whose lines add up to the final number. */
 export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "home" | "verify" | "share") => void, paid = false): HTMLElement {
-  const title = o.kind === "cashed" ? "CASHED OUT" : o.kind === "survived" ? "SURVIVED" : "LIQUIDATED";
+  const title = o.kind === "cashed" ? "CASHED OUT" : o.kind === "survived" ? "SURVIVED" : o.death?.eaten ? "EATEN" : "LIQUIDATED";
   const rows = o.lines
     .map((l) => `<div class="flex justify-between gap-6"><span>${esc(l.label)}</span><span class="num ${l.amount < 0 ? "text-liq" : ""}">${fmt(l.amount)}</span></div>`)
     .join("");
@@ -65,7 +65,7 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
       </div>
       <p class="mt-1 text-xs text-ink/60">${paid ? "Real dollars, paid to your balance when the match settles." : "Practice credits. Never cash, never bought."}</p>
       <div class="mt-5 grid grid-cols-[1.4fr_1fr_1fr] gap-3">${[btn("again", "Play again", true).replace("bg-paper", "bg-liq"), btn("verify", "Verify", false), btn("home", "Home", false)].map((b) => b.replace("px-5", "px-2").replace("text-xl", "text-lg")).join("")}</div>
-      ${o.death ? `<button data-act="share" class="tag mt-4 underline">Get your Liquidation Certificate</button>` : ""}
+      ${o.death && !o.death.eaten ? `<button data-act="share" class="tag mt-4 underline">Get your Liquidation Certificate</button>` : ""}
     </div>`,
   );
   wire(el, act);

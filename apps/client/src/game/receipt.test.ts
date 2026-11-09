@@ -29,4 +29,13 @@ describe("Receipt", () => {
     expect(o.end).toBe(0);
     expect(o.death).toMatchObject({ by: "\u{1F916} Agent-3", leverage: 2.5, redS: 6 });
   });
+
+  it("being eaten is a death too, without a certificate", () => {
+    const r = new Receipt("me");
+    r.event({ type: "eat", by: "big", victim: "me", gained: 60 });
+    const o = r.outcome([]);
+    expect(o.kind).toBe("popped");
+    expect(o.death).toMatchObject({ by: "big", eaten: true, keeper: false });
+    expect(o.lines[0]!.label).toBe("Eaten");
+  });
 });

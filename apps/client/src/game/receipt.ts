@@ -26,6 +26,8 @@ export interface Outcome {
     peakLeverage: number;
     /** Match second when the ring last left green before the pop: the moment to REPAY. */
     warnAtS: number | null;
+    /** Eaten by a bigger blob (not a liquidation): no certificate, different stamp. */
+    eaten?: boolean;
   };
 }
 
@@ -70,22 +72,26 @@ export class Receipt {
         break;
       case "eat":
         if (e.by === this.me) add(`Ate ${this.name(e.victim)}`, e.gained);
+        if (e.victim === this.me) this.died(this.name(e.by), false, true);
         break;
       case "pop":
         if (e.by === this.me) add(`Popped ${this.name(e.victim)}`, e.bounty);
-        if (e.victim === this.me) {
-          const m = this.lastMe;
-          this.death = {
-            by: e.keeper || !e.by ? "the vault" : this.name(e.by),
-            keeper: e.keeper,
-            leverage: m && m.equity > 0 ? (m.equity + m.owe) / m.equity : 0,
-            redS: this.redS,
-            peakLeverage: this.peakLev,
-            warnAtS: this.warnAt,
-          };
-        }
+        if (e.victim === this.me) this.died(e.keeper || !e.by ? "the vault" : this.name(e.by), e.keeper, false);
         break;
     }
+  }
+
+  private died(by: string, keeper: boolean, eaten: boolean): void {
+    const m = this.lastMe;
+    this.death = {
+      by,
+      keeper,
+      leverage: m && m.equity > 0 ? (m.equity + m.owe) / m.equity : 0,
+      redS: this.redS,
+      peakLeverage: this.peakLev,
+      warnAtS: this.warnAt,
+      eaten,
+    };
   }
 
   get popped(): boolean {
@@ -104,7 +110,7 @@ export class Receipt {
     if (this.fees) known.push({ label: "Borrow fees", amount: -this.fees });
     if (kind === "popped") known.push({ label: "Liquidated", amount: 0 });
     const food = end - this.start - known.reduce((s, l) => s + l.amount, 0);
-    const lines = kind === "popped" ? [{ label: "Lost to liquidation", amount: -this.start }] : [{ label: "Food and moves", amount: food }, ...known];
+    const lines = kind === "popped" ? [{ label: this.death?.eaten ? "Eaten" : "Lost to liquidation", amount: -this.start }] : [{ label: "Food and moves", amount: food }, ...known];
     return {
       kind,
       start: this.start,

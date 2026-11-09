@@ -27,7 +27,7 @@ export async function runChecks(log: LogEntry[], anchorHead?: string | null): Pr
   let books: Check;
   try {
     result = settle(log);
-    books = { state: "ok", detail: "Replayed every money event: 0 Micro created or destroyed." };
+    books = { state: "ok", detail: "Replayed every money event: not one millionth of a credit created or destroyed." };
   } catch (e) {
     books = { state: "bad", detail: e instanceof Error ? e.message : String(e) };
   }

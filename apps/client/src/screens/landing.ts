@@ -85,7 +85,7 @@ export const landing: Screen = (root) => {
       ].filter(([n]) => (n as number) > 0);
       const el = root.querySelector<HTMLElement>("[data-proof]");
       if (!el || !parts.length) return;
-      el.innerHTML = parts.map(([n, t]) => `<b class="num text-paper">${(n as number).toLocaleString()}</b> ${t}`).join(" · ");
+      el.innerHTML = parts.map(([n, t]) => `<b class="font-display text-lg text-ink">${(n as number).toLocaleString()}</b> ${t}`).join(" · ");
       el.classList.remove("hidden");
     })
     .catch(() => {});

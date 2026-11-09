@@ -17,7 +17,7 @@ const BEYOND = 3000;
 /** Spikes further than this from my edge never warn: "within reach" (RULES, Spikes). */
 const WARN_REACH = 500;
 /** World px visible across the short screen side at start size. */
-const VIEW_AT_START = 900;
+const VIEW_AT_START = 720;
 
 export type FrameSource = (nowMs: number) => Frame | null;
 
@@ -131,15 +131,8 @@ export class ArenaRenderer {
     if (key === this.zoneKey) return;
     this.zoneKey = key;
     this.zone.clear();
-    // Soft edge band instead of a hard wall line: the floor just greys out past the arena.
-    this.zone
-      .rect(-BEYOND, -BEYOND, f.arena.w + BEYOND * 2, f.arena.h + BEYOND * 2)
-      .fill({ color: C.edge, alpha: 0.45 })
-      .rect(0, 0, f.arena.w, f.arena.h)
-      .cut();
-    for (let i = 1; i <= 3; i++) {
-      this.zone.rect(-i * 10, -i * 10, f.arena.w + i * 20, f.arena.h + i * 20).stroke({ width: 10, color: C.edge, alpha: 0.18 * (4 - i) });
-    }
+    // agar.io edge: same grid on both sides, only a faint thin line marks the end.
+    this.zone.rect(0, 0, f.arena.w, f.arena.h).stroke({ width: 2, color: C.edge, alpha: 0.9 });
     if (shrinking) {
       const pad = Math.max(f.arena.w, f.arena.h);
       this.zone
@@ -165,7 +158,7 @@ export class ArenaRenderer {
         this.foodLayer.addChild(s);
       }
       s.position.set(fd.x, fd.y);
-      s.width = s.height = fd.r * 2 * (1 + 0.08 * Math.sin(this.lastT * 3 + fd.id));
+      s.width = s.height = fd.r * 2 * (0.94 + 0.06 * Math.sin(this.lastT * 3 + fd.id));
     }
     prune(this.foods, seen);
   }
@@ -226,7 +219,7 @@ export class ArenaRenderer {
     const { width, height } = this.app.screen;
     const base = Math.min(width, height) / this.view;
     // Zoom out as I grow so a boosted blob still sees its threats (agar.io feel).
-    const target = base * Math.min(1.2, Math.max(0.45, Math.pow(57 / Math.max(r, 1), 0.45)));
+    const target = base * Math.min(1.2, Math.max(0.4, Math.pow(57 / Math.max(r, 1), 0.5)));
     this.zoom += (target - this.zoom) * 0.08;
     this.world.scale.set(this.zoom);
     this.world.position.set(width / 2 - x * this.zoom, height / 2 - y * this.zoom);

@@ -176,6 +176,7 @@ export const play: Screen = (root, params) => {
           : "";
     if (params.code && !(s instanceof LocalMatch)) roomChip(root, params.code);
     receipt = new Receipt(s.me);
+    if (import.meta.env.DEV) (window as unknown as { __receipt: Receipt }).__receipt = receipt;
     s.onCommander = (r) => hud.commander(r);
     s.onAborted = (reason) => {
       ended = true;
@@ -185,7 +186,7 @@ export const play: Screen = (root, params) => {
     s.onEvent((e) => {
       receipt?.event(e);
       juice(e, s.me);
-      if (e.type === "pop" && e.victim === s.me && !ended) {
+      if ((e.type === "pop" || e.type === "eat") && e.victim === s.me && !ended) {
         const death = receipt!.outcome(lastFrame?.blobs ?? []).death!;
         overlay = showDeath(root, death, (a) => {
           if (a === "again") return again();
