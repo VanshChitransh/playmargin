@@ -13,16 +13,14 @@ type Cfg = {
   src?: Record<string, [string, string][]>;
   caution?: number;
 };
-// Candidates for the liquidation balance proposal (board, 9 Nov). Each runs twice: the greedy
-// player dodging spikes like a practised bot (caution 0.6) and like a first-timer (0.2).
-const repayOnly: [string, string] = ["const eaters = players\\(w\\)", "const eaters = players(w).filter((b) => ring(b) !== \"red\")"];
-const spikes = (k: number): [string, string] => ["SPIKES_PER_PLAYER = 2", `SPIKES_PER_PLAYER = ${k}`];
-const B = { SPIKE_BIG_SHARE: 0.5, SPIKE_LEVERAGE_MULT_MAX: 2.0, RED_GRACE_MS: 150 };
+// Balance B (approved 9 Nov) is now the real rules. "before" rebuilds the old rules for comparison.
+// Each runs twice: the greedy player dodging spikes like a practised bot (caution 0.6) and like a
+// first-timer (0.2).
+const redEatsFood: [string, string] = ["players\\(w\\)\\.filter\\(\\(b\\) => ring\\(b\\) !== \"red\"\\)", "players(w)"];
+const BEFORE = { RED_GRACE_MS: 300, SPIKE_LEVERAGE_MULT_MAX: 1.5, SPIKE_BIG_SHARE: 0.3, SPIKES_PER_PLAYER: 2 };
 const CONFIGS: Cfg[] = [0.6, 0.2].flatMap((caution) => [
-  { name: `baseline (caution ${caution})`, caution },
-  { name: `A: REPAY-only, 4 spikes, lev 2.0 (caution ${caution})`, caution, rules: { SPIKE_LEVERAGE_MULT_MAX: 2.0 }, src: { "step.ts": [repayOnly], "world.ts": [spikes(4)] } },
-  { name: `B: A + big 50%, grace 150 (caution ${caution})`, caution, rules: B, src: { "step.ts": [repayOnly], "world.ts": [spikes(4)] } },
-  { name: `C: B with 5 spikes (caution ${caution})`, caution, rules: B, src: { "step.ts": [repayOnly], "world.ts": [spikes(5)] } },
+  { name: `before B (caution ${caution})`, caution, rules: BEFORE, src: { "step.ts": [redEatsFood] } },
+  { name: `RULES now = B (caution ${caution})`, caution },
 ]);
 const extra = process.argv[3] ? (JSON.parse(process.argv[3]) as Cfg[]) : [];
 

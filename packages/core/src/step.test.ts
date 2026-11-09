@@ -77,7 +77,7 @@ describe("step", () => {
   });
 
   it("pops resolve before eats: a big red blob is popped by the small toucher", () => {
-    // Red (HF 0.923) and past the 300 ms grace; the small blob sits inside it.
+    // Red (HF 0.923) and past the 150 ms grace; the small blob sits inside it.
     const red = makeBlob({ id: "red", mass: u(300), debt: u(260), redSince: -100 });
     const small = makeBlob({ id: "small", mass: u(100), x: 520 });
     const w = makeWorld([red, small]);
@@ -88,18 +88,18 @@ describe("step", () => {
     expect(small.mass).toBeGreaterThan(u(100 + 20)); // bounty 8% of 260
   });
 
-  it("a red blob inside its grace eats food only, never blobs", () => {
+  it("a red blob eats nothing, not even food: REPAY is the only way out (balance B)", () => {
     const red = makeBlob({ id: "red", mass: u(300), debt: u(260) });
     const small = makeBlob({ id: "small", mass: u(100), x: 520 });
     const w = makeWorld([red, small]);
-    w.food.push({ id: 99, x: 480, y: 500, mass: u(1) });
+    w.food.push({ id: 99, x: 440, y: 500, mass: u(1) }); // inside red, out of small's reach
     w.pot += u(1);
     step(w, new Map(), 1);
     expect(small.state).toBe("alive");
     expect(red.state).toBe("alive");
     expect(red.redSince).toBe(1);
-    expect(w.food).toEqual([]);
-    expect(red.mass).toBe(u(301));
+    expect(w.food).toHaveLength(1);
+    expect(red.mass).toBe(u(300));
   });
 
   it("eat scatter lands outside the eater: the 30% is not swallowed back", () => {
