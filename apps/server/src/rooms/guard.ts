@@ -21,8 +21,9 @@ export class RateLimiter {
   }
 }
 
-/** 12 joins a minute per IP: a real player needs about one per match (~2 min). */
-export const joinLimit = new RateLimiter(12, 60_000);
+/** 12 joins a minute per IP: a real player needs about one per match (~2 min). Load tests that
+ *  open many rooms from one machine raise it with JOIN_LIMIT_PER_MIN. */
+export const joinLimit = new RateLimiter(Number(process.env.JOIN_LIMIT_PER_MIN ?? 12), 60_000);
 
 /** Live rooms on this process; onCreate refuses past MAX_ROOMS (env, default 100 = 1,200 seats). */
 export const rooms = { live: 0, max: Number(process.env.MAX_ROOMS ?? 100) };
