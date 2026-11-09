@@ -17,7 +17,7 @@ export function boostBlocked(me: BlobView, m: MatchView): boolean {
     me.state !== "alive" ||
     me.ring === "red" ||
     me.shielded ||
-    me.pips <= 0 ||
+    fuelOf(me) <= 0.001 ||
     elapsedS(m) >= R.BOOST_LOCKOUT_S
   );
 }
@@ -37,13 +37,19 @@ export const interestPerS = (owe: number, tier: RateTier, rateBps?: number): num
   (owe * (rateBps !== undefined ? rateBps / 10_000 : TIER_RATE_PER_MIN[tier])) / 60;
 
 /** Radii for the BOOST preview: after one tap, and after every lit pip (capped at 2.5x equity). */
+/** Fuel 0..1 (S1 hold-to-nitro); falls back to the deprecated pips until the schema sends fuel. */
+export function fuelOf(me: Pick<BlobView, "fuel" | "pips">): number {
+  return Math.max(0, Math.min(1, me.fuel ?? me.pips / R.BOOST_PIPS));
+}
+
+/** Radii for the preview rings: my size after 1 s of nitro, and with every drop of fuel spent. */
 export function boostPreview(me: BlobView): { next: number; max: number } | null {
-  if (me.pips <= 0 || me.equity <= 0) return null;
+  const f = fuelOf(me);
+  if (f <= 0 || me.equity <= 0) return null;
   const mass = me.equity + me.owe;
   const cap = me.equity * R.LEVERAGE_CAP;
-  const charge = me.equity * R.BOOST_CHARGE_EQUITY;
   const r = (units: number): number => radius(Math.round(Math.min(units, cap) * MICRO));
-  return { next: r(mass + charge), max: r(mass + charge * me.pips) };
+  return { next: r(mass + me.equity * R.NITRO_RATE_EQUITY_PER_S), max: r(cap) };
 }
 
 /** All non-popped, non-drone blobs (cashed ones keep their payout) ranked by equity, highest first (same order as the final ranking). */
@@ -52,18 +58,10 @@ export function ranking(blobs: BlobView[]): BlobView[] {
 }
 
 /** conic-gradient for the pip ring: each pip is a 120 degree arc filled 0..1. */
-export function pipGradient(fills: number[], on: string, off: string): string {
-  const n = fills.length;
-  const seg = 360 / n;
-  const gap = 6;
-  const stops: string[] = [];
-  fills.forEach((f, i) => {
-    const a0 = i * seg + gap / 2;
-    const a1 = (i + 1) * seg - gap / 2;
-    const mid = a0 + (a1 - a0) * Math.max(0, Math.min(1, f));
-    stops.push(`transparent ${i * seg}deg ${a0}deg`, `${on} ${a0}deg ${mid}deg`, `${off} ${mid}deg ${a1}deg`, `transparent ${a1}deg ${(i + 1) * seg}deg`);
-  });
-  return `conic-gradient(${stops.join(", ")})`;
+/** One fuel ring as a conic gradient: lit arc for the fuel left, dim for the rest. */
+export function fuelGradient(fuel: number, on: string, off: string): string {
+  const deg = Math.round(Math.max(0, Math.min(1, fuel)) * 360);
+  return `conic-gradient(${on} 0deg ${deg}deg, ${off} ${deg}deg 360deg)`;
 }
 
 const ROBOT = "\u{1F916}";

@@ -1,7 +1,8 @@
 // Player input as Commands (never positions). Desktop: mouse steers, Space = BOOST,
 // R = REPAY, E = cash out. Phone: nipplejs joystick on the left, buttons on the right.
-// Sends at most 30/s; taps are edge events carried by the next command; any blur or
-// tab switch sends a zero command at once so nothing stays held (EDGE-CASES: stuck BOOST).
+// Sends at most 30/s. BOOST is HELD state (hold-to-nitro): true in every command while Space
+// or the button is down. REPAY and cash-out stay edge taps. Any blur or tab switch sends a zero
+// command at once so nothing stays held (EDGE-CASES: stuck BOOST, plus the 250 ms server expiry).
 import nipplejs from "nipplejs";
 import type { InputCmd } from "@margin/core";
 import { dirFromPointer } from "./dir";
@@ -20,7 +21,8 @@ export class Controls {
   readonly touch = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
   readonly els: ControlsEls;
   private dir = { x: 0, y: 0 };
-  private taps = { boost: false, repay: false, cashout: false };
+  private taps = { repay: false, cashout: false };
+  private boostHeld = false;
   private seq = 0;
   private lastSent = 0;
   private timer: number;
@@ -45,9 +47,14 @@ export class Controls {
       // pointerdown, not click: answers on touch-down instead of ~100 ms later on release.
       this.listen(this.els[t], "pointerdown", (e) => {
         e.preventDefault();
+        if (t === "boost") {
+          this.els.boost.setPointerCapture(e.pointerId); // a finger sliding off still counts until lifted
+          return this.hold(true);
+        }
         this.tap(t);
       });
     }
+    for (const type of ["pointerup", "pointercancel", "lostpointercapture"] as const) this.listen(this.els.boost, type, () => this.hold(false));
     if (this.touch) this.joystick(layer.querySelector<HTMLElement>("[data-zone]")!);
     this.desktop();
     this.listen(window, "blur", () => this.release());
@@ -72,12 +79,18 @@ export class Controls {
       if (e.pointerType === "mouse") this.dir = dirFromPointer(e.clientX, e.clientY, innerWidth, innerHeight);
     });
     this.listen(window, "keydown", (e) => {
-      if (e.repeat) return; // holding Space must not spam BOOST: one press, one pip
-      const t: Tap | null = e.code === "Space" ? "boost" : e.code === "KeyR" ? "repay" : e.code === "KeyE" ? "cashout" : null;
+      if (e.code === "Space") {
+        e.preventDefault();
+        if (!e.repeat) this.hold(true);
+        return;
+      }
+      if (e.repeat) return; // REPAY and cash-out are one press, one tap
+      const t: Tap | null = e.code === "KeyR" ? "repay" : e.code === "KeyE" ? "cashout" : null;
       if (!t) return;
       e.preventDefault();
       this.tap(t);
     });
+    this.listen(window, "keyup", (e) => e.code === "Space" && this.hold(false));
   }
 
   private joystick(zone: HTMLElement): void {
@@ -88,7 +101,16 @@ export class Controls {
     this.off.push(() => stick.destroy());
   }
 
-  private tap(t: Tap): void {
+  /** Nitro on or off; the change goes out at once, then every 33 ms while held. */
+  private hold(on: boolean): void {
+    if (this.boostHeld === on) return;
+    this.boostHeld = on;
+    this.els.boost.classList.toggle("holding", on);
+    this.lastSent = 0;
+    this.flush(false);
+  }
+
+  private tap(t: Exclude<Tap, "boost">): void {
     // Answer the press locally at once (< 100 ms rule); the server's result follows.
     this.els[t].animate([{ transform: "scale(0.86)" }, { transform: "scale(1)" }], { duration: 140, easing: "ease-out" });
     this.taps[t] = true;
@@ -98,7 +120,9 @@ export class Controls {
   /** Zero everything and tell the server now, so a lost focus never leaves input held. */
   private release(): void {
     this.dir = { x: 0, y: 0 };
-    this.taps = { boost: false, repay: false, cashout: false };
+    this.taps = { repay: false, cashout: false };
+    this.boostHeld = false;
+    this.els.boost.classList.remove("holding");
     this.lastSent = 0;
     this.flush(false);
   }
@@ -107,8 +131,8 @@ export class Controls {
     const now = performance.now();
     if (!fromTimer && now - this.lastSent < SEND_MS) return; // the interval picks it up within 33 ms
     this.lastSent = now;
-    this.send({ seq: ++this.seq, dirX: this.dir.x, dirY: this.dir.y, ...this.taps });
-    this.taps = { boost: false, repay: false, cashout: false };
+    this.send({ seq: ++this.seq, dirX: this.dir.x, dirY: this.dir.y, boost: this.boostHeld, ...this.taps });
+    this.taps = { repay: false, cashout: false };
   }
 
   private listen<K extends keyof (WindowEventMap & DocumentEventMap)>(

@@ -44,9 +44,9 @@ export class LocalMatch {
   }
 
   send(cmd: InputCmd): void {
-    // Taps are edges: keep one pending until a tick consumes it.
+    // BOOST is held: the latest command wins. REPAY and cash-out are edges kept until a tick uses them.
     const prev = this.myCmd;
-    this.myCmd = prev ? { ...cmd, boost: cmd.boost || prev.boost, repay: cmd.repay || prev.repay, cashout: cmd.cashout || prev.cashout } : cmd;
+    this.myCmd = prev ? { ...cmd, repay: cmd.repay || prev.repay, cashout: cmd.cashout || prev.cashout } : cmd;
   }
 
   onEvent(cb: (e: GameEventMsg) => void): () => void {
@@ -73,7 +73,7 @@ export class LocalMatch {
     if (this.w.phase === "WARMUP" && this.tick >= this.warmTicks) startMatch(this.w, this.tick);
     const inputs = new Map<string, InputCmd>();
     if (this.myCmd && this.o.withMe) inputs.set(ME, this.myCmd);
-    this.myCmd = this.myCmd ? { ...this.myCmd, boost: false, repay: false, cashout: false } : null;
+    this.myCmd = this.myCmd ? { ...this.myCmd, repay: false, cashout: false } : null;
     if (this.tick % 6 === 0) for (const b of this.w.blobs.values()) if (b.kind === "agent") inputs.set(b.id, this.brain(b));
     const ev = step(this.w, inputs, this.tick);
     this.events.push(...this.w.pendingLog.splice(0));
@@ -122,7 +122,8 @@ export class LocalMatch {
       seq: ++this.botSeq,
       dirX: tx / len,
       dirY: ty / len,
-      boost: debtRatio < 0.3 && (this.tick + b.id.length * 37) % 240 === 0,
+      // Hold nitro for ~1.5 s out of every 4 s while the loan is small.
+      boost: debtRatio < 0.3 && (this.tick + b.id.length * 37) % 240 < 90,
       repay: debtRatio > 0.45,
       cashout: false,
     };

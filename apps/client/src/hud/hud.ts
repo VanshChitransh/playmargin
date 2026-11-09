@@ -4,7 +4,7 @@
 import { R, type BlobView } from "@margin/core";
 import type { Frame } from "../game/frame";
 import type { ControlsEls } from "../input/controls";
-import { boostBlocked, cashoutOpen, displayName, elapsedS, interestPerS, phaseName, pipGradient, ranking } from "./logic";
+import { boostBlocked, cashoutOpen, displayName, elapsedS, interestPerS, phaseName, fuelGradient, fuelOf, ranking } from "./logic";
 import "./hud.css";
 import { isMuted, play as sfx, setMuted } from "../audio";
 
@@ -12,9 +12,6 @@ const LB_MS = 1000 / R.LEADERBOARD_HZ;
 const ROW_PX = 22;
 const C = { gold: "#F5B83D", liq: "#FF3D5A", dim: "#1A2742", paper: "#EEF2FF" };
 
-// S1 one-off (BOOST hold-to-nitro removed R.BOOST_RECHARGE_S): keeps the old pip animation compiling
-// until S3 swaps the pips for the fuel ring from BlobView.fuel.
-const PIP_ANIM_MS = 3000;
 
 export class Hud {
   private el: HTMLElement;
@@ -23,8 +20,6 @@ export class Hud {
   private lbAt = 0;
   private bannerKey = "";
   private pipRing: HTMLElement;
-  private recharge: number[] = []; // ms timestamps each spent pip relights
-  private prevPips: number = R.BOOST_PIPS;
   private lastBeat = 0;
 
   constructor(root: HTMLElement, private els: ControlsEls, private onCashoutWindow: (open: boolean) => void) {
@@ -80,7 +75,7 @@ export class Hud {
       this.leaderboard(f);
     }
     if (!me) return;
-    this.pips(me, now, boostBlocked(me, m));
+    this.fuel(me, boostBlocked(me, m));
     const ring = me.state === "alive" && m.phase === "LIVE" ? me.ring : "green";
     this.set("ring", ring, () => {
       // Android buzz on the way into red (iOS has no vibrate; the frame and label still show).
@@ -203,19 +198,12 @@ export class Hud {
     if (show) mine.innerHTML = row(ranked[myRank]!, myRank + 1);
   }
 
-  private pips(me: BlobView, now: number, blocked: boolean): void {
-    const max = R.BOOST_PIPS;
-    const lit = Math.min(max, me.pips);
-    // The server only sends the lit count: start a 3 s refill per spent pip on our side.
-    if (lit < this.prevPips) for (let i = lit; i < this.prevPips; i++) this.recharge.push(now + PIP_ANIM_MS);
-    if (lit > this.prevPips) this.recharge.splice(0, lit - this.prevPips);
-    this.prevPips = lit;
-    this.recharge = this.recharge.slice(-(max - lit));
-    const spent = [...this.recharge].sort((a, b) => a - b).map((t) => 1 - Math.max(0, t - now) / (PIP_ANIM_MS));
-    const fills = Array.from({ length: max }, (_, i) => (i < lit ? 1 : (spent[i - lit] ?? 0)));
-    this.pipRing.style.background = pipGradient(fills, blocked ? "#8391B3" : C.gold, C.dim);
+  /** The fuel ring around BOOST: drains while held, refills as REPAY or eating raise equity. */
+  private fuel(me: BlobView, blocked: boolean): void {
+    this.pipRing.style.background = fuelGradient(fuelOf(me), blocked ? "#8391B3" : C.gold, C.dim);
     this.els.boost.classList.toggle("blocked", blocked);
   }
+
 
   /** The agents' commander plan, shown so spectators see what the AI is up to. Null hides it. */
   commander(text: string | null): void {

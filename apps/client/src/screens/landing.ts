@@ -8,7 +8,7 @@ import { newRoomCode } from "../net/room-code";
 import { ENDPOINT } from "../net/client";
 
 const STEPS: Array<[string, string]> = [
-  ["BOOST = borrow", "Each tap borrows from the vault and makes you bigger and faster. Three taps, max."],
+  ["BOOST = borrow", "Hold BOOST to borrow from the vault: bigger and faster while it burns. The ring is your fuel."],
   ["Red ring = poppable", "Losses eat your margin. Go red and any blob that touches you pops you and takes a bounty."],
   ["Cash out to keep it", "Between 0:45 and 1:20, hold still for 4 s and walk away with your equity."],
 ];
@@ -40,7 +40,7 @@ export const landing: Screen = (root) => {
           <a href="#/cash" class="sticker sticker-press rounded-box bg-ink px-5 py-3 font-display text-xl text-paper">Play for $1</a>
           <button data-challenge class="tag basis-full text-left underline">Challenge a friend: private room link</button>
           <p data-proof class="tag hidden basis-full"></p>
-          <span class="text-sm">No wallet. No sign-up.<span class="pointer-coarse:hidden"><br />Mouse steers, <kbd class="kbd kbd-sm">Space</kbd> = BOOST</span></span>
+          <span class="text-sm">No wallet. No sign-up.<span class="pointer-coarse:hidden"><br />Mouse steers, hold <kbd class="kbd kbd-sm">Space</kbd> = BOOST</span></span>
         </div>
       </section>
       <section class="relative">
