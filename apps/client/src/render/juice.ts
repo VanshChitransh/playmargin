@@ -28,6 +28,16 @@ export const JUICE = {
   /** Freeze on my own pop so it lands. */
   HIT_STOP_MS: 150,
 
+  // Debt shell (feel spec 2.1): the borrowed part of MY blob drawn as a gold outer band.
+  SHELL_COLOR: 0xf5b83d,
+  SHELL_ALPHA: 0.6,
+  /** Stretch along heading while boosting, eased in and out (fraction of size). */
+  BOOST_STRETCH: 0.06,
+  STRETCH_EASE: 12,
+  /** REPAY squash: compress then spring back. */
+  REPAY_SQUASH: 0.06,
+  REPAY_SQUASH_MS: 120,
+
   // Before GO, other blobs are ghosts: overlap must never read as contact.
   GHOST_ALPHA: 0.35,
 } as const;

@@ -3,7 +3,7 @@
 // players read it too (inspiration.md principle 2). Bodies are agar-style: a vivid colour
 // per id, darker rim, name centred in white with a dark stroke. Drones are hollow hexes.
 import { Container, Graphics, Text } from "pixi.js";
-import type { BlobView, Ring } from "@margin/core";
+import { MICRO, radius, type BlobView, type Ring } from "@margin/core";
 import { C, darken, vivid } from "./colors";
 import { displayName } from "../hud/logic";
 import { reducedMotion } from "./motion";
@@ -24,6 +24,11 @@ export class BlobSprite extends Container {
   private fill = 0;
   private calm = false;
   private isMe = false;
+  /** Radius of my equity core inside the debt shell (0 = no loan). */
+  private core = 0;
+  private stretch = 0;
+  private heading = 0;
+  private squashUntil = 0;
 
   constructor(v: BlobView, isMe: boolean) {
     super();
@@ -39,8 +44,9 @@ export class BlobSprite extends Container {
   }
 
   /** Sync to a view; tS is seconds since start (pulses), zoom keeps text a fixed screen size. */
-  update(v: BlobView, tS: number, isMe: boolean, zoom: number, ghost = false): void {
+  update(v: BlobView, tS: number, isMe: boolean, zoom: number, ghost = false, boosting = false): void {
     const moved = Math.hypot(v.x - this.prev.x, v.y - this.prev.y);
+    if (moved > 0.5) this.heading = Math.atan2(v.y - this.prev.y, v.x - this.prev.x);
     this.prev = { x: v.x, y: v.y, speed: this.prev.speed * 0.85 + Math.min(moved, 20) * 0.15 };
     this.position.set(v.x, v.y);
     this.visible = v.state === "alive";
@@ -48,13 +54,17 @@ export class BlobSprite extends Container {
     // Before GO nobody can touch: others are faint ghosts with no ring, so overlap never reads as contact.
     this.alpha = ghost ? JUICE.GHOST_ALPHA : 1;
     this.ring.visible = !ghost;
+    // My debt shell: the core keeps my colour and is sized by equity; the rest of me is the loan.
+    const core = isMe && v.owe > 0.5 && v.equity > 0 ? Math.min(v.radius, radius(Math.round(v.equity * MICRO))) : 0;
     // Redraw geometry only when it visibly changes; 12 blobs, but phones count.
-    if (Math.abs(v.radius - this.drawn.r) > 0.5 || v.ring !== this.drawn.ring || v.kind !== this.drawn.kind) {
+    if (Math.abs(v.radius - this.drawn.r) > 0.5 || Math.abs(core - this.core) > 0.5 || v.ring !== this.drawn.ring || v.kind !== this.drawn.kind) {
+      this.core = core;
       this.redraw(v, isMe);
     }
     const r = v.radius + RING_GAP;
     const k = 1 / zoom;
     if (v.kind !== "drone") this.membrane(v.radius, tS);
+    this.feel(boosting);
     // Name inside the blob, sized with it (agar.io), never under ~11 px on screen.
     const ns = Math.max(v.radius * 0.5, 11 / zoom) / 28;
     this.nameText.scale.set(ns);
@@ -83,9 +93,30 @@ export class BlobSprite extends Container {
       const rr = r + amp * Math.sin(a * 5 + tS * 6) * Math.sin(a * 3 - tS * 4);
       pts.push(Math.cos(a) * rr, Math.sin(a) * rr);
     }
-    this.body.clear().poly(pts).fill(this.fill).stroke({ width: Math.max(3, r * 0.06), color: darken(this.fill) });
+    this.body.clear();
+    if (this.core > 0) {
+      // Loan as shape: a translucent gold band outside a player-coloured equity core.
+      this.body.poly(pts).fill({ color: JUICE.SHELL_COLOR, alpha: JUICE.SHELL_ALPHA }).stroke({ width: Math.max(3, r * 0.06), color: darken(JUICE.SHELL_COLOR) });
+      this.body.circle(0, 0, this.core).fill(this.fill).stroke({ width: Math.max(2, this.core * 0.05), color: darken(this.fill) });
+    } else {
+      this.body.poly(pts).fill(this.fill).stroke({ width: Math.max(3, r * 0.06), color: darken(this.fill) });
+    }
     // My own blob: a thin paper ring just inside the rim, so "me" reads at a glance.
-    if (this.isMe) this.body.circle(0, 0, r * 0.84).stroke({ width: Math.max(4, r * 0.07), color: 0xffffff, alpha: 0.9 });
+    if (this.isMe) this.body.circle(0, 0, (this.core || r) * 0.84).stroke({ width: Math.max(4, r * 0.07), color: 0xffffff, alpha: 0.9 });
+  }
+
+  /** REPAY landed: compress then spring back (presentation only). */
+  squash(): void {
+    if (!reducedMotion) this.squashUntil = performance.now() + JUICE.REPAY_SQUASH_MS;
+  }
+
+  /** Stretch along heading while boosting, squash on REPAY; never under reduced motion. */
+  private feel(boosting: boolean): void {
+    if (reducedMotion) return;
+    this.stretch += ((boosting ? JUICE.BOOST_STRETCH : 0) - this.stretch) * Math.min(1, JUICE.STRETCH_EASE / 60);
+    const sq = performance.now() < this.squashUntil ? 1 - JUICE.REPAY_SQUASH : 1;
+    this.body.rotation = this.heading;
+    this.body.scale.set((1 + this.stretch) * sq, (1 - this.stretch / 2) * sq);
   }
 
   private redraw(v: BlobView, isMe: boolean): void {

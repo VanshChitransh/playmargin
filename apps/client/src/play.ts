@@ -114,6 +114,7 @@ export const play: Screen = (root, params) => {
       case "repay": {
         const p = e.blob === me ? at(me) : undefined;
         if (p) sfx("repay");
+        if (p) arena.squashMe(me);
         if (p) arena.fx.floatText(p.x, p.y - p.r, `\u2212${num(e.amount)}`, C.paper, z);
         break;
       }

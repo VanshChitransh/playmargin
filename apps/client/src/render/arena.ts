@@ -95,6 +95,11 @@ export class ArenaRenderer {
     });
   }
 
+  /** My blob squashes when a REPAY lands. */
+  squashMe(id: string): void {
+    this.blobs.get(id)?.squash();
+  }
+
   /** Freeze the world picture for ms (effects keep moving). */
   hitStop(ms: number): void {
     if (reducedMotion) return;
@@ -228,7 +233,8 @@ export class ArenaRenderer {
         this.blobs.set(v.id, s);
         this.blobLayer.addChild(s);
       }
-      s.update(v, tS, isMe, this.zoom, !isMe && (f.match.phase === "WARMUP" || f.match.phase === "COUNTDOWN"));
+      const boosting = isMe && this.held && f.match.phase === "LIVE" && (v.fuel ?? 1) > 0.001;
+      s.update(v, tS, isMe, this.zoom, !isMe && (f.match.phase === "WARMUP" || f.match.phase === "COUNTDOWN"), boosting);
       s.zIndex = isMe ? 1e6 : v.radius; // small under big, me always on top
     }
     this.blobLayer.sortableChildren = true;
