@@ -40,6 +40,11 @@ export function entryStake(): Promise<string> {
   return stake;
 }
 
+/** Drop the cached stake (the owner changed it): the next entryStake() reads config again. */
+export function forgetEntryStake(): void {
+  stake = null;
+}
+
 const GAS = "100000000000000"; // 100 Tgas: ft_transfer_call / withdraw + their callbacks
 
 /** Moves `amount` base units from the wallet into the contract (credits the same account). */

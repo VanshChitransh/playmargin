@@ -299,6 +299,36 @@ mod tests {
         c.set_entry_stake(U128(100_000));
     }
 
+    /// Final money pass: 0.30 USDC would leave 1e8 / 300000 Micro per base unit, not exact.
+    #[test]
+    #[should_panic(expected = "must divide 100000000")]
+    fn odd_stake_rejected() {
+        let mut c = setup();
+        ctx("owner.near", 1, 0);
+        c.set_entry_stake(U128(300_000));
+    }
+
+    /// N11 final pass M2: migrate must not accept a zero stake (free tickets, zero-budget matches).
+    #[test]
+    #[should_panic(expected = "entry stake below the minimum deposit")]
+    fn migrate_rejects_tiny_stake() {
+        setup();
+        let v1 = ContractV1 {
+            owner: acc("owner.near"),
+            settler: acc("settler.near"),
+            usdc: acc("usdc.near"),
+            balances: LookupMap::new(Key::Balances),
+            tickets: LookupMap::new(Key::Tickets),
+            matches: LookupMap::new(Key::Matches),
+            anchors: LookupMap::new(Key::Anchors),
+            vault: Vault::default(),
+            reserve: 0,
+        };
+        env::state_write(&v1);
+        ctx("margin.near", 0, 0);
+        let _ = Contract::migrate(Some(U128(0)));
+    }
+
     /// Upgrade path: V1 state (no entry_stake) on disk, migrate keeps balances and adds the stake.
     #[test]
     fn migrate_from_v1() {

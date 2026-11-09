@@ -23,7 +23,8 @@ pub const ENTRY_STAKE: u128 = 1_000_000;
 /// RULES.html ROOM_VAULT_BUDGET = (LEVERAGE_CAP - 1) * pot, as basis points of the stakes.
 pub const BUDGET_BPS: u128 = 15_000;
 
-/// RULES.html ROOM_SIZE 12 plus up to 4 drone/agent accounts. Bounds settle gas and storage.
+/// RULES.html ROOM_SIZE 12, with headroom. Payouts only reach match players (drone bounties ride
+/// in `reserve`), so this only bounds settle gas and the args size.
 pub const MAX_PAYOUTS: usize = 16;
 
 /// Settler-supplied strings are stored forever at the contract's storage cost, so cap them.
@@ -151,6 +152,14 @@ pub(crate) fn j<T: Serialize + ?Sized>(v: &T) -> String {
     serde_json::to_string(v).expect("json")
 }
 
+/// A stake must be at least MIN_DEPOSIT and divide 100,000,000: core counts 1 USDC as 1e8 Micro,
+/// so Micro per base unit (1e8 / stake) must be whole or paid settles cannot be exact.
+/// Valid: 100000 (0.10), 200000, 250000, 500000, 1000000 (1 USDC).
+pub(crate) fn check_stake(stake: u128) {
+    require!(stake >= MIN_DEPOSIT, "entry stake below the minimum deposit");
+    require!(100_000_000 % stake == 0, "entry stake must divide 100000000 (e.g. 100000 or 1000000)");
+}
+
 pub(crate) fn add(a: u128, b: u128) -> u128 {
     a.checked_add(b).expect("overflow")
 }
@@ -165,7 +174,7 @@ impl Contract {
     pub fn new(owner: AccountId, settler: AccountId, usdc: AccountId, entry_stake: Option<U128>) -> Self {
         require!(owner != env::current_account_id(), "owner must not be the contract account");
         let entry_stake = entry_stake.map_or(ENTRY_STAKE, |s| s.0);
-        require!(entry_stake >= MIN_DEPOSIT, "entry stake below the minimum deposit");
+        check_stake(entry_stake);
         Self {
             owner,
             settler,
@@ -188,6 +197,7 @@ impl Contract {
         let v1: ContractV1 = env::state_read().expect("no V1 state");
         let ContractV1 { owner, settler, usdc, balances, tickets, matches, anchors, vault, reserve } = v1;
         let entry_stake = entry_stake.map_or(ENTRY_STAKE, |s| s.0);
+        check_stake(entry_stake);
         Self { owner, settler, usdc, balances, tickets, matches, anchors, vault, reserve, entry_stake }
     }
 
@@ -197,7 +207,7 @@ impl Contract {
     pub fn set_entry_stake(&mut self, entry_stake: U128) {
         assert_one_yocto();
         require!(env::predecessor_account_id() == self.owner, "only the owner");
-        require!(entry_stake.0 >= MIN_DEPOSIT, "entry stake below the minimum deposit");
+        check_stake(entry_stake.0);
         self.entry_stake = entry_stake.0;
         emit("entry_stake_changed", format!(r#"{{"entry_stake":"{}"}}"#, entry_stake.0));
     }

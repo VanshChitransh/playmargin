@@ -5,7 +5,7 @@
 
 import { Near, generateKey, parseKey } from "near-kit";
 import { CONTRACT_ID, NETWORK, RELAYER_URL } from "./config";
-import { entryStake } from "./funds";
+import { entryStake, forgetEntryStake } from "./funds";
 import { wallet } from "./wallet";
 
 /** Explicit allowance (the near-api-js default is 0.25 NEAR). Relaying never spends it. */
@@ -83,6 +83,9 @@ export async function enterArena(accountId: string, secret: Secret, relayerUrl =
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ payload }),
   });
-  return (await res.json()) as RelayResult;
+  const r = (await res.json()) as RelayResult;
+  // The owner changed the stake since we cached it: re-read on the next try instead of failing forever.
+  if (!r.ok && JSON.stringify(r).includes("entry stake")) forgetEntryStake();
+  return r;
 }
 
