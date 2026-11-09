@@ -7,6 +7,7 @@ import { verify } from "./screens/verify";
 import { landing } from "./screens/landing";
 import { play } from "./play";
 import { cash } from "./screens/cash";
+import { watch } from "./screens/watch";
 import { unlockAudioOnGesture } from "./audio";
 
 unlockAudioOnGesture();
@@ -17,6 +18,7 @@ else startRouter(app, {
   "/": landing,
   "/play": play,
   "/cash": cash,
+  "/watch": watch,
   "/judge": (root, p) => play(root, { ...p, judge: "1" }),
   "/verify/:id": verify,
   "/r/:code": play,

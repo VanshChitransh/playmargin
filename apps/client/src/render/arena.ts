@@ -11,6 +11,7 @@ import { SpikeSprite, bakeSpikeTextures } from "./spike";
 import { boostBlocked, boostPreview } from "../hud/logic";
 import { FxLayer } from "./fx";
 import { NitroFeel } from "./nitro";
+import type { Shot } from "./director";
 
 /** ~35 grid cells across the screen at start size (agar.io measured). */
 const CELL = 60;
@@ -49,9 +50,18 @@ export class ArenaRenderer {
   held = false;
   private nitro = new NitroFeel();
   private lastDraw = 0;
+  /** Spectator camera: where to look when there is no player blob (#/watch). */
+  director?: (f: Frame, tS: number) => Shot | null;
+  private cam: Shot | null = null;
   private view = VIEW_AT_START;
 
   async mount(root: HTMLElement, source: FrameSource, opts: { fps?: boolean; fit?: HTMLElement; view?: number } = {}): Promise<void> {
+    // Canvas text bakes whatever font is loaded at creation: wait for ours (a direct load of
+    // #/watch drew names in a serif fallback otherwise). Never block on a font that fails.
+    await Promise.race([
+      Promise.all(["700 28px Rubik", "30px 'Lilita One'"].map((f) => document.fonts.load(f))).catch(() => {}),
+      new Promise((ok) => setTimeout(ok, 1500)),
+    ]);
     await this.app.init({
       resizeTo: opts.fit ?? window,
       background: C.floor,
@@ -65,7 +75,7 @@ export class ArenaRenderer {
     this.world.addChild(this.grid, this.zone, this.foodLayer, this.spikeLayer, this.blobLayer, this.preview, this.fx);
     this.app.stage.addChild(this.world);
     if (opts.fps) {
-      this.fps = new Text({ text: "", style: { fontFamily: "JetBrains Mono", fontSize: 12, fill: C.muted } });
+      this.fps = new Text({ text: "", style: { fontFamily: ["JetBrains Mono", "monospace"], fontSize: 12, fill: C.muted } });
       this.fps.position.set(8, 8);
       this.app.stage.addChild(this.fps);
     }
@@ -129,6 +139,19 @@ export class ArenaRenderer {
     this.lastDraw = tS;
     this.nitro.update(meView, meView && this.blobs.get(meView.id), f.match.phase, this.held, this.fx, this.zoom, dt);
     if (meView) this.follow(meView.x, meView.y, meView.radius);
+    else this.direct(f, tS);
+  }
+
+  /** Smooth pan and zoom toward the director's shot, so cuts read as camera moves. */
+  private direct(f: Frame, tS: number): void {
+    const s = this.director?.(f, tS);
+    if (!s) return;
+    const c = (this.cam ??= { ...s });
+    const k = 0.05;
+    c.x += (s.x - c.x) * k;
+    c.y += (s.y - c.y) * k;
+    c.r += (s.r - c.r) * k;
+    this.follow(c.x, c.y, c.r);
   }
 
   private drawZone(f: Frame): void {

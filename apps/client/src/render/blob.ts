@@ -27,7 +27,7 @@ export class BlobSprite extends Container {
     const name = displayName(v);
     this.nameText = new Text({
       text: name,
-      style: { fontFamily: "Rubik", fontSize: 28, fontWeight: "700", fill: 0xffffff, stroke: { color: C.ink, width: 5, join: "round" } },
+      style: { fontFamily: ["Rubik", "system-ui", "sans-serif"], fontSize: 28, fontWeight: "700", fill: 0xffffff, stroke: { color: C.ink, width: 5, join: "round" } },
     });
     this.nameText.anchor.set(0.5);
     this.warnSign = new Text({ text: "⚠", style: { fontSize: 18, fill: C.liq } });

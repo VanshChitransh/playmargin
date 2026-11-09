@@ -20,7 +20,7 @@ export class FxLayer extends Container {
   floatText(x: number, y: number, text: string, color: number, zoom: number): void {
     const t = new Text({
       text,
-      style: { fontFamily: "Lilita One", fontSize: 30, fill: color, stroke: { color: C.ink, width: 6, join: "round" } },
+      style: { fontFamily: ["Lilita One", "system-ui", "sans-serif"], fontSize: 30, fill: color, stroke: { color: C.ink, width: 6, join: "round" } },
     });
     t.anchor.set(0.5);
     t.position.set(x, y);

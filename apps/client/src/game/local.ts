@@ -1,7 +1,7 @@
 // A whole match in the browser on the real rules (core newWorld/startMatch/step), with
 // simple labelled bots. Drives offline practice and the landing hero, so both show the
 // actual game instead of a mock. The server stays the only authority for real matches.
-import { R, SPIKE_RADIUS, TICK_MS, appendLog, blobView, matchView, newWorld, radius, startMatch, step, type Blob, type GameEventMsg, type InputCmd, type LogEntry, type PlayerSeed, type World } from "@margin/core";
+import { R, SPIKE_RADIUS, TICK_MS, appendLog, blobView, foodView, matchView, newWorld, radius, startMatch, step, type Blob, type GameEventMsg, type InputCmd, type LogEntry, type PlayerSeed, type World } from "@margin/core";
 import type { Frame } from "./frame";
 
 const ME = "me";
@@ -137,7 +137,7 @@ export class LocalMatch {
       arena: this.w.arena,
       match: { ...m, timeLeftS: m.phase === "WARMUP" ? Math.ceil((this.warmTicks - t) / R.TICK_HZ) : Math.ceil(m.timeLeftS) },
       blobs: [...this.w.blobs.values()].map((b) => blobView(b, t)),
-      food: this.w.food.map((f) => ({ id: f.id, x: f.x, y: f.y, r: Math.min(14, radius(f.mass) * 0.6) })),
+      food: this.w.food.map(foodView), // core hitbox radius, same as the server sends
       spikes: this.w.spikes.filter((s) => s.respawnAt === null).map((s) => ({ id: s.id, x: s.x, y: s.y, big: s.big, r: SPIKE_RADIUS })),
     };
   }

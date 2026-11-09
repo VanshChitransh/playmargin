@@ -27,7 +27,7 @@ export class Hud {
   private touch = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
   held = false;
 
-  constructor(root: HTMLElement, private els: ControlsEls, private onCashoutWindow: (open: boolean) => void) {
+  constructor(root: HTMLElement, private els: ControlsEls, private onCashoutWindow: (open: boolean) => void, opts: { coach?: boolean } = {}) {
     this.el = document.createElement("div");
     this.el.className = "pointer-events-none fixed inset-0 select-none font-sans text-paper";
     this.el.innerHTML = `
@@ -63,7 +63,7 @@ export class Hud {
     this.pipRing.className = "pip-ring";
     els.boost.classList.add("relative");
     els.boost.appendChild(this.pipRing);
-    this.closeCoach = coachMarks(root, this.touch);
+    this.closeCoach = opts.coach === false ? () => {} : coachMarks(root, this.touch);
   }
 
   destroy(): void {
