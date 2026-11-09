@@ -32,8 +32,6 @@ export class RateLimit {
 
 interface Pending {
   cmd: InputCmd;
-  boost: boolean;
-  repay: boolean;
   cashout: boolean;
 }
 
@@ -60,20 +58,19 @@ export class InputQueue {
     const cmd = parseInput(msg);
     if (!cmd) return;
     const prev = this.pending.get(id);
-    // BOOST is held state: the latest message wins (core's 250 ms expiry ends it if messages stop).
-    // REPAY and cash out are taps: OR them until a tick consumes them, so none is lost between ticks.
+    // BOOST and REPAY are held state: the latest message wins (core's 250 ms expiry ends a hold if
+    // messages stop, so a dropped player never repays or borrows forever). Cash out is a tap: OR it
+    // until a tick consumes it, so none is lost between ticks.
     this.pending.set(id, {
       cmd,
-      boost: cmd.boost,
-      repay: cmd.repay || (prev?.repay ?? false),
       cashout: cmd.cashout || (prev?.cashout ?? false),
     });
   }
 
-  /** Everything that arrived since the last call, taps merged; the queue is then empty. */
+  /** The latest command per player since the last call, cash-out taps merged; the queue is then empty. */
   take(): Map<string, InputCmd> {
     const out = new Map<string, InputCmd>();
-    for (const [id, p] of this.pending) out.set(id, { ...p.cmd, boost: p.boost, repay: p.repay, cashout: p.cashout });
+    for (const [id, p] of this.pending) out.set(id, { ...p.cmd, cashout: p.cashout });
     this.pending.clear();
     return out;
   }

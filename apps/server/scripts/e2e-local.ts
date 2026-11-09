@@ -41,8 +41,11 @@ if (rooms[0]!.roomId !== rooms[1]!.roomId) fail("the two players landed in diffe
 const dupe = await sdk.joinOrCreate("match", { mode: "free", guestKey: keys[0] }).then(() => "joined", (e: Error) => e.message);
 if (!/already in this match/.test(dupe)) fail(`same guest joined twice: ${dupe}`);
 const phases: string[] = [];
+// Room 0's private owe numbers, one list per REPAY hold.
+let repayHeld = false;
+const heldOwe: number[][] = [];
 rooms.forEach((r, i) => {
-  r.onMessage("me", () => {});
+  r.onMessage("me", (m: { owe: number }) => i === 0 && repayHeld && heldOwe.at(-1)!.push(m.owe));
   r.onMessage("commander", () => {});
   r.onMessage("ev", (e: { type: string; phase?: string }) => i === 0 && e.type === "phase" && phases.push(e.phase!));
 });
@@ -80,7 +83,11 @@ const spectate = (async () => {
 let t = 0;
 const iv = setInterval(() => {
   t++;
-  rooms.forEach((r, i) => r.send("input", { seq: t, dirX: Math.cos(t / 8 + i * 3), dirY: Math.sin(t / 8 + i * 3), boost: t % 80 < 20, repay: t % 60 === 20, cashout: false }));
+  // Hold BOOST for 1 s, rest, then hold REPAY for 1 s (both are held state, sent every message).
+  const repay = t % 80 >= 24 && t % 80 < 44;
+  if (repay && !repayHeld) heldOwe.push([]);
+  repayHeld = repay;
+  rooms.forEach((r, i) => r.send("input", { seq: t, dirX: Math.cos(t / 8 + i * 3), dirY: Math.sin(t / 8 + i * 3), boost: t % 80 < 20, repay, cashout: false }));
 }, 50);
 await Promise.all(rooms.map((r) => new Promise<void>((res) => r.onLeave(() => res()))));
 clearInterval(iv);
@@ -107,6 +114,8 @@ const checks = {
   fuelSeen,
   radii: [...radii].sort().join(" "),
   heldBoostBorrowed: fuelDropped && served.log.some((e) => e.type === "BOOST"),
+  // Longest run of owe values that only fall while REPAY is held (each "me" is a change).
+  heldRepayFalls: Math.max(0, ...heldOwe.map((o) => (o.every((x, k) => k === 0 || x < o[k - 1]!) ? o.length - 1 : 0))),
 };
 console.log(checks);
 if (checks.phases !== "WARMUP > COUNTDOWN > LIVE > ENDED") fail(`phases ${checks.phases}`);
@@ -121,6 +130,7 @@ if (!seen.includes(`food:${R.FOOD_RADIUS_PX}`) || !seen.every((r) => wireOk.has(
 if (!watch.joined || watch.sawEvents === 0 || watch.gotMe || watch.humans !== 2 || watch.blobs !== 12) fail(`spectate ${JSON.stringify(watch)}`);
 if (!checks.fuelSeen) fail("BlobView.fuel never reached the client");
 if (!checks.heldBoostBorrowed) fail("holding BOOST never borrowed");
+if (checks.heldRepayFalls < 5) fail(`holding REPAY did not pay the debt down continuously (${checks.heldRepayFalls} steps)`);
 if (!checks.replayEqualsStored) fail("settleVerified(log) differs from stored payouts");
 console.log("E2E OK");
 process.exit(0);

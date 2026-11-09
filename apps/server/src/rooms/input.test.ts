@@ -37,7 +37,7 @@ describe("InputQueue", () => {
     q.open("a");
     q.push("a", { ...ok, boost: true, repay: true }, 0);
     q.push("a", { ...ok, seq: 2, boost: false, repay: false }, 0);
-    expect(q.take().get("a")).toMatchObject({ seq: 2, boost: false, repay: true, dirX: 0.6 });
+    expect(q.take().get("a")).toMatchObject({ seq: 2, boost: false, repay: false, dirX: 0.6 });
     q.push("a", { ...ok, seq: 3, boost: true }, 0);
     expect(q.take().get("a")).toMatchObject({ boost: true });
     expect(q.take().has("a")).toBe(false);
