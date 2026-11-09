@@ -6,6 +6,7 @@
 //   npx tsx apps/server/scripts/playtest.ts runs [n=10] [strategy=food] [--par 5]   n fresh-server matches
 //   npx tsx apps/server/scripts/playtest.ts survival [n=10]        n staggered matches, no BOOST
 //   npx tsx apps/server/scripts/playtest.ts edges                   reload, late join, 2 tabs, credits, freeze
+//   npx tsx apps/server/scripts/playtest.ts walls                   4 walls, a corner, blob on blob: r/2 clamp
 // strategies: wander | food | flee | boost | redrepay | cashout. Output: playtest-out/<run>/ (json, png, mp4)
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -370,12 +371,121 @@ async function edges() {
   Object.assign(report, out);
 }
 
+/**
+ * Walls: one room, 7 browser players. Four push into a wall, one into the nearest corner, two push
+ * into each other; each holds 2 s and screenshots. A spectator checks every synced blob, every
+ * patch, against the edge clamp: centre at least r/2 inside each wall.
+ */
+async function walls(o: { w: number; h: number }) {
+  const env = await boot();
+  const browser = await chromium.launch({ executablePath: CHROME, headless: true, args: ["--use-angle=metal", "--enable-gpu"] });
+  const roles = ["left", "right", "top", "bottom", "corner", "pushA", "pushB"] as const;
+  const pages: Array<Awaited<ReturnType<typeof newPage>> & { role: (typeof roles)[number]; label: string }> = [];
+  const sdk = new Client(env.api.replace("http", "ws"));
+  let spec: Room | null = null;
+  // Join one at a time: the server labels humans "Player N" in join order, so N maps to a page.
+  for (const role of roles) {
+    const pg = await newPage(browser, { ...o, guest: `qa-wall-${role}-${Date.now()}` });
+    await pg.page.goto(`${env.web}/#/play`);
+    pages.push({ ...pg, role, label: `Player ${pages.length + 1}` });
+    for (let i = 0; i < 20; i++) {
+      if (!spec && ((await (await fetch(`${env.api}/health`)).json()) as { rooms: number }).rooms >= 1) spec = await sdk.consumeSeatReservation(await (await fetch(`${env.api}/api/watch`)).json());
+      if (spec && (spec.state as unknown as St).blobs && [...(spec.state as unknown as St).blobs.values()].filter((b) => b.kind === "human").length >= pages.length) break;
+      await sleep(300);
+    }
+  }
+  if (!spec) throw new Error("could not spectate the room");
+  spec.onMessage("ev", () => {});
+  spec.onMessage("commander", () => {});
+  const st = () => spec!.state as unknown as St;
+  // The clamp, checked on every patch for every blob of every kind.
+  const breaches: string[] = [];
+  let checked = 0;
+  spec.onStateChange(() => {
+    const s = st();
+    if (s.phase !== "LIVE") return;
+    for (const b of s.blobs.values()) {
+      if (b.state !== "alive") continue;
+      checked++;
+      const gap = Math.min(b.x, s.arenaW - b.x, b.y, s.arenaH - b.y) - b.radius / 2;
+      if (gap < -1 && breaches.length < 20) breaches.push(`${b.label} r=${Math.round(b.radius)} at (${Math.round(b.x)},${Math.round(b.y)}) is ${Math.round(-gap)} px past r/2`);
+    }
+  });
+  const mine = (label: string) => [...st().blobs.values()].find((b) => b.label === label);
+  const results: Record<string, unknown> = {};
+  const done = new Set<string>();
+  const holdStart = new Map<string, number>();
+  const pressed = new Map<string, { gap: number[]; dist: number[] }>();
+  while (st().phase !== "LIVE" || !st().blobs) await sleep(200);
+  const t0 = Date.now();
+  while (done.size < pages.length && Date.now() - t0 < 50_000) {
+    await sleep(100);
+    const s = st();
+    for (const pg of pages) {
+      if (done.has(pg.role)) continue;
+      const me = mine(pg.label);
+      if (!me || me.state !== "alive") {
+        results[pg.role] = { verdict: "DIED before the check", at: me ? `(${Math.round(me.x)},${Math.round(me.y)})` : "gone" };
+        done.add(pg.role);
+        continue;
+      }
+      // Direction to push, and how far the blob still is from touching what it pushes against.
+      let dx = 0, dy = 0, away = Infinity;
+      if (pg.role === "left") (dx = -1), (away = me.x - me.radius);
+      if (pg.role === "right") (dx = 1), (away = s.arenaW - me.x - me.radius);
+      if (pg.role === "top") (dy = -1), (away = me.y - me.radius);
+      if (pg.role === "bottom") (dy = 1), (away = s.arenaH - me.y - me.radius);
+      if (pg.role === "corner") {
+        dx = me.x < s.arenaW / 2 ? -1 : 1;
+        dy = me.y < s.arenaH / 2 ? -1 : 1;
+        away = Math.max(Math.min(me.x, s.arenaW - me.x), Math.min(me.y, s.arenaH - me.y)) - me.radius;
+      }
+      let other: Blob | undefined;
+      if (pg.role === "pushA" || pg.role === "pushB") {
+        other = mine(pg.role === "pushA" ? pages[6]!.label : pages[5]!.label);
+        if (!other || other.state !== "alive") {
+          results[pg.role] = { verdict: "partner DIED before the check" };
+          done.add(pg.role);
+          continue;
+        }
+        (dx = other.x - me.x), (dy = other.y - me.y);
+        away = Math.hypot(dx, dy) - me.radius - other.radius;
+      }
+      await steer(pg.page, o.w, o.h, dx, dy);
+      if (away > 4 && !holdStart.has(pg.role)) continue;
+      if (!holdStart.has(pg.role)) holdStart.set(pg.role, Date.now());
+      const rec = pressed.get(pg.role) ?? { gap: [], dist: [] };
+      pressed.set(pg.role, rec);
+      if (other) rec.dist.push(Math.round((Math.hypot(other.x - me.x, other.y - me.y) / (me.radius + other.radius)) * 100) / 100);
+      else rec.gap.push(Math.round(Math.min(me.x, s.arenaW - me.x, me.y, s.arenaH - me.y) - me.radius / 2));
+      if (Date.now() - holdStart.get(pg.role)! < 2000) continue;
+      await pg.page.screenshot({ path: join(OUT, `wall-${pg.role}.png`) });
+      results[pg.role] = other
+        ? { reachedS: Math.round((holdStart.get(pg.role)! - t0) / 100) / 10, centreDistOverRadiiSum: { min: Math.min(...rec.dist), max: Math.max(...rec.dist) }, bothAlive: other.state === "alive" }
+        : { reachedS: Math.round((holdStart.get(pg.role)! - t0) / 100) / 10, radius: Math.round(me.radius), minGapPastHalfR: Math.min(...rec.gap), at: `(${Math.round(me.x)},${Math.round(me.y)})` };
+      done.add(pg.role);
+    }
+  }
+  for (const pg of pages) if (!done.has(pg.role)) results[pg.role] = { verdict: "never reached the target in 50 s" };
+  const fps = await Promise.all(pages.map(async (pg) => ({ role: pg.role, ...(await frameStats(pg.page)), console: pg.consoleLog.slice(0, 5) })));
+  await spec.leave();
+  await browser.close();
+  Object.assign(report, {
+    arena: `${st().arenaW}x${st().arenaH}`,
+    clamp: { blobPatchesChecked: checked, breaches: breaches.length, firstBreaches: breaches.slice(0, 8) },
+    results,
+    fps: fps.map((f) => ({ role: f.role, fps: f.fps, p95ms: f.p95ms, over33ms: f.over33ms, console: f.console })),
+    serverErrors: env.serverLog.join("").split("\n").filter((l) => /error|Error/.test(l)).slice(0, 20),
+  });
+}
+
 const w = Number(flag("w", "1280"));
 const h = Number(flag("h", "800"));
 if (mode === "play") Object.assign(report, await play(argv[1] && !argv[1].startsWith("--") ? argv[1] : "food", { w, h, cpu: flag("cpu") ? Number(flag("cpu")) : undefined, mobile: !!flag("mobile") }));
 else if (mode === "runs") await runs(Number(argv[1] ?? 10), argv[2] ?? "food", Number(flag("par", "5")));
 else if (mode === "survival") await survival(Number(argv[1] ?? 10));
 else if (mode === "edges") await edges();
+else if (mode === "walls") await walls({ w, h });
 writeFileSync(join(OUT, "report.json"), JSON.stringify(report, null, 1));
 console.log(JSON.stringify(report, null, 1));
 console.log(`artifacts: ${OUT}`);
