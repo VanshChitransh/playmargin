@@ -16,10 +16,12 @@ if ! command -v caddy >/dev/null; then
 fi
 
 id margin >/dev/null 2>&1 || useradd --system --home /opt/margin --shell /usr/sbin/nologin margin
+id margin-relayer >/dev/null 2>&1 || useradd --system --home /opt/margin --shell /usr/sbin/nologin margin-relayer
 install -d -o margin -g margin /opt/margin /opt/margin/releases /var/lib/margin
-install -d -m 750 -o root -g margin /etc/margin
+# /etc/margin is traversable by both service users, each env file is readable by its own group only.
+install -d -m 755 -o root -g root /etc/margin
 [[ -f /etc/margin/env ]] || echo "create /etc/margin/env from ops/env.example (chmod 640, group margin)"
-[[ -f /etc/margin/relayer.env ]] || echo "create /etc/margin/relayer.env from ops/relayer.env.example (chmod 640, group margin)"
+[[ -f /etc/margin/relayer.env ]] || echo "create /etc/margin/relayer.env from ops/relayer.env.example (chmod 640, group margin-relayer)"
 
 ufw allow OpenSSH && ufw allow 80,443/tcp && ufw --force enable
 echo "setup done. Next: ./ops/deploy.sh from your laptop, then install ops/Caddyfile."

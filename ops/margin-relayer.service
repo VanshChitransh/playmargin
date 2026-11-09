@@ -7,8 +7,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=margin
-Group=margin
+# Its own user: it cannot read /etc/margin/env (settler key), the game server cannot read relayer.env.
+User=margin-relayer
+Group=margin-relayer
 WorkingDirectory=/opt/margin/current/services/relayer
 EnvironmentFile=/etc/margin/relayer.env
 Environment=NODE_ENV=production

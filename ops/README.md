@@ -39,7 +39,7 @@ scp ops/setup.sh root@<ip>: && ssh root@<ip> ./setup.sh
 ### 4. Secrets (on the droplet only, never in git, never in chat)
 ```
 sudo install -m 640 -o root -g margin /dev/null /etc/margin/env          # then edit from ops/env.example
-sudo install -m 640 -o root -g margin /dev/null /etc/margin/relayer.env  # then edit from ops/relayer.env.example
+sudo install -m 640 -o root -g margin-relayer /dev/null /etc/margin/relayer.env  # then edit from ops/relayer.env.example
 ```
 Copy a key from the laptop without it touching the shell history:
 `jq -r .private_key ~/.near-credentials/mainnet/settler.playmargin.near.json | ssh root@<ip> 'cat >> /etc/margin/env'`
