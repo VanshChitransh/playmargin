@@ -1,9 +1,9 @@
 // One tick of a match, in the fixed order from DEVELOPMENT C3 (RULES + EDGE-CASES).
 // Order matters: damage then keeper check, pops before eats (GR-03), largest eater first (GR-14).
-// `inputs` holds commands that arrived since the last tick; boost/repay/cashout are taps.
+// `inputs` holds commands that arrived since the last tick: repay/cashout are taps, boost is held.
 import * as C from "./constants";
 import {
-  accrueInterest, boostTap, cashOut, eat, hitSpike, keeperCheck, liquidate, matchT, outweighs, refillPips,
+  accrueInterest, boostHold, cashOut, eat, flushBoost, hitSpike, keeperCheck, liquidate, matchT, outweighs,
   repayTap, ring, zoneTick,
 } from "./economy";
 import { checkInvariant } from "./invariant";
@@ -41,7 +41,8 @@ function canStartCashout(w: World, b: Blob, tick: number): boolean {
   );
 }
 
-// 1 + 3: store fresh inputs, apply taps, then zero any held input older than 250 ms.
+// 1 + 3: store fresh inputs, apply taps, then zero any held input older than 250 ms and run held
+// BOOST off what is left, so a lost "release" message can't keep borrowing past 250 ms.
 function applyInputs(w: World, inputs: Map<string, InputCmd>, tick: number, ev: Ev): void {
   for (const [id, cmd] of inputs) {
     const b = w.blobs.get(id);
@@ -50,12 +51,9 @@ function applyInputs(w: World, inputs: Map<string, InputCmd>, tick: number, ev: 
     b.lastInputAt = tick;
     // Drones hold no stake: they only steer, so BOOST, REPAY and cash-out never apply to them.
     if (w.phase !== "LIVE" || b.kind === "drone") continue;
-    if (cmd.boost) {
-      const amt = boostTap(w, b, tick);
-      if (amt > 0) ev.push({ type: "boost", blob: b.id, amount: toUnits(amt) });
-    }
     if (cmd.repay) {
-      const amt = repayTap(w, b, tick);
+      let amt = 0;
+      boostEvent(b, () => (amt = repayTap(w, b, tick)), ev);
       if (amt > 0) ev.push({ type: "repay", blob: b.id, amount: toUnits(amt) });
     }
     if (cmd.cashout && canStartCashout(w, b, tick)) {
@@ -67,7 +65,19 @@ function applyInputs(w: World, inputs: Map<string, InputCmd>, tick: number, ev: 
     const cmd = b.lastInput && tick - b.lastInputAt <= INPUT_EXPIRE_T ? b.lastInput : null;
     b.dirX = cmd ? cmd.dirX : 0;
     b.dirY = cmd ? cmd.dirY : 0;
+    if (w.phase !== "LIVE" || b.state !== "alive" || b.kind === "drone") continue;
+    // Held and allowed: borrow this tick. Released, or not allowed any more: the hold is logged.
+    if (cmd?.boost && boostHold(w, b, tick) > 0) continue;
+    const amt = flushBoost(w, b, tick);
+    if (amt > 0) ev.push({ type: "boost", blob: b.id, amount: toUnits(amt) });
   }
+}
+
+/** Run fn and tell clients about any held loan it logged first, so "+N" shows every part of a long hold. */
+function boostEvent(b: Blob, fn: () => unknown, ev: Ev): void {
+  const pending = b.pendingBorrow;
+  fn();
+  if (pending > 0 && b.pendingBorrow === 0) ev.push({ type: "boost", blob: b.id, amount: toUnits(pending) });
 }
 
 function keeper(w: World, b: Blob, tick: number, ev: Ev): void {
@@ -207,13 +217,12 @@ export function step(w: World, inputs: Map<string, InputCmd>, tick: number): Gam
   // 2. phase timers
   const t = matchT(w, tick);
   if (t === T(C.R.LAST_CALL_S)) ev.push({ type: "lastCall", tick });
-  for (const b of live(w)) refillPips(b, tick);
   // 4. move
   for (const b of live(w)) move(b, DT, tick, w.arena);
   // 5. interest, once per whole second
   if (t > 0 && t % T(C.R.INTEREST_ACCRUE_S) === 0) {
     for (const b of players(w)) {
-      accrueInterest(w, b, tick);
+      boostEvent(b, () => accrueInterest(w, b, tick), ev);
       keeper(w, b, tick, ev);
     }
   }

@@ -13,15 +13,11 @@ type Cfg = {
   src?: Record<string, [string, string][]>;
   caution?: number;
 };
-// Balance B (approved 9 Nov) is now the real rules. "before" rebuilds the old rules for comparison.
-// Each runs twice: the greedy player dodging spikes like a practised bot (caution 0.6) and like a
-// first-timer (0.2).
-const redEatsFood: [string, string] = ["players\\(w\\)\\.filter\\(\\(b\\) => ring\\(b\\) !== \"red\"\\)", "players(w)"];
-const BEFORE = { RED_GRACE_MS: 300, SPIKE_LEVERAGE_MULT_MAX: 1.5, SPIKE_BIG_SHARE: 0.3, SPIKES_PER_PLAYER: 2 };
-const CONFIGS: Cfg[] = [0.6, 0.2].flatMap((caution) => [
-  { name: `before B (caution ${caution})`, caution, rules: BEFORE, src: { "step.ts": [redEatsFood] } },
-  { name: `RULES now = B (caution ${caution})`, caution },
-]);
+// BOOST is hold-to-nitro (9 Nov): candidates for its borrow rate, on top of balance B. Each runs
+// twice: the greedy player dodging spikes like a practised bot (caution 0.6) and like a first-timer (0.2).
+const CONFIGS: Cfg[] = [0.6, 0.2].flatMap((caution) =>
+  [0.75, 1.0, 1.5].map((rate) => ({ name: `nitro ${rate}x equity/s (caution ${caution})`, caution, rules: { NITRO_RATE_EQUITY_PER_S: rate } })),
+);
 const extra = process.argv[3] ? (JSON.parse(process.argv[3]) as Cfg[]) : [];
 
 const n = process.argv[2] ?? "200";

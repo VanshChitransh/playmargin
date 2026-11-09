@@ -24,14 +24,13 @@ export interface Blob {
   dirY: number;
   mass: Micro;
   debt: Micro;
-  /** Borrow fees paid on the open loan; added back when sizing BOOST so fees never shrink your limit (RULES worked check: 3 taps of 40). */
+  /** Borrow fees paid on the open loan; added back when sizing BOOST so fees never shrink your limit (RULES worked check: a full hold borrows 120). */
   boostFees: Micro;
   /** What this blob left with (cash-out or bell); 0 if popped or eaten. */
   payout: Micro;
-  /** Lit BOOST pips; pipReadyAt holds the tick each spent pip relights. */
-  pips: number;
-  pipReadyAt: number[];
-  /** Tick the 1 s BOOST speed burst ends. */
+  /** Borrowed during the current BOOST hold, not yet logged (its fee is charged when logged). */
+  pendingBorrow: Micro;
+  /** Tick the BOOST speed ends: the tick after the last held tick that borrowed. */
   boostUntil: number;
   /** Tick the next REPAY tap is allowed (0.4 s cooldown). */
   repayReadyAt: number;

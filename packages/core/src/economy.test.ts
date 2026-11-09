@@ -2,26 +2,33 @@
 import { describe, expect, it } from "vitest";
 import { MICRO } from "./constants";
 import {
-  accrueInterest, boostRoom, boostTap, canBoost, cashOut, eat, hfBps, hitSpike, keeperCheck,
-  liquidate, matchRateBps, refillPips, repayTap, ring, spikeDamage, zoneTick,
+  accrueInterest, boostHold, boostRoom, canBoost, cashOut, eat, flushBoost, fuel, hfBps, hitSpike, keeperCheck,
+  liquidate, matchRateBps, repayTap, ring, spikeDamage, zoneTick,
 } from "./economy";
 import { leak, makeBlob, makeWorld } from "./testkit";
 
 const u = (x: number) => Math.round(x * MICRO);
 
 describe("RULES worked check", () => {
-  it("80 -> 3 taps -> spike -> 2 REPAY taps", () => {
+  it("80 -> hold BOOST to the cap -> spike -> 2 REPAY taps", () => {
     const a = makeBlob();
     const w = makeWorld([a]);
     expect(ring(a)).toBe("green");
 
-    for (let i = 0; i < 3; i++) expect(boostTap(w, a, 1 + i)).toBe(u(40));
+    // 1x own money per second: 1,333,333 Micro a tick, so the 120 of room fills in 91 ticks (~1.5 s).
+    let tick = 1;
+    while (boostHold(w, a, tick) > 0) tick++;
+    expect(tick).toBe(92);
+    expect(fuel(a)).toBe(0);
+    expect(a.mass).toBe(u(200));
+    expect(flushBoost(w, a, tick)).toBe(u(120)); // one BOOST entry for the whole hold, fee 1.2
+    expect(w.pendingLog.filter((e) => e.type === "BOOST")).toHaveLength(1);
     expect(a.mass).toBe(u(198.8));
     expect(a.debt).toBe(u(120));
     expect(hfBps(a)).toBe(13253); // 1.33
     expect(ring(a)).toBe("green");
     expect(boostRoom(a)).toBe(0);
-    expect(boostTap(w, a, 4)).toBe(0); // no pips, no room
+    expect(boostHold(w, a, tick)).toBe(0); // tank empty
 
     expect(hitSpike(w, a, 1, true, 10)).toBe(u(198.8 - 142.5));
     expect(a.mass).toBe(u(142.5));
@@ -53,16 +60,24 @@ describe("RULES worked check", () => {
   });
 });
 
-describe("BOOST", () => {
-  it("chunks are 0.5x own money: 200 -> 100, 50 -> 25", () => {
+describe("BOOST (hold to nitro)", () => {
+  it("borrows 1x own money per second while held: 200 -> ~200 in 1 s, 50 -> ~50", () => {
     const big = makeBlob({ mass: u(200) });
     const small = makeBlob({ id: "s", mass: u(50) });
     const w = makeWorld([big, small]);
-    expect(boostTap(w, big, 1)).toBe(u(100));
-    expect(boostTap(w, small, 1)).toBe(u(25));
+    for (let t = 1; t <= 60; t++) {
+      boostHold(w, big, t);
+      boostHold(w, small, t);
+    }
+    expect(Math.abs(big.debt - u(200))).toBeLessThanOrEqual(60);
+    expect(Math.abs(small.debt - u(50))).toBeLessThanOrEqual(60);
+    expect(big.boostUntil).toBe(61); // x1.5 speed only while it borrows
+    expect(leak(w)).toBe(0);
+    expect(flushBoost(w, big, 61)).toBe(big.debt);
+    expect(flushBoost(w, big, 62)).toBe(0);
     expect(leak(w)).toBe(0);
   });
-  it("blocked when shielded, cashing out, after 80 s, outside LIVE; pips refill after 3 s", () => {
+  it("blocked when shielded, cashing out, after 80 s, outside LIVE, for drones", () => {
     const a = makeBlob({ shieldUntil: 100 });
     const w = makeWorld([a]);
     expect(canBoost(w, a, 50)).toBe(false);
@@ -74,20 +89,25 @@ describe("BOOST", () => {
     w.phase = "WARMUP";
     expect(canBoost(w, a, 200)).toBe(false);
     w.phase = "LIVE";
-    boostTap(w, a, 200);
-    expect(a.pips).toBe(2);
-    refillPips(a, 200 + 179);
-    expect(a.pips).toBe(2);
-    refillPips(a, 200 + 180);
-    expect(a.pips).toBe(3);
+    a.kind = "drone";
+    expect(canBoost(w, a, 200)).toBe(false);
   });
-  it("blocked when red; eating raises the limit again", () => {
+  it("blocked when red; REPAY or eating refills the tank", () => {
     const a = makeBlob({ mass: u(142.5), debt: u(120), boostFees: u(1.2) });
     const w = makeWorld([a]);
     expect(canBoost(w, a, 1)).toBe(false);
     a.mass += u(60);
     expect(ring(a)).toBe("green");
-    expect(boostRoom(a)).toBeGreaterThan(0);
+    expect(fuel(a)).toBeGreaterThan(0);
+  });
+  it("a REPAY mid-hold logs the loan first, so settle sees the debt it repays", () => {
+    const a = makeBlob();
+    const w = makeWorld([a]);
+    for (let t = 1; t <= 30; t++) boostHold(w, a, t);
+    repayTap(w, a, 31);
+    expect(w.pendingLog.map((e) => e.type)).toEqual(["BOOST", "REPAY"]);
+    expect(a.pendingBorrow).toBe(0);
+    expect(leak(w)).toBe(0);
   });
 });
 
@@ -97,10 +117,8 @@ describe("audit: borrow/repay cycles", () => {
     const w = makeWorld([a]);
     let tick = 1;
     for (let cycle = 0; cycle < 120; cycle++) {
-      for (let i = 0; i < 3; i++) {
-        a.pips = 3;
-        boostTap(w, a, tick++);
-      }
+      while (boostHold(w, a, tick) > 0) tick++;
+      flushBoost(w, a, tick++);
       while (a.debt > 1) {
         a.repayReadyAt = 0;
         repayTap(w, a, tick++);
@@ -108,8 +126,8 @@ describe("audit: borrow/repay cycles", () => {
       expect(a.mass * 10_000).toBeLessThanOrEqual(25_200 * (a.mass - a.debt) + 10_000);
     }
     w.vault.budget = 10 * a.mass;
-    a.pips = 3;
-    for (let i = 0; i < 3; i++) boostTap(w, a, tick++);
+    while (boostHold(w, a, tick) > 0) tick++;
+    flushBoost(w, a, tick);
     expect(ring(a)).toBe("green");
     expect(leak(w)).toBe(0);
   });
@@ -174,11 +192,11 @@ describe("eat and cash-out", () => {
   it("cash-out repays debt and pays equity", () => {
     const a = makeBlob();
     const w = makeWorld([a]);
-    boostTap(w, a, 1);
-    expect(cashOut(w, a, 2)).toBe(u(79.6));
+    for (let t = 1; t <= 30; t++) boostHold(w, a, t); // half a second: 39,999,990 borrowed, fee 0.4
+    expect(cashOut(w, a, 31)).toBe(u(79.6));
     expect(a.state).toBe("cashed");
     expect(a.payout).toBe(u(79.6));
-    expect(w.vault.repaid).toBe(u(40));
+    expect(w.vault.repaid).toBe(39_999_990);
     expect(leak(w)).toBe(0);
   });
 });

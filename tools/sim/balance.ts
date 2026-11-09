@@ -1,5 +1,5 @@
 // `npx tsx tools/sim/balance.ts [matches] [greedy caution]`: liquidation balance under the CURRENT constants.
-// Each match has one greedy player (holds all 3 pips: boosts whenever it can, never repays or
+// Each match has one greedy player (holds BOOST whenever it can, to the cap, never repays or
 // cashes out) among normal FreeBots. Prints one JSON line; tools/sim/sweep.ts runs it per config.
 import { type AgentView, type Brain, type InputCmd } from "@margin/core";
 import { FreeBot } from "../../apps/server/src/agents/index";
@@ -10,7 +10,7 @@ class Greedy implements Brain {
   constructor(seed: number, caution: number) { this.bot = new FreeBot(seed, { greed: 1, caution }); }
   decide(v: AgentView, tick: number): InputCmd {
     const c = this.bot.decide(v, tick);
-    return { ...c, boost: v.self.pips > 0, repay: false, cashout: false };
+    return { ...c, boost: true, repay: false, cashout: false };
   }
 }
 

@@ -1,7 +1,7 @@
 // Mapper from engine state to the display-only views in protocol.ts. Money leaves the
 // engine only as display units here, never as raw Micro (DEVELOPMENT 0.6, Mapper).
 import { MATCH_TICKS, R } from "./constants";
-import { equity, matchT, ring } from "./economy";
+import { equity, fuel, matchT, ring } from "./economy";
 import { radius } from "./motion";
 import type { BlobView, FoodView, MatchView, RateTier, SpikeView } from "./protocol";
 import type { Blob, Food, Spike, World } from "./types";
@@ -12,7 +12,7 @@ import { ranking } from "./world";
 export function blobView(b: Blob, tick: number): BlobView {
   return {
     id: b.id, kind: b.kind, label: b.label, x: b.x, y: b.y, radius: radius(b.mass), ring: ring(b),
-    pips: b.pips, owe: toUnits(b.debt), equity: toUnits(b.state === "cashed" ? b.payout : equity(b)),
+    fuel: fuel(b), pips: Math.ceil(fuel(b) * R.BOOST_PIPS - 1e-9), owe: toUnits(b.debt), equity: toUnits(b.state === "cashed" ? b.payout : equity(b)),
     shielded: tick < b.shieldUntil, cashingOut: b.cashout !== null, state: b.state,
   };
 }
