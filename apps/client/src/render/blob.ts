@@ -2,12 +2,24 @@
 // (solid green, dashed yellow, pulsing red with a warning sign) so colour-blind
 // players read it too (inspiration.md principle 2). Bodies are agar-style: a vivid colour
 // per id, darker rim, name centred in white with a dark stroke. Drones are hollow hexes.
+// The outline is a soft membrane (membrane.ts): it flattens on the wall, dents under bigger
+// blobs and wobbles; the debt shell, me ring, health ring and shield follow the same outline.
 import { Container, Graphics, Text } from "pixi.js";
 import { MICRO, radius, type BlobView, type Ring } from "@margin/core";
 import { C, darken, vivid } from "./colors";
 import { displayName } from "../hud/logic";
 import { reducedMotion } from "./motion";
 import { JUICE } from "./juice";
+import { Membrane, type Neighbour } from "./membrane";
+
+/** What a blob needs to know about the world to shape its outline. */
+export interface Surroundings {
+  w: number;
+  h: number;
+  /** Blobs drawn on top of this one that may overlap it. */
+  over: readonly Neighbour[];
+  dt: number;
+}
 
 const RING_GAP = 4;
 const RING_W = 4;
@@ -22,8 +34,11 @@ export class BlobSprite extends Container {
   private drawn = { r: -1, ring: "" as Ring | "", kind: "" };
   private prev = { x: 0, y: 0, speed: 0 };
   private fill = 0;
-  private calm = false;
   private isMe = false;
+  private mem = new Membrane();
+  private ringStyle: { w: number; color: number; dashed: boolean } = { w: RING_W, color: C.ringSafe, dashed: false };
+  private lastR = -1;
+  private dirty = true;
   /** Radius of my equity core inside the debt shell (0 = no loan). */
   private core = 0;
   private stretch = 0;
@@ -45,7 +60,7 @@ export class BlobSprite extends Container {
   }
 
   /** Sync to a view; tS is seconds since start (pulses), zoom keeps text a fixed screen size. */
-  update(v: BlobView, tS: number, isMe: boolean, zoom: number, ghost = false, boosting = false): void {
+  update(v: BlobView, tS: number, isMe: boolean, zoom: number, ghost = false, boosting = false, around?: Surroundings): void {
     const moved = Math.hypot(v.x - this.prev.x, v.y - this.prev.y);
     if (moved > 0.5) this.heading = Math.atan2(v.y - this.prev.y, v.x - this.prev.x);
     this.prev = { x: v.x, y: v.y, speed: this.prev.speed * 0.85 + Math.min(moved, 20) * 0.15 };
@@ -64,8 +79,8 @@ export class BlobSprite extends Container {
     }
     const r = v.radius + RING_GAP;
     const k = 1 / zoom;
-    if (v.kind !== "drone") this.membrane(v.radius, tS);
     this.feel(boosting);
+    if (v.kind !== "drone") this.membrane(v, tS, around);
     // Name inside the blob, sized with it (agar.io), never under ~11 px on screen.
     const ns = Math.max(v.radius * 0.5, 11 / zoom) / 28;
     this.nameText.scale.set(ns);
@@ -82,28 +97,52 @@ export class BlobSprite extends Container {
     this.warnSign.alpha = 0.6 + 0.4 * p;
   }
 
-  /** agar.io membrane: a flat vivid body with a darker rim that ripples while moving. */
-  private membrane(r: number, tS: number, force = false): void {
+  /** Shape the soft outline for this frame and redraw it when it moved. */
+  private membrane(v: BlobView, tS: number, around?: Surroundings): void {
+    const r = v.radius;
     const amp = reducedMotion ? 0 : wobble(r, this.prev.speed);
-    if (amp < 0.3 && !force && this.calm) return;
-    this.calm = amp < 0.3;
-    const n = 48;
-    const pts: number[] = [];
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * Math.PI * 2;
-      const rr = r + amp * Math.sin(a * 5 + tS * 6) * Math.sin(a * 3 - tS * 4);
-      pts.push(Math.cos(a) * rr, Math.sin(a) * rr);
-    }
-    this.body.clear();
+    const sq = performance.now() < this.squashUntil ? 1 - this.squashAmount : 1;
+    const sx = 1 + this.stretch;
+    const sy = 1 - this.stretch / 2;
+    const h = this.heading;
+    // Free shape: stretched along the heading (BOOST), squashed (REPAY, pickups), rippling.
+    const shape = (a: number): number => {
+      const c = Math.cos(a - h) / sx;
+      const s = Math.sin(a - h) / sy;
+      return (r * sq) / Math.sqrt(c * c + s * s) + amp * Math.sin(a * 5 + tS * 6) * Math.sin(a * 3 - tS * 4);
+    };
+    this.mem.target(v.x, v.y, r, shape, around?.w ?? Infinity, around?.h ?? Infinity, around?.over ?? []);
+    this.mem.settleIfNew();
+    if (this.lastR > 0 && !reducedMotion && Math.abs(r - this.lastR) > 1) this.mem.kick((r - this.lastR) * JUICE.MEMBRANE_KICK);
+    this.lastR = r;
+    // Ask before stepping: a reduced-motion snap lands on the target in one step and would hide the change.
+    const moving = this.mem.moving();
+    this.mem.step(around?.dt ?? 1 / 60, !reducedMotion);
+    if (!this.dirty && !moving) return;
+    this.dirty = false;
+    this.paint(r);
+  }
+
+  /** Body, debt shell, me ring, health ring and shield, all from the one outline. */
+  private paint(r: number): void {
+    const b = this.body.clear();
+    const rim = Math.max(3, r * 0.06);
     if (this.core > 0) {
       // Loan as shape: a translucent gold band outside a player-coloured equity core.
-      this.body.poly(pts).fill({ color: JUICE.SHELL_COLOR, alpha: JUICE.SHELL_ALPHA }).stroke({ width: Math.max(3, r * 0.06), color: darken(JUICE.SHELL_COLOR) });
-      this.body.circle(0, 0, this.core).fill(this.fill).stroke({ width: Math.max(2, this.core * 0.05), color: darken(this.fill) });
+      smooth(b, this.mem.points()).fill({ color: JUICE.SHELL_COLOR, alpha: JUICE.SHELL_ALPHA }).stroke({ width: rim, color: darken(JUICE.SHELL_COLOR) });
+      smooth(b, this.mem.points(this.core / r)).fill(this.fill).stroke({ width: Math.max(2, this.core * 0.05), color: darken(this.fill) });
     } else {
-      this.body.poly(pts).fill(this.fill).stroke({ width: Math.max(3, r * 0.06), color: darken(this.fill) });
+      smooth(b, this.mem.points()).fill(this.fill).stroke({ width: rim, color: darken(this.fill) });
     }
     // My own blob: a thin paper ring just inside the rim, so "me" reads at a glance.
-    if (this.isMe) this.body.circle(0, 0, (this.core || r) * 0.84).stroke({ width: Math.max(4, r * 0.07), color: 0xffffff, alpha: 0.9 });
+    if (this.isMe) smooth(b, this.mem.points(((this.core || r) * 0.84) / r)).stroke({ width: Math.max(4, r * 0.07), color: 0xffffff, alpha: 0.9 });
+    const ring = this.ring.clear();
+    const pts = this.mem.points(1, RING_GAP);
+    // Ink under every ring (sticker outline): green, amber and red read on any fill and floor.
+    smooth(ring, pts).stroke({ width: this.ringStyle.w + 3, color: C.ink, alpha: 0.85 });
+    if (this.ringStyle.dashed) dashed(ring, pts, this.ringStyle.color);
+    else smooth(ring, pts).stroke({ width: this.ringStyle.w, color: this.ringStyle.color });
+    smooth(this.shield.clear(), this.mem.points(1, RING_GAP + 7)).stroke({ width: 2, color: C.navy, alpha: 0.35 });
   }
 
   /** REPAY landed: compress then spring back (presentation only). */
@@ -113,13 +152,10 @@ export class BlobSprite extends Container {
     this.squashUntil = performance.now() + ms;
   }
 
-  /** Stretch along heading while boosting, squash on REPAY; never under reduced motion. */
+  /** Stretch along heading while boosting; the membrane bakes it into the outline. */
   private feel(boosting: boolean): void {
     if (reducedMotion) return;
     this.stretch += ((boosting ? JUICE.BOOST_STRETCH : 0) - this.stretch) * Math.min(1, JUICE.STRETCH_EASE / 60);
-    const sq = performance.now() < this.squashUntil ? 1 - this.squashAmount : 1;
-    this.body.rotation = this.heading;
-    this.body.scale.set((1 + this.stretch) * sq, (1 - this.stretch / 2) * sq);
   }
 
   private redraw(v: BlobView, isMe: boolean): void {
@@ -135,27 +171,34 @@ export class BlobSprite extends Container {
     }
     this.fill = vivid(v.id);
     this.isMe = isMe;
-    this.membrane(r, 0, true);
-    const rr = r + RING_GAP;
-    // Ink under every ring (sticker outline): green, amber and red read on any fill and floor.
-    const w = v.ring === "red" ? RING_W * 2 : RING_W;
-    this.ring.circle(0, 0, rr).stroke({ width: w + 3, color: C.ink, alpha: 0.85 });
-    if (v.ring === "yellow") dashed(this.ring, rr, C.ringWarn);
-    else this.ring.circle(0, 0, rr).stroke({ width: w, color: v.ring === "red" ? C.liq : C.ringSafe });
-    this.shield.circle(0, 0, rr + 7).stroke({ width: 2, color: C.navy, alpha: 0.35 });
+    this.ringStyle = { w: v.ring === "red" ? RING_W * 2 : RING_W, color: v.ring === "red" ? C.liq : v.ring === "yellow" ? C.ringWarn : C.ringSafe, dashed: v.ring === "yellow" };
+    this.dirty = true;
   }
 }
 
 /** Wobble amplitude in world units grows with speed, so a blob at rest is a clean circle. */
 function wobble(r: number, speed: number): number {
-  return Math.min(r * 0.035, speed * 0.25);
+  return Math.min(r * JUICE.MEMBRANE_RIPPLE, speed * 0.25);
 }
 
-function dashed(g: Graphics, r: number, color: number): void {
-  const step = (Math.PI * 2) / DASHES;
-  for (let i = 0; i < DASHES; i++) {
-    const a = i * step;
-    g.moveTo(Math.cos(a) * r, Math.sin(a) * r).arc(0, 0, r, a, a + step * 0.6);
+/** Closed smooth curve through the outline points: quadratic segments between midpoints. */
+function smooth(g: Graphics, p: number[]): Graphics {
+  const n = p.length / 2;
+  const mx = (i: number): number => (p[(i % n) * 2]! + p[((i + 1) % n) * 2]!) / 2;
+  const my = (i: number): number => (p[(i % n) * 2 + 1]! + p[((i + 1) % n) * 2 + 1]!) / 2;
+  g.moveTo(mx(n - 1), my(n - 1));
+  for (let i = 0; i < n; i++) g.quadraticCurveTo(p[i * 2]!, p[i * 2 + 1]!, mx(i), my(i));
+  return g.closePath();
+}
+
+/** Yellow ring: DASHES dashes along the outline, each 60% of its slot. */
+function dashed(g: Graphics, p: number[], color: number): void {
+  const n = p.length / 2;
+  for (let d = 0; d < DASHES; d++) {
+    const i0 = Math.round((d * n) / DASHES);
+    const i1 = Math.round(((d + 0.6) * n) / DASHES);
+    g.moveTo(p[(i0 % n) * 2]!, p[(i0 % n) * 2 + 1]!);
+    for (let i = i0 + 1; i <= i1; i++) g.lineTo(p[(i % n) * 2]!, p[(i % n) * 2 + 1]!);
   }
   g.stroke({ width: RING_W, color, cap: "round" });
 }

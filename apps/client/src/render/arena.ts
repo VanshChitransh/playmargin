@@ -66,6 +66,7 @@ export class ArenaRenderer {
   private wasBoosting = false;
   private last: { x: number; y: number; h: number } | null = null;
   private view = VIEW_AT_START;
+  private lastBlobT = 0;
 
   async mount(root: HTMLElement, source: FrameSource, opts: { fps?: boolean; fit?: HTMLElement; view?: number } = {}): Promise<void> {
     // Canvas text bakes whatever font is loaded at creation: wait for ours (a direct load of
@@ -180,12 +181,18 @@ export class ArenaRenderer {
     if (f.match.phase !== "LIVE") this.zoneMaxR = 0;
     else this.zoneMaxR = Math.max(this.zoneMaxR, z.r);
     const shrinking = f.match.phase === "LIVE" && z.r < this.zoneMaxR - 1 && z.r < Math.hypot(f.arena.w, f.arena.h);
-    const key = `${z.cx | 0},${z.cy | 0},${z.r | 0},${shrinking},${f.arena.w},${f.arena.h}`;
+    const key = `${z.cx | 0},${z.cy | 0},${z.r | 0},${shrinking},${f.arena.w},${f.arena.h},${this.zoom.toFixed(2)}`;
     if (key === this.zoneKey) return;
     this.zoneKey = key;
     this.zone.clear();
-    // agar.io edge: same grid on both sides, only a faint thin line marks the end.
-    this.zone.rect(0, 0, f.arena.w, f.arena.h).stroke({ width: 2, color: C.edge, alpha: 0.9 });
+    // agar.io edge: the floor past the wall is a shade darker and the edge is a soft thick line,
+    // so a blob flattening there reads as hitting a wall.
+    const out = Math.max(f.arena.w, f.arena.h) + BEYOND;
+    this.zone
+      .rect(-out, -out, f.arena.w + out * 2, f.arena.h + out * 2)
+      .fill({ color: C.ink, alpha: JUICE.WALL_TINT_ALPHA })
+      .rect(0, 0, f.arena.w, f.arena.h)
+      .cut();
     if (shrinking) {
       const pad = Math.max(f.arena.w, f.arena.h);
       this.zone
@@ -196,6 +203,7 @@ export class ArenaRenderer {
         .circle(z.cx, z.cy, z.r)
         .stroke({ width: 4, color: C.liq, alpha: 0.7 });
     }
+    this.zone.rect(0, 0, f.arena.w, f.arena.h).stroke({ width: JUICE.WALL_LINE_PX / this.zoom, color: C.ink, alpha: JUICE.WALL_LINE_ALPHA });
   }
 
   private syncFood(f: Frame): void {
@@ -252,6 +260,11 @@ export class ArenaRenderer {
 
   private syncBlobs(f: Frame, tS: number): void {
     const seen = new Set<string>();
+    const dt = Math.min(0.1, Math.max(0, tS - this.lastBlobT));
+    this.lastBlobT = tS;
+    // Before GO blobs pass through each other, so nothing dents; drones never touch anyone.
+    const live = f.match.phase !== "WARMUP" && f.match.phase !== "COUNTDOWN";
+    const solid = live ? f.blobs.filter((b) => b.state === "alive" && b.kind !== "drone") : [];
     for (const v of f.blobs) {
       seen.add(v.id);
       const isMe = v.id === f.me;
@@ -262,8 +275,11 @@ export class ArenaRenderer {
         this.blobLayer.addChild(s);
       }
       const boosting = isMe && this.held && f.match.phase === "LIVE" && (v.fuel ?? 1) > 0.001;
-      s.update(v, tS, isMe, this.zoom, !isMe && (f.match.phase === "WARMUP" || f.match.phase === "COUNTDOWN"), boosting);
-      s.zIndex = isMe ? 1e6 : v.radius; // small under big, me always on top
+      // agar: cells overlap and the bigger one draws on top (me wins a tie), so only the
+      // smaller blob dents, along the edge of the one above it.
+      const over = solid.filter((o) => o.id !== v.id && above(o, v, f.me) && Math.hypot(o.x - v.x, o.y - v.y) < o.radius + v.radius);
+      s.update(v, tS, isMe, this.zoom, !isMe && !live, boosting, { w: f.arena.w, h: f.arena.h, over: over.map((o) => ({ x: o.x, y: o.y, r: o.radius })), dt });
+      s.zIndex = v.radius + (isMe ? 0.5 : 0);
     }
     this.blobLayer.sortableChildren = true;
     prune(this.blobs, seen);
@@ -317,6 +333,11 @@ export class ArenaRenderer {
     const oy = this.lead.y + this.kick.y;
     this.world.position.set(width / 2 - ox - x * this.zoom, height / 2 - oy - y * this.zoom);
   }
+}
+
+/** Is blob a drawn on top of blob b? Bigger on top; my blob wins a tie. */
+function above(a: Frame["blobs"][number], b: Frame["blobs"][number], me: string): boolean {
+  return a.radius > b.radius || (a.radius === b.radius && (a.id === me || (b.id !== me && a.id > b.id)));
 }
 
 function prune<K, V extends Container>(map: Map<K, V>, seen: Set<K>): void {

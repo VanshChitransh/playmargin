@@ -105,4 +105,35 @@ export const JUICE = {
 
   // Before GO, other blobs are ghosts: overlap must never read as contact.
   GHOST_ALPHA: 0.35,
+
+  // Soft body (membrane.ts): agar cells flatten on the wall and wobble like jelly
+  /** Rim length per outline point, and the point count bounds. */
+  MEMBRANE_SPACING: 7,
+  MEMBRANE_MIN_PTS: 40,
+  MEMBRANE_MAX_PTS: 100,
+  /** Spring toward the target, pull toward the neighbours' average, and damping (per second). */
+  MEMBRANE_K: 260,
+  MEMBRANE_NEIGHBOUR: 160,
+  MEMBRANE_DAMP: 14,
+  /** Longest step the springs take, so a background tab never explodes the jelly. */
+  MEMBRANE_MAX_DT: 1 / 30,
+  /** No point of the outline closer to the centre than this share of the radius. */
+  MEMBRANE_MIN: 0.45,
+  /** World units the outline keeps from the centre even flat on the wall (no zero-size slivers). */
+  MEMBRANE_WALL_MIN: 2,
+  /** Dent under a bigger blob: full up to this overlap (share of my diameter), gone by the next. */
+  MEMBRANE_DENT_FULL: 0.25,
+  MEMBRANE_DENT_GONE: 0.5,
+  /** How far the dent follows the bigger blob's edge (1 = all the way). */
+  MEMBRANE_DENT_DEPTH: 0.6,
+  /** A sudden size jump (an eat, a hit) kicks the rim outward this much per world unit of change. */
+  MEMBRANE_KICK: 6,
+  /** Moving ripple: largest bump as a share of the radius (grows with speed up to this). */
+  MEMBRANE_RIPPLE: 0.016,
+
+  // Arena wall
+  /** Out of bounds floor tint (ink at this alpha) and the soft edge line width in screen px. */
+  WALL_TINT_ALPHA: 0.07,
+  WALL_LINE_PX: 3.5,
+  WALL_LINE_ALPHA: 0.35,
 } as const;
