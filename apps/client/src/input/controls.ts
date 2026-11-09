@@ -89,6 +89,8 @@ export class Controls {
   }
 
   private tap(t: Tap): void {
+    // Answer the press locally at once (< 100 ms rule); the server's result follows.
+    this.els[t].animate([{ transform: "scale(0.86)" }, { transform: "scale(1)" }], { duration: 140, easing: "ease-out" });
     this.taps[t] = true;
     this.flush(false);
   }

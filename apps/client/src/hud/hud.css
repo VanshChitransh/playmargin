@@ -25,3 +25,10 @@
 @media (prefers-reduced-motion: reduce) {
   .punch, .banner { animation-duration: 1ms; }
 }
+
+/* Margin call: a hard frame around the screen (brand: no soft vignette). Yellow breathes,
+   red beats like a heart. Shape + motion + the MARGIN CALL label, never colour alone. */
+@keyframes beat { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.call-frame { position: fixed; inset: 0; pointer-events: none; border: 0 solid transparent; transition: border-width 150ms; }
+.call-frame[data-ring="yellow"] { border-width: 6px; border-color: var(--color-warn); animation: beat 1s ease-in-out infinite; }
+.call-frame[data-ring="red"] { border-width: 14px; border-color: var(--color-liq); animation: beat 0.45s ease-in-out infinite; }

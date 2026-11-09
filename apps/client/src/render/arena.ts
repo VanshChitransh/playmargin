@@ -8,6 +8,7 @@ import { C } from "./colors";
 import { spikeWouldRedden } from "./danger";
 import { SPIKE_R, SpikeSprite, bakeSpikeTextures } from "./spike";
 import { boostBlocked, boostPreview } from "../hud/logic";
+import { FxLayer } from "./fx";
 
 const CELL = 64;
 /** Spikes further than this from my edge never warn: "within reach" (RULES, Spikes). */
@@ -26,6 +27,10 @@ export class ArenaRenderer {
   private spikeLayer = new Container();
   private blobLayer = new Container();
   private preview = new Graphics();
+  readonly fx = new FxLayer();
+  private frozenUntil = 0;
+  private lastFrame: Frame | null = null;
+  private lastT = 0;
   private foods = new Map<number, Sprite>();
   private spikes = new Map<number, SpikeSprite>();
   private blobs = new Map<string, BlobSprite>();
@@ -47,7 +52,7 @@ export class ArenaRenderer {
     root.appendChild(this.app.canvas);
     this.view = opts.view ?? VIEW_AT_START;
     this.bake();
-    this.world.addChild(this.grid, this.zone, this.foodLayer, this.spikeLayer, this.blobLayer, this.preview);
+    this.world.addChild(this.grid, this.zone, this.foodLayer, this.spikeLayer, this.blobLayer, this.preview, this.fx);
     this.app.stage.addChild(this.world);
     if (opts.fps) {
       this.fps = new Text({ text: "", style: { fontFamily: "JetBrains Mono", fontSize: 12, fill: C.muted } });
@@ -57,10 +62,24 @@ export class ArenaRenderer {
     const t0 = performance.now();
     this.app.ticker.add(() => {
       const now = performance.now();
-      const f = source(now);
-      if (f) this.draw(f, (now - t0) / 1000);
+      const tS = (now - t0) / 1000;
+      // Hit-stop: hold the last picture for a beat so my own pop lands (Juice it or lose it).
+      const f = now < this.frozenUntil ? this.lastFrame : source(now);
+      if (f) this.draw(f, tS);
+      this.lastFrame = f;
+      this.fx.tick(Math.min(0.05, tS - this.lastT));
+      this.lastT = tS;
       if (this.fps) this.fps.text = `${Math.round(this.app.ticker.FPS)} fps`;
     });
+  }
+
+  /** Freeze the world picture for ms (effects keep moving). */
+  hitStop(ms: number): void {
+    this.frozenUntil = performance.now() + ms;
+  }
+
+  get zoomLevel(): number {
+    return this.zoom;
   }
 
   destroy(): void {

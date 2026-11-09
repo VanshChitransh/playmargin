@@ -11,6 +11,7 @@ import { MatchConnection, guestKey } from "./net/client";
 import { ArenaRenderer } from "./render/arena";
 import { rerender, type Screen } from "./router";
 import { showDeath, showResults } from "./screens/overlays";
+import { C } from "./render/colors";
 
 interface Source {
   readonly me: string;
@@ -55,6 +56,44 @@ export const play: Screen = (root, params) => {
   status.textContent = "Connecting";
   root.appendChild(status);
 
+  /** Event to effect: every money moment gets a visible number or burst where it happened. */
+  const juice = (e: GameEventMsg, me: string): void => {
+    const at = (id: string): { x: number; y: number; r: number } | undefined => {
+      const b = lastFrame?.blobs.find((x) => x.id === id);
+      return b && { x: b.x, y: b.y, r: b.radius };
+    };
+    const z = arena.zoomLevel;
+    const num = (n: number): string => (n >= 10 ? Math.round(n).toString() : n.toFixed(1));
+    switch (e.type) {
+      case "boost":
+      case "repay": {
+        const p = e.blob === me ? at(me) : undefined;
+        if (p) arena.fx.floatText(p.x, p.y - p.r, `${e.type === "boost" ? "+" : "\u2212"}${num(e.amount)}`, e.type === "boost" ? C.gold : C.paper, z);
+        break;
+      }
+      case "spikeHit": {
+        const p = at(e.blob);
+        if (!p) break;
+        arena.fx.shards(p.x, p.y, Math.max(4, Math.min(18, Math.round(e.damage / 2))), C.muted, p.r);
+        if (e.blob === me) arena.fx.floatText(p.x, p.y - p.r, `\u2212${num(e.damage)}`, C.liq, z);
+        break;
+      }
+      case "pop": {
+        const p = at(e.victim);
+        if (p) arena.fx.shards(p.x, p.y, 22, C.liq, p.r);
+        if (e.victim === me) arena.hitStop(150);
+        const by = e.by === me ? at(me) : undefined;
+        if (by && e.bounty > 0) arena.fx.floatText(by.x, by.y - by.r, `+${num(e.bounty)}`, C.gold, z);
+        break;
+      }
+      case "eat": {
+        const p = e.by === me ? at(me) : undefined;
+        if (p) arena.fx.floatText(p.x, p.y - p.r, `+${num(e.gained)}`, C.gold, z);
+        break;
+      }
+    }
+  };
+
   const again = (): void => rerender();
   const home = (): void => void (location.hash = "#/");
   const finish = (): void => {
@@ -92,6 +131,7 @@ export const play: Screen = (root, params) => {
     receipt = new Receipt(s.me);
     s.onEvent((e) => {
       receipt?.event(e);
+      juice(e, s.me);
       if (e.type === "pop" && e.victim === s.me && !ended) {
         overlay = showDeath(root, receipt!.outcome(lastFrame?.blobs ?? []).death!, (a) => {
           if (a === "again") return again();
