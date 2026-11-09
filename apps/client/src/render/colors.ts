@@ -14,6 +14,9 @@ export const C = {
   floor: 0xeefafd, // measured from agar.io
   floorLine: 0xd9e6ea,
   edge: 0xc9d3df,
+  // Past the wall: a flat desaturated slate with no grid, so it reads as "not playable".
+  outside: 0xb7c0cb,
+  wall: 0x3d4a5c,
   virus: 0x4fc94f, // agar-green virus, yellower than the safe ring so the two never read alike
   virusLine: 0x2c8a2c,
   // Health rings on the light floor: deeper than the HUD tokens so they hold contrast on white.

@@ -18,8 +18,6 @@ import { wallDistance } from "./membrane";
 
 /** ~35 grid cells across the screen at start size (agar.io measured). */
 const CELL = 60;
-/** Grid drawn this far past the arena so the camera never shows a void. */
-const BEYOND = 3000;
 /** Spikes further than this from my edge never warn: "within reach" (RULES, Spikes). */
 const WARN_REACH = 500;
 /** World units across the LONG screen side at start size: a start blob is ~5.5% of it (agar.io). */
@@ -70,6 +68,8 @@ export class ArenaRenderer {
   private last: { x: number; y: number; h: number } | null = null;
   private view = VIEW_AT_START;
   private lastBlobT = 0;
+  private arena = { w: 0, h: 0 };
+  private lastRadius = new Map<string, number>();
 
   async mount(root: HTMLElement, source: FrameSource, opts: { fps?: boolean; fit?: HTMLElement; view?: number } = {}): Promise<void> {
     // Canvas text bakes whatever font is loaded at creation: wait for ours (a direct load of
@@ -80,7 +80,7 @@ export class ArenaRenderer {
     ]);
     await this.app.init({
       resizeTo: opts.fit ?? window,
-      background: C.floor,
+      background: C.outside,
       antialias: true,
       autoDensity: true,
       resolution: Math.min(window.devicePixelRatio || 1, 2),
@@ -108,6 +108,14 @@ export class ArenaRenderer {
       this.lastT = tS;
       if (this.fps) this.fps.text = `${Math.round(this.app.ticker.FPS)} fps`;
     });
+  }
+
+  /** A blob's centre and radius in screen px (for HUD effects that start at the blob). */
+  screenOf(id: string): { x: number; y: number; r: number } | null {
+    const b = this.blobs.get(id);
+    if (!b || !b.visible) return null;
+    const p = b.getGlobalPosition();
+    return { x: p.x, y: p.y, r: (this.lastRadius.get(id) ?? 0) * this.zoom };
   }
 
   /** My blob squashes when a REPAY lands. */
@@ -149,10 +157,12 @@ export class ArenaRenderer {
   }
 
   private draw(f: Frame, tS: number): void {
+    this.arena = f.arena;
     const meView = f.blobs.find((b) => b.id === f.me);
-    this.grid.position.set(-BEYOND, -BEYOND);
-    this.grid.width = f.arena.w + BEYOND * 2;
-    this.grid.height = f.arena.h + BEYOND * 2;
+    // The grid is the playable floor only; past the wall is the flat slate background.
+    this.grid.position.set(0, 0);
+    this.grid.width = f.arena.w;
+    this.grid.height = f.arena.h;
     this.drawZone(f);
     this.syncFood(f);
     this.syncSpikes(f, meView, tS);
@@ -188,14 +198,6 @@ export class ArenaRenderer {
     if (key === this.zoneKey) return;
     this.zoneKey = key;
     this.zone.clear();
-    // agar.io edge: the floor past the wall is a shade darker and the edge is a soft thick line,
-    // so a blob flattening there reads as hitting a wall.
-    const out = Math.max(f.arena.w, f.arena.h) + BEYOND;
-    this.zone
-      .rect(-out, -out, f.arena.w + out * 2, f.arena.h + out * 2)
-      .fill({ color: C.ink, alpha: JUICE.WALL_TINT_ALPHA })
-      .rect(0, 0, f.arena.w, f.arena.h)
-      .cut();
     if (shrinking) {
       const pad = Math.max(f.arena.w, f.arena.h);
       this.zone
@@ -206,7 +208,15 @@ export class ArenaRenderer {
         .circle(z.cx, z.cy, z.r)
         .stroke({ width: 4, color: C.liq, alpha: 0.7 });
     }
-    this.zone.rect(0, 0, f.arena.w, f.arena.h).stroke({ width: JUICE.WALL_LINE_PX / this.zoom, color: C.ink, alpha: JUICE.WALL_LINE_ALPHA });
+    // The wall: a soft inner rim (a few fading strokes on the arena side), then a solid dark line.
+    const px = 1 / this.zoom;
+    for (let i = 0; i < JUICE.WALL_RIM_STEPS; i++) {
+      const inset = (JUICE.WALL_LINE_PX / 2 + (i + 0.5) * (JUICE.WALL_RIM_PX / JUICE.WALL_RIM_STEPS)) * px;
+      this.zone
+        .rect(inset, inset, f.arena.w - inset * 2, f.arena.h - inset * 2)
+        .stroke({ width: (JUICE.WALL_RIM_PX / JUICE.WALL_RIM_STEPS) * px, color: C.wall, alpha: JUICE.WALL_RIM_ALPHA * (1 - i / JUICE.WALL_RIM_STEPS) });
+    }
+    this.zone.rect(0, 0, f.arena.w, f.arena.h).stroke({ width: JUICE.WALL_LINE_PX * px, color: C.wall });
   }
 
   private syncFood(f: Frame): void {
@@ -283,6 +293,7 @@ export class ArenaRenderer {
       const over = solid.filter((o) => o.id !== v.id && above(o, v, f.me) && Math.hypot(o.x - v.x, o.y - v.y) < o.radius + v.radius);
       s.update(v, tS, isMe, this.zoom, !isMe && !live, boosting, { w: f.arena.w, h: f.arena.h, over: over.map((o) => ({ x: o.x, y: o.y, r: o.radius })), dt });
       s.zIndex = v.radius + (isMe ? 0.5 : 0);
+      this.lastRadius.set(v.id, v.radius);
     }
     this.blobLayer.sortableChildren = true;
     prune(this.blobs, seen);
@@ -346,10 +357,20 @@ export class ArenaRenderer {
     const target = base * size * (1 - JUICE.BOOST_ZOOM_OUT * this.bz);
     this.zoom += (target - this.zoom) * (1 - Math.exp(-dt / JUICE.ZOOM_TAU_S));
     this.world.scale.set(this.zoom);
-    const ox = this.lead.x + this.kick.x;
-    const oy = this.lead.y + this.kick.y;
-    this.world.position.set(width / 2 - ox - x * this.zoom, height / 2 - oy - y * this.zoom);
+    // Camera centre in world units, then clamped so at most CAM_MAX_OUTSIDE of the view is
+    // past the wall: near a wall the player drifts off-centre instead (agar).
+    const cx = clampCam(x + (this.lead.x + this.kick.x) / this.zoom, width / 2 / this.zoom, this.arena.w);
+    const cy = clampCam(y + (this.lead.y + this.kick.y) / this.zoom, height / 2 / this.zoom, this.arena.h);
+    this.world.position.set(width / 2 - cx * this.zoom, height / 2 - cy * this.zoom);
   }
+}
+
+/** Clamp a camera centre on one axis: half view hw, arena size size (world units). */
+function clampCam(c: number, hw: number, size: number): number {
+  if (!(size > 0)) return c;
+  const lo = hw * (1 - 2 * JUICE.CAM_MAX_OUTSIDE);
+  const hi = size - lo;
+  return lo > hi ? size / 2 : Math.max(lo, Math.min(hi, c));
 }
 
 /** Is blob a drawn on top of blob b? Bigger on top; my blob wins a tie. */

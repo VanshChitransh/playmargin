@@ -96,6 +96,7 @@ export const play: Screen = (root, params) => {
 
   const controls = new Controls(root, (cmd) => src?.send(cmd));
   const hud = new Hud(root, controls.els, (open) => controls.setCashoutVisible(open));
+  hud.anchor = () => (lastFrame ? arena.screenOf(lastFrame.me) : null);
   controls.onHold = (on) => {
     arena.held = on;
     hud.held = on;
@@ -104,9 +105,14 @@ export const play: Screen = (root, params) => {
     hud.speedLines(on && !controls.els.boost.classList.contains("blocked"));
   };
   let repayHeld = false;
+  let holdAt = 0;
+  // After a real hold the counter already told the story: drop the trailing logged repay event.
+  let quietUntil = 0;
   controls.onRepayHold = (on) => {
+    const now = performance.now();
+    if (on) holdAt = now;
+    else if (now - holdAt > JUICE.REPAY_TAP_MS) quietUntil = now + 600;
     repayHeld = on;
-    repaySum = 0;
     hud.repayHold(on);
     repayTone(on && !controls.els.repay.classList.contains("blocked"));
   };
@@ -118,9 +124,6 @@ export const play: Screen = (root, params) => {
 
   /** Event to effect: every money moment gets a visible number or burst where it happened. */
   arena.onPickup = () => sfx("blip", 1 + (Math.random() * 2 - 1) * JUICE.PICKUP_PITCH_JITTER);
-  // Held REPAY sends a stream of repay events: sum them into one floating number per window.
-  let repaySum = 0;
-  let repayFloatAt = -Infinity;
   // Nitro sound follows the tank: pitch rises, a coin ticks per 10% borrowed, a clunk when dry.
   let lastStep = -1;
   let dry = false;
@@ -152,15 +155,12 @@ export const play: Screen = (root, params) => {
       case "repay": {
         const p = e.blob === me ? at(me) : undefined;
         if (!p) break;
-        const now = performance.now();
-        repaySum += e.amount;
-        if (now - repayFloatAt < JUICE.REPAY_FLOAT_MS) break;
-        // A quick press gets the full burst; a hold already has its coin stream and tone.
-        if (!repayHeld) (sfx("clink"), hud.coinsToOwe());
-        repayFloatAt = now;
+        // A hold shows one big counter (HUD); only a quick tap gets its chunk number and clink.
+        if (repayHeld || performance.now() < quietUntil) break;
+        sfx("clink");
+        hud.coinsToOwe();
         arena.squashMe(me);
-        arena.fx.floatText(p.x, p.y - p.r, `\u2212${num(repaySum)}`, C.paper, z);
-        repaySum = 0;
+        arena.fx.floatText(p.x, p.y - p.r, `\u2212${num(e.amount)}`, C.paper, z);
         break;
       }
       case "clutchSave": {

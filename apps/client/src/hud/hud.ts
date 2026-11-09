@@ -59,6 +59,7 @@ export class Hud {
       <button data-h=mute class="tag pointer-events-auto absolute left-0 top-0 m-3 mt-[max(12px,env(safe-area-inset-top))] rounded-field bg-navy/80 px-2 py-1 text-muted"></button>
       <div data-h=tap class="pointer-events-none absolute left-1/2 top-[calc(50%+64px)] hidden -translate-x-1/2"><span class="sticker rounded-field bg-paper px-3 py-1 font-display text-xl text-ink">${this.touch ? "HOLD REPAY" : "HOLD R"}</span></div>
       <div data-h=call class="tag absolute inset-x-0 bottom-28 hidden text-center"><span class="rounded-field bg-liq px-3 py-1 text-paper">Margin call: hold REPAY to get out</span></div>
+      <div data-h=pay class="pointer-events-none absolute hidden -translate-x-1/2 -translate-y-full"><span data-h=payt class="block whitespace-nowrap font-display text-5xl tabular-nums text-gold" style="-webkit-text-stroke:6px var(--color-ink);paint-order:stroke fill"></span></div>
       <div data-h=money class="pointer-events-none hidden items-baseline gap-2 rounded-field bg-navy/90 px-2 py-0.5">
         <span data-h=owe class="num text-gold"></span>
         <span data-h=drain class="num hidden text-xs text-liq"></span>
@@ -132,8 +133,10 @@ export class Hud {
     const cash = cashoutOpen(me, m);
     this.set("cash", String(cash), () => this.onCashoutWindow(cash));
     this.els.repay.classList.toggle("blocked", me.owe <= 0 || m.phase !== "LIVE");
+    if (this.oweNow > 0.5 && me.owe <= 0.5 && me.state === "alive" && m.phase === "LIVE") this.paidOff(now);
     this.oweNow = me.owe;
     this.repayFill();
+    this.payCounter(now);
     const owe = Math.round(me.owe);
     this.set("owe", String(owe), () => {
       const o = this.q("owe");
@@ -334,14 +337,24 @@ export class Hud {
   private oweNow = 0;
   private oweAtPress = 0;
   private stream = 0;
+  private repaying = false;
+  private paidUntil = 0;
+  /** Where my blob is on screen (px), so coins and the counter start at it, not at the centre. */
+  anchor: () => { x: number; y: number; r: number } | null = () => null;
 
-  /** Held REPAY: a steady coin stream into the owe badge and a gold fill rising on the button. */
+  /** Held REPAY: a dense coin stream into the owe badge, a gold fill on the button, and one
+   *  big owe counter over my blob ticking down (replaces a flurry of small minus numbers). */
   repayHold(on: boolean): void {
     clearInterval(this.stream);
+    this.repaying = on;
     this.oweAtPress = on ? this.oweNow : 0;
     this.repayFill();
+    this.payCounter();
     if (!on || reducedMotion) return;
-    this.stream = window.setInterval(() => this.oweNow > 0 && this.coin(0), JUICE.REPAY_STREAM_MS);
+    this.stream = window.setInterval(() => {
+      if (this.oweNow <= 0) return;
+      for (let i = 0; i < JUICE.REPAY_STREAM_COINS; i++) this.coin(i * 15);
+    }, JUICE.REPAY_STREAM_MS);
   }
 
   /** Share of the debt paid since the press: 0 just pressed, 1 cleared. */
@@ -352,6 +365,32 @@ export class Hud {
   private repayFill(): void {
     const p = Math.round(this.repayProgress() * 100);
     this.els.repay.style.backgroundImage = this.oweAtPress > 0 ? `linear-gradient(to top, var(--color-gold) ${p}%, transparent ${p}%)` : "";
+  }
+
+  /** The big counter over my blob: "owe N" while held, then PAID OFF for a beat at zero. */
+  private payCounter(now = performance.now()): void {
+    const box = this.q("pay");
+    const paid = now < this.paidUntil;
+    const on = paid || (this.repaying && this.oweNow > 0);
+    box.classList.toggle("hidden", !on);
+    if (!on) return;
+    const a = this.anchor() ?? { x: innerWidth / 2, y: innerHeight / 2, r: 40 };
+    box.style.left = `${a.x}px`;
+    box.style.top = `${a.y - a.r - 12}px`;
+    if (!paid) this.q("payt").textContent = `owe ${Math.ceil(this.oweNow)}`;
+  }
+
+  /** Debt hit zero: PAID OFF pops over my blob with a cash-register chord. */
+  private paidOff(now: number): void {
+    this.paidUntil = now + JUICE.PAID_OFF_MS;
+    const t = this.q("payt");
+    t.textContent = "PAID OFF";
+    t.classList.remove("punch");
+    void t.offsetWidth; // restart the animation
+    t.classList.add("punch");
+    sfx("paid");
+    navigator.vibrate?.(30);
+    if (!reducedMotion) for (let i = 0; i < JUICE.PAID_OFF_COINS; i++) this.coin(i * 20);
   }
 
   /** A quick REPAY press: a few gold coins fly from my blob (screen centre) into the owe badge. */
@@ -365,8 +404,10 @@ export class Hud {
     if (!to.width) return;
     const c = document.createElement("span");
     c.className = "pointer-events-none fixed z-20 size-3 rounded-full border-2 border-ink bg-gold";
-    c.style.left = `${innerWidth / 2 + (Math.random() - 0.5) * 30}px`;
-    c.style.top = `${innerHeight / 2 + (Math.random() - 0.5) * 30}px`;
+    const from = this.anchor() ?? { x: innerWidth / 2, y: innerHeight / 2, r: 30 };
+    const spread = Math.min(from.r, 60);
+    c.style.left = `${from.x + (Math.random() - 0.5) * spread}px`;
+    c.style.top = `${from.y + (Math.random() - 0.5) * spread}px`;
     document.body.appendChild(c);
     const dx = to.left + to.width / 2 - parseFloat(c.style.left);
     const dy = to.top + to.height / 2 - parseFloat(c.style.top);

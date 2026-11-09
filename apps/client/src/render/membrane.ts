@@ -53,8 +53,9 @@ export class Membrane {
   private cos = new Float32Array(0);
   private sin = new Float32Array(0);
 
-  /** Recompute targets. shape(a) is the free outline radius at angle a (stretch, squash, ripple). */
-  target(cx: number, cy: number, r: number, shape: (a: number) => number, w: number, h: number, others: readonly Neighbour[]): void {
+  /** Recompute targets. shape(a) is the free outline radius at angle a (stretch, squash, ripple).
+   *  pad keeps the outline that far inside the wall (room for a ring drawn outside it). */
+  target(cx: number, cy: number, r: number, shape: (a: number) => number, w: number, h: number, others: readonly Neighbour[], pad = 0): void {
     this.resize(pointCount(r));
     const floor = r * JUICE.MEMBRANE_MIN;
     const dents: Array<{ o: Neighbour; k: number }> = [];
@@ -65,7 +66,7 @@ export class Membrane {
     for (let i = 0; i < this.n; i++) {
       const c = this.cos[i]!;
       const s = this.sin[i]!;
-      const wall = wallDistance(cx, cy, c, s, w, h);
+      const wall = wallDistance(cx - pad, cy - pad, c, s, w - pad * 2, h - pad * 2);
       let t = Math.min(shape((i / this.n) * Math.PI * 2), wall);
       for (const { o, k } of dents) {
         const e = rayEnter(cx, cy, c, s, o);
@@ -138,6 +139,20 @@ export class Membrane {
   moving(): boolean {
     for (let i = 0; i < this.n; i++) if (Math.abs(this.vel[i]!) > 0.05 || Math.abs(this.tgt[i]! - this.rad[i]!) > 0.05) return true;
     return false;
+  }
+
+  /** Centre of the outline and its mean radius: where the name sits and how big it can be. */
+  centre(): { x: number; y: number; mean: number } {
+    let x = 0;
+    let y = 0;
+    let m = 0;
+    for (let i = 0; i < this.n; i++) {
+      x += this.cos[i]! * this.rad[i]!;
+      y += this.sin[i]! * this.rad[i]!;
+      m += this.rad[i]!;
+    }
+    const n = this.n || 1;
+    return { x: x / n, y: y / n, mean: m / n };
   }
 
   /** First frame: start exactly on the targets instead of springing out of nothing. */

@@ -79,16 +79,20 @@ export const JUICE = {
   FUEL_REFILL_MS: 300,
 
   // REPAY (hold-to-repay)
-  /** One coin leaves my blob for the owe badge this often while REPAY is held, flight time below. */
-  REPAY_STREAM_MS: 80,
+  /** While REPAY is held, this many coins leave my blob for the owe badge every REPAY_STREAM_MS. */
+  REPAY_STREAM_MS: 50,
+  REPAY_STREAM_COINS: 2,
+  /** PAID OFF stays over my blob this long, with a burst of this many coins. */
+  PAID_OFF_MS: 1100,
+  PAID_OFF_COINS: 12,
+  /** A press shorter than this is a tap: it gets the quick chunk number instead of the counter. */
+  REPAY_TAP_MS: 250,
   COIN_FLY_MS: 450,
   /** Coins on a single quick press (the server repays one chunk). */
   REPAY_COINS: 5,
   /** Repay tone: starts here and climbs an octave as the debt clears. */
   REPAY_HZ: 440,
   REPAY_GAIN: 0.06,
-  /** While held, the floating minus number sums the repay events over this window. */
-  REPAY_FLOAT_MS: 300,
 
   // Red state (feel spec 2.2): heartbeat speeds up as the margin thins (health 1.0 to 0.9).
   BEAT_SLOW_MS: 900,
@@ -132,10 +136,13 @@ export const JUICE = {
   MEMBRANE_RIPPLE: 0.016,
 
   // Arena wall
-  /** Out of bounds floor tint (ink at this alpha) and the soft edge line width in screen px. */
-  WALL_TINT_ALPHA: 0.07,
-  WALL_LINE_PX: 3.5,
-  WALL_LINE_ALPHA: 0.35,
+  /** The wall line in screen px, and the soft rim on the arena side (width, steps, start alpha). */
+  WALL_LINE_PX: 4,
+  WALL_RIM_PX: 14,
+  WALL_RIM_STEPS: 5,
+  WALL_RIM_ALPHA: 0.16,
+  /** Camera: at most this share of the view may show past the wall on each axis. */
+  CAM_MAX_OUTSIDE: 0.25,
   /** BOOST preview rings fade to this share of their alpha while they touch the wall. */
   PREVIEW_WALL_FADE: 0.5,
 } as const;

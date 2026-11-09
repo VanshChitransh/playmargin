@@ -82,10 +82,12 @@ export class BlobSprite extends Container {
     this.feel(boosting);
     if (v.kind !== "drone") this.membrane(v, tS, around);
     // Name inside the blob, sized with it (agar.io), never under ~11 px on screen.
-    const ns = Math.max(v.radius * 0.5, 11 / zoom) / 28;
+    // Pressed on a wall the outline shifts and shrinks: the name follows its centre and size.
+    const c = v.kind === "drone" || !this.mem.n ? { x: 0, y: 0, mean: v.radius } : this.mem.centre();
+    const ns = Math.max(Math.min(v.radius, c.mean) * 0.5, 11 / zoom) / 28;
     this.nameText.scale.set(ns);
     this.warnSign.scale.set(k);
-    this.nameText.position.set(0, v.kind === "drone" ? r + 14 * k : 0);
+    this.nameText.position.set(c.x, v.kind === "drone" ? r + 14 * k : c.y);
     this.warnSign.visible = v.ring === "red" && v.kind !== "drone";
     this.warnSign.position.set(0, -r - 14 * k);
     this.shield.visible = v.shielded;
@@ -111,7 +113,8 @@ export class BlobSprite extends Container {
       const s = Math.sin(a - h) / sy;
       return (r * sq) / Math.sqrt(c * c + s * s) + amp * Math.sin(a * 5 + tS * 6) * Math.sin(a * 3 - tS * 4);
     };
-    this.mem.target(v.x, v.y, r, shape, around?.w ?? Infinity, around?.h ?? Infinity, around?.over ?? []);
+    // The health ring sits outside the body: keep the body back so the ring, not the body, meets the wall.
+    this.mem.target(v.x, v.y, r, shape, around?.w ?? Infinity, around?.h ?? Infinity, around?.over ?? [], RING_GAP + RING_W);
     this.mem.settleIfNew();
     if (this.lastR > 0 && !reducedMotion && Math.abs(r - this.lastR) > 1) this.mem.kick((r - this.lastR) * JUICE.MEMBRANE_KICK);
     this.lastR = r;
