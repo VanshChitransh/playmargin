@@ -27,8 +27,11 @@ export const C = {
  */
 export const VIVID = [0x6d5dfc, 0x3b82f6, 0x0ea5e9, 0x06b6d4, 0x4f46e5, 0xa855f7, 0xc026d3, 0x0891b2] as const;
 
-/** Pellets: the same hues, lightened, so food reads as food and never as a small blob. */
-export const PELLET = VIVID.map((c) => lighten(c, 0.42));
+/**
+ * Pellets: the same hues, lightened a little (fresh, saturated candy, still lighter than any
+ * blob), so food reads as food and never as a small blob or a safety colour.
+ */
+export const PELLET = VIVID.map((c) => lighten(c, 0.22));
 
 function hash(id: string | number): number {
   let h = 2166136261;

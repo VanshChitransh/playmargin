@@ -49,7 +49,7 @@ export class Hud {
         <div data-h=banner class="mt-3 px-3 text-center font-display text-3xl tracking-wide max-sm:mt-40 max-sm:text-2xl"></div>
       </div>
       <div class="absolute right-0 top-0 p-3 pr-[max(12px,env(safe-area-inset-right))] pt-[max(12px,env(safe-area-inset-top))]">
-        <ol data-h=lb class="relative w-36 rounded-box bg-navy/90 p-2 text-xs transition-[height] duration-300 sm:w-44 sm:text-sm" style="height:${ROW_PX + 16}px"></ol>
+        <ol data-h=lb class="relative w-36 overflow-hidden rounded-box bg-navy p-2 text-xs transition-[height] duration-300 sm:w-44 sm:text-sm" style="height:${ROW_PX + 16}px"></ol>
         <div data-h=myrank class="mt-1 hidden w-36 rounded-box bg-navy/90 px-2 py-1 text-xs sm:w-44 sm:text-sm"></div>
       </div>
       <div data-h=center class="absolute inset-x-0 top-[14%] grid place-items-center text-center"></div>
@@ -211,7 +211,9 @@ export class Hud {
         <span class="num text-gold">${Math.round(b.equity)}</span></div>`;
     };
     // Rows are keyed by blob id and placed with translateY, so a rank change slides the
-    // same element (CSS transition) instead of re-creating it.
+    // same element (CSS transition) instead of re-creating it. Rows are opaque and the one
+    // climbing rides on top, so two rows swapping never show text through each other; a new
+    // entrant fades in instead of popping onto the row sliding out of its slot.
     const lb = this.q("lb");
     const keep = new Set<string>();
     top.forEach((b, i) => {
@@ -220,10 +222,15 @@ export class Hud {
       if (!li) {
         li = document.createElement("li");
         li.dataset.id = b.id;
-        li.style.cssText = `position:absolute;left:8px;right:8px;top:8px;height:${ROW_PX}px;transition:transform 300ms ease`;
+        li.className = "bg-navy";
+        li.style.cssText = `position:absolute;left:8px;right:8px;top:8px;height:${ROW_PX}px;transition:transform 250ms ease,opacity 250ms ease;opacity:0`;
         li.style.transform = `translateY(${i * ROW_PX}px)`;
         lb.appendChild(li);
+        requestAnimationFrame(() => li && (li.style.opacity = "1"));
       }
+      const was = Number(li.dataset.i ?? i);
+      li.style.zIndex = i < was ? "2" : "1";
+      li.dataset.i = String(i);
       li.style.transform = `translateY(${i * ROW_PX}px)`;
       const html = row(b, i + 1);
       if (li.dataset.html !== html) {
