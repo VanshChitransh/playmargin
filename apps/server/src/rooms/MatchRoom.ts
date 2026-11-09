@@ -27,9 +27,10 @@ import {
 } from "@margin/core";
 import { Commander, agentView, createBrain, nearAiCall } from "../agents";
 import { sharedDb, userForAccount } from "../db";
-import { settlementFor } from "../settlement";
+import { settlementFor, sharedChain } from "../settlement";
 import { admitFree, chargeEntry } from "./freeMatch";
 import { admitPaid, refundTickets, seatedAccounts } from "./paidMatch";
+import { paidStakeBase, wrongStake } from "../settlement/stake";
 import { InputQueue } from "./input";
 import { clientIp, joinLimit, rooms } from "./guard";
 import { log, ticks } from "../obs";
@@ -86,6 +87,8 @@ export class MatchRoom extends Room {
   private accounts = new Set<string>();
   /** Paid: open_match on chain, started at the 3-2-1. GO waits for it, a failure aborts the room. */
   private opening: "none" | "pending" | "ok" | "failed" = "none";
+  /** Paid: the contract's entry stake (USDC base units), read fresh at the 3-2-1. Free rooms ignore it. */
+  private stakeBase = 1_000_000;
   private key: RoomKey = { mode: "free", roomCode: null };
   private startNow = false;
   private joined = 0;
@@ -323,7 +326,7 @@ export class MatchRoom extends Room {
       this.clients.getById(id)?.leave(4001, "not enough credits");
     }
     const players = this.roster();
-    this.world = newWorld(this.seed, this.key.mode, players, this.roomId);
+    this.world = newWorld(this.seed, this.key.mode, players, this.roomId, this.stakeBase);
     startMatch(this.world, this.roomTick);
     const human = players.find((p) => p.kind === "human");
     if (this.judge && human) applyJudgeLayout(this.world, human.id);
@@ -341,9 +344,19 @@ export class MatchRoom extends Room {
   /** Bind the tickets and reserve the vault budget during the 3-2-1, sized exactly as GO will be. */
   private openOnChain(): void {
     this.opening = "pending";
-    const preview = newWorld(this.seed, this.key.mode, this.roster(), this.roomId);
-    startMatch(preview, 0);
-    this.log.reserve(preview).then(
+    const chain = sharedChain();
+    const accounts = this.roster().flatMap((p) => (p.accountId ? [p.accountId] : []));
+    const ready = async () => {
+      if (!chain) throw new Error("paid mode is off");
+      // Fresh stake, and every ticket must carry it: a mixed-stake match can never settle.
+      this.stakeBase = await paidStakeBase(chain, true);
+      const wrong = await wrongStake(chain, accounts, this.stakeBase);
+      if (wrong.length) throw new Error(`tickets with another stake: ${wrong.join(", ")}`);
+      const preview = newWorld(this.seed, this.key.mode, this.roster(), this.roomId, this.stakeBase);
+      startMatch(preview, 0);
+      await this.log.reserve(preview);
+    };
+    ready().then(
       () => (this.opening = "ok"),
       (err: unknown) => {
         log.error("open_failed", { matchId: this.roomId, err });
@@ -355,7 +368,7 @@ export class MatchRoom extends Room {
   /** open_match failed (vault low, ticket gone): nobody played, so refund every ticket and close. */
   private abort(): void {
     const accounts = [...this.world.blobs.values()].flatMap((b) => (b.accountId ? [b.accountId] : []));
-    this.broadcast("aborted", { reason: "The match could not start on NEAR. Your 1 USDC is back in your balance." });
+    this.broadcast("aborted", { reason: "The match could not start on NEAR. Your stake is back in your balance." });
     void refundTickets(accounts).finally(() => this.disconnect());
     this.enter("ENDED", false);
   }

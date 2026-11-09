@@ -10,7 +10,7 @@ import { mountApi } from "./api";
 import { sharedDb } from "./db";
 import { anchorPending } from "./anchor/job";
 import { sharedChain } from "./settlement";
-import { assertStakeMatches } from "./settlement/stake";
+import { paidStakeBase } from "./settlement/stake";
 import { SETTLER_LOW_NEAR, log, settler } from "./obs";
 
 const server = defineServer({
@@ -54,9 +54,9 @@ const checkSettler = async () => {
 };
 setInterval(checkSettler, 5 * 60_000).unref();
 void checkSettler();
-// Paid stake from the contract at boot (logs paid_stake, or paid_stake_mismatch if the engine differs).
+// Paid stake from the contract at boot (logs paid_stake, or paid_stake_failed for a stake core cannot settle).
 const ch = sharedChain();
-if (ch) void assertStakeMatches(ch).catch(() => undefined);
+if (ch) void paidStakeBase(ch).catch((err: unknown) => log.error("paid_stake_failed", { err }));
 void anchor();
 
 listen(server).then(() =>

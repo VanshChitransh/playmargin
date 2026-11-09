@@ -46,6 +46,17 @@ describe("toSettleArgs", () => {
     }
   });
 
+  it("conserves at a 0.10 USDC stake (1000 Micro per base unit) for 500 random matches", () => {
+    for (let seed = 1; seed <= 500; seed++) {
+      const r = { ...randomResult(seed), stakeBase: 100_000 };
+      const a = toSettleArgs(r);
+      const stakes = BigInt(r.payouts.length) * 100_000n; // one 0.10 USDC ticket per player
+      const out = a.payouts.reduce((x, [, v]) => x + BigInt(v), 0n) + BigInt(a.vault_repaid) + BigInt(a.interest_to_vault) + BigInt(a.fees) + BigInt(a.reserve);
+      expect(out).toBe(stakes + BigInt(a.lent));
+      expect(BigInt(a.reserve) >= 0n).toBe(true);
+    }
+  });
+
   it("repays bad debt above the chain cap from the biggest payout", () => {
     // 2 players, budget 3 USDC, cap 0.3 USDC; 1 USDC of bad debt, so 0.7 comes out of the winner.
     const r: SettleResult = {

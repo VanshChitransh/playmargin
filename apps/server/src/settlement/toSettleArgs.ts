@@ -3,22 +3,23 @@
 // the reserve takes the remainder, so the contract's exact conservation check holds. Payouts with
 // no account (drone bounties) are swept into the reserve. Bad debt is floored once and the chain's
 // 10% cap is enforced here: any excess is repaid to the vault out of the largest payouts first.
-import { MICRO, R, type SettleArgs, type SettleResult } from "@margin/core";
+import { microPerBase, type SettleArgs, type SettleResult } from "@margin/core";
 
-/** Micro per USDC base unit (100 with the current RULES). */
-export const MICRO_PER_BASE = (R.UNITS_PER_USDC * MICRO) / 1_000_000;
+/** Micro per USDC base unit at the default 1 USDC stake (100). Any stake: microPerBase(stakeBase). */
+export const MICRO_PER_BASE = microPerBase(1_000_000);
 /** Mirrors contracts/margin/src/lib.rs: budget reserved at open, and the bad debt cap per match. */
 const BUDGET_BPS = 15_000n;
 const BAD_DEBT_MAX_BPS = 1_000n;
 
-const base = (m: number): bigint => BigInt(Math.floor(m / MICRO_PER_BASE));
-
 /** Contract args for a settled paid match. Throws if the stakes are not whole base units. */
 export function toSettleArgs(r: SettleResult): SettleArgs {
+  // The room's stake sets the conversion (100 Micro per base unit at 1 USDC, 1000 at 0.10).
+  const per = microPerBase(r.stakeBase ?? 1_000_000);
+  const base = (m: number): bigint => BigInt(Math.floor(m / per));
   const paidMicro = r.payouts.reduce((s, p) => s + p.amount, 0);
   const potMicro = paidMicro + r.vaultRepaid + r.interestToVault + r.fees + r.reserve - r.lent;
-  if (potMicro % MICRO_PER_BASE !== 0) throw new Error(`stakes ${potMicro} Micro are not whole USDC base units`);
-  const stakes = BigInt(potMicro / MICRO_PER_BASE);
+  if (potMicro % per !== 0) throw new Error(`stakes ${potMicro} Micro are not whole USDC base units`);
+  const stakes = BigInt(potMicro / per);
 
   const perAccount = new Map<string, bigint>();
   for (const p of r.payouts) {

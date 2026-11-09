@@ -3,7 +3,8 @@
 import type { LogEntry, Micro, Mode } from "@margin/core";
 import type { Db } from "./db";
 
-export type MatchStatus = "live" | "settled" | "refused";
+/** retrying: the log is proven but the payment tx has not landed yet (background retries). */
+export type MatchStatus = "live" | "settled" | "retrying" | "refused";
 
 /** Row for a match at GO. */
 export function createMatch(db: Db, m: { id: string; mode: Mode; seed: number; pot: Micro }): void {

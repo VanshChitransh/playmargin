@@ -52,6 +52,28 @@ export class MatchRecord {
     addMatchPlayer(this.db, { matchId: this.matchId, userId, blobId, entry: entryFor(this.mode) });
   }
 
+  /** Background settle retries at 30 s, 2 min and 10 min, each failure an alert in the log. */
+  private retrySettle(result: SettleResult, payouts: Map<string, number>, attempt: number): void {
+    const delay = [30_000, 120_000, 600_000][attempt - 1];
+    if (delay === undefined) {
+      log.error("settle_gave_up", { matchId: this.matchId, attempts: attempt, note: "players can reclaim() after 15 min" });
+      finishMatch(this.db, this.matchId, { status: "refused", head: result.head });
+      return;
+    }
+    setTimeout(() => {
+      this.settlement.settle(result, result.head).then(
+        (tx) => {
+          finishMatch(this.db, this.matchId, { status: "settled", head: result.head, txHash: tx?.hash, payouts });
+          log.info("settled", { matchId: this.matchId, mode: this.mode, tx: tx?.hash ?? null, attempt: attempt + 1 });
+        },
+        (err: unknown) => {
+          log.error("settle_revert", { matchId: this.matchId, attempt: attempt + 1, err });
+          this.retrySettle(result, payouts, attempt + 1);
+        },
+      );
+    }, delay).unref();
+  }
+
   /** Replay, check against the live world, pay, and close the row. Never throws. */
   async settle(w: World): Promise<SettleResult | null> {
     try {
@@ -63,10 +85,18 @@ export class MatchRecord {
         if (live !== p.amount) throw new Error(`settle != live for ${p.id}: ${p.amount} vs ${live}`);
       }
       this.flush();
-      const tx = await this.settlement.settle(result, result.head);
       const payouts = new Map(result.payouts.map((p) => [p.id, p.amount]));
-      finishMatch(this.db, this.matchId, { status: "settled", head: result.head, txHash: tx?.hash, payouts });
-      log.info("settled", { matchId: this.matchId, mode: this.mode, tx: tx?.hash ?? null });
+      try {
+        const tx = await this.settlement.settle(result, result.head);
+        finishMatch(this.db, this.matchId, { status: "settled", head: result.head, txHash: tx?.hash, payouts });
+        log.info("settled", { matchId: this.matchId, mode: this.mode, tx: tx?.hash ?? null });
+      } catch (err) {
+        // The log is proven; only the payment failed (contract revert, RPC down). Keep trying in the
+        // background so the room can close; players can still reclaim() after 15 min if it never lands.
+        log.error("settle_revert", { matchId: this.matchId, attempt: 1, err });
+        finishMatch(this.db, this.matchId, { status: "retrying", head: result.head, payouts });
+        this.retrySettle(result, payouts, 1);
+      }
       return result;
     } catch (err) {
       log.error("settle_refused", { matchId: this.matchId, err });

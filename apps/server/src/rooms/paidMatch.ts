@@ -6,10 +6,11 @@
 import { isValidAccountId, verifyNep413Signature } from "near-kit";
 import { log } from "../obs";
 import { sharedChain } from "../settlement";
-import { assertStakeMatches } from "../settlement/stake";
+import { paidStakeBase } from "../settlement/stake";
 import type { Chain } from "../settlement/chain";
 
 interface Ticket {
+  stake: string;
   match_id: string | null;
 }
 
@@ -66,11 +67,13 @@ export const seatedAccounts = new Set<string>();
 export async function admitPaid(opts: unknown): Promise<{ accountId: string }> {
   const chain = sharedChain();
   if (!chain) throw new Error("paid mode is off on this server");
-  await assertStakeMatches(chain);
+  const stake = await paidStakeBase(chain);
   const accountId = await verifyJoin(chain, (opts as { join?: unknown } | null)?.join);
   const t = await chain.view<Ticket | null>("ticket_of", { account_id: accountId });
-  if (!t) throw new Error("no ticket: enter the arena first (1 USDC)");
+  if (!t) throw new Error("no ticket: enter the arena first");
   if (t.match_id) throw new Error("ticket already in a match");
+  // A mixed-stake match can never settle on chain.
+  if (Number(t.stake) !== stake) throw new Error("your ticket is for an older stake: reclaim it and enter again");
   return { accountId };
 }
 
