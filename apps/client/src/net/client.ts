@@ -41,8 +41,10 @@ export class MatchConnection {
   onAborted?: (reason: string) => void;
 
   /** Join a match (free or paid); rejects if the server is unreachable or refuses the seat. */
-  async join(opts: JoinOpts): Promise<void> {
-    this.room = await new Client(ENDPOINT).joinOrCreate("match", opts);
+  async join(opts: JoinOpts, judge = false): Promise<void> {
+    // Server rooms: "judge" = the seeded Judge Run, "private" = filtered by roomCode, else "match".
+    const name = judge ? "judge" : opts.roomCode ? "private" : "match";
+    this.room = await new Client(ENDPOINT).joinOrCreate(name, opts);
     this.room.onStateChange((raw) => {
       const s = raw as RoomState;
       this.buffer.push({ at: this.stamp(s.tick), frame: this.toFrame(s) });

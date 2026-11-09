@@ -36,7 +36,7 @@ const JOIN_TIMEOUT_MS = 2500;
 let paidSeat: (() => JoinOpts) | null = null;
 export const setPaidSeat = (o: () => JoinOpts): void => void (paidSeat = o);
 
-async function connect(roomCode?: string): Promise<Source> {
+async function connect(roomCode?: string, judge = false): Promise<Source> {
   const paid = paidSeat;
   paidSeat = null;
   // A paid seat never falls back to offline practice: the ticket is real, so the error must show.
@@ -49,7 +49,7 @@ async function connect(roomCode?: string): Promise<Source> {
     const conn = new MatchConnection();
     const timeout = new Promise<never>((_, no) => setTimeout(() => no(new Error("join timeout")), JOIN_TIMEOUT_MS));
     try {
-      await Promise.race([conn.join({ mode: "free", guestKey: guestKey(), roomCode }), timeout]);
+      await Promise.race([conn.join({ mode: "free", guestKey: guestKey(), roomCode }, judge), timeout]);
       return conn;
     } catch (e) {
       conn.leave();
@@ -162,13 +162,18 @@ export const play: Screen = (root, params) => {
     if (left) arena.destroy();
   });
 
-  void connect(params.code).catch((e: Error) => {
+  void connect(params.code, params.judge === "1").catch((e: Error) => {
     status.textContent = `Could not join the paid match: ${e.message}. Your ticket stays on your account for the next one.`;
     return new Promise<never>(() => {});
   }).then((s) => {
     if (left) return s.leave?.();
     src = s;
-    status.textContent = s instanceof LocalMatch ? "Offline practice: real rules, local bots" : "";
+    status.textContent =
+      s instanceof LocalMatch
+        ? "Offline practice: real rules, local bots"
+        : params.judge === "1"
+          ? "Judge Run: a 90 s scenario. Seeded map, normal rules, Drone-1 hunts red blobs. Most first-timers get greedy. Will you?"
+          : "";
     if (params.code && !(s instanceof LocalMatch)) roomChip(root, params.code);
     receipt = new Receipt(s.me);
     s.onCommander = (r) => hud.commander(r);

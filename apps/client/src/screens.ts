@@ -1,4 +1,4 @@
-// Placeholder screens still waiting for their task: #/judge (M9b) and the 404.
+// The 404 screen.
 import type { Screen } from "./router";
 
 const shell = (title: string, body: string): string => `
@@ -13,9 +13,6 @@ const shell = (title: string, body: string): string => `
     </div>
   </main>`;
 
-export const judge: Screen = (root) => {
-  root.innerHTML = shell("Judge run", "A seeded first match. Coming soon.");
-};
 export const notFound: Screen = (root) => {
   root.innerHTML = shell("404", "No such page.");
 };

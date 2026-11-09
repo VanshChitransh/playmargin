@@ -5,6 +5,7 @@ import { LocalMatch } from "../game/local";
 import { ArenaRenderer } from "../render/arena";
 import type { Screen } from "../router";
 import { newRoomCode } from "../net/room-code";
+import { ENDPOINT } from "../net/client";
 
 const STEPS: Array<[string, string]> = [
   ["BOOST = borrow", "Each tap borrows from the vault and makes you bigger and faster. Three taps, max."],
@@ -20,7 +21,10 @@ export const landing: Screen = (root) => {
         <img src="/brand/margin-icon.svg" alt="" class="sticker size-11 rounded-field" />
         <span class="outlined font-display text-3xl text-paper">MARGIN</span>
       </a>
-      <a href="#how" class="tag hidden sm:block">How it works</a>
+      <nav class="tag flex items-center gap-5">
+        <a href="#how" class="hidden sm:block">How it works</a>
+        <a href="#/judge" class="rounded-field border-2 border-ink px-2 py-1" title="A seeded 90 s match on normal rules">Judge Run</a>
+      </nav>
     </header>
     <main class="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-16 pt-4 lg:grid-cols-[1fr_1.1fr]">
       <section>
@@ -35,6 +39,7 @@ export const landing: Screen = (root) => {
           <a href="#/play" class="sticker sticker-press rounded-box bg-paper px-7 py-4 font-display text-2xl">Practice free</a>
           <a href="#/cash" class="sticker sticker-press rounded-box bg-ink px-5 py-3 font-display text-xl text-paper">Play for $1</a>
           <button data-challenge class="tag basis-full text-left underline">Challenge a friend: private room link</button>
+          <p data-proof class="tag hidden basis-full"></p>
           <span class="text-sm">No wallet. No sign-up.<span class="pointer-coarse:hidden"><br />Mouse steers, <kbd class="kbd kbd-sm">Space</kbd> = BOOST</span></span>
         </div>
       </section>
@@ -68,6 +73,22 @@ export const landing: Screen = (root) => {
   </div>`;
 
   // A private room is just a fresh code: the first one in creates it, the friend's link joins it.
+  // Proof strip: real counts from the server, a number that is still 0 is left out, never padded.
+  void fetch(`${ENDPOINT}/api/stats`)
+    .then((r) => (r.ok ? (r.json() as Promise<{ matches: number; players: number; agentPops: number }>) : null))
+    .then((s) => {
+      if (!s) return;
+      const parts = [
+        [s.matches, "matches played"],
+        [s.players, "players"],
+        [s.agentPops, "liquidations by AI agents"],
+      ].filter(([n]) => (n as number) > 0);
+      const el = root.querySelector<HTMLElement>("[data-proof]");
+      if (!el || !parts.length) return;
+      el.innerHTML = parts.map(([n, t]) => `<b class="num text-paper">${(n as number).toLocaleString()}</b> ${t}`).join(" · ");
+      el.classList.remove("hidden");
+    })
+    .catch(() => {});
   root.querySelector("[data-challenge]")!.addEventListener("click", () => (location.hash = `#/r/${newRoomCode()}`));
   const box = root.querySelector<HTMLElement>("[data-hero]")!;
   const arena = new ArenaRenderer();

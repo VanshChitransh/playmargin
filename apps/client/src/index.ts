@@ -2,7 +2,7 @@
 import "./style.css";
 import { startRouter } from "./router";
 import { isAuthCallback, runAuthCallback } from "./auth-callback";
-import { judge, notFound } from "./screens";
+import { notFound } from "./screens";
 import { verify } from "./screens/verify";
 import { landing } from "./screens/landing";
 import { play } from "./play";
@@ -17,7 +17,7 @@ else startRouter(app, {
   "/": landing,
   "/play": play,
   "/cash": cash,
-  "/judge": judge,
+  "/judge": (root, p) => play(root, { ...p, judge: "1" }),
   "/verify/:id": verify,
   "/r/:code": play,
   "*": notFound,
