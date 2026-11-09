@@ -357,8 +357,10 @@ async function matchLog(src: unknown): Promise<LogEntry[] | null> {
   if (!id) return null;
   for (let i = 0; i < 3; i++) {
     const r = await fetch(`${ENDPOINT}/api/matches/${encodeURIComponent(id)}/log`);
-    if (r.ok) return ((await r.json()) as { log: LogEntry[] }).log;
-    await new Promise((ok) => setTimeout(ok, 600)); // the room writes the log at the bell
+    // The room saves entries as they happen: only a log that reached MATCH_END is the whole match.
+    const log = r.ok ? ((await r.json()) as { log: LogEntry[] }).log : null;
+    if (log?.at(-1)?.type === "MATCH_END") return log;
+    await new Promise((ok) => setTimeout(ok, 600));
   }
   return null;
 }

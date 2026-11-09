@@ -18,6 +18,7 @@ describe("receiptFromLog", () => {
         { type: "INTEREST", data: { blob: "me", amount: M(2), toFood: 0, toVault: 0, toReserve: 0 } },
         { type: "SPIKE", data: { blob: "me", spike: 1, damage: M(20) } },
         { type: "POP", data: { by: "a3", victim: "me", debtRepaid: M(40), badDebt: 0, bounty: M(3.2), fee: M(0.8), scattered: M(60) } },
+        { type: "MATCH_END", data: { tick: 0, finalMasses: {}, dust: 0, toVault: 0, ranking: [] } },
       ]),
       "me",
     )!;
@@ -36,6 +37,7 @@ describe("receiptFromLog", () => {
         { type: "CHARGE", data: { blob: "me", entry: M(100) } },
         { type: "CASHOUT", data: { blob: "me", amount: M(95) } },
         { type: "CASHOUT", data: { blob: "me", amount: M(5) } },
+        { type: "MATCH_END", data: { tick: 0, finalMasses: {}, dust: 0, toVault: 0, ranking: [] } },
       ]),
       "me",
     )!;
@@ -44,5 +46,17 @@ describe("receiptFromLog", () => {
       { label: "Food minus zone", amount: 15 },
       { label: "Leftover food share", amount: 5 },
     ]);
+  });
+
+  it("refuses a log fetched before the bell landed (no MATCH_END), so the live receipt is kept", () => {
+    const r = receiptFromLog(
+      log([
+        join("me", "you"),
+        { type: "CHARGE", data: { blob: "me", entry: M(100) } },
+        { type: "BOOST", data: { blob: "me", borrowed: M(40), fee: M(0.4) } },
+      ]),
+      "me",
+    );
+    expect(r).toBeNull();
   });
 });

@@ -197,9 +197,12 @@ export class Receipt {
 /**
  * The money receipt from the hash-chained match log (the same entries settle() replays), so every
  * line is a real logged number. Food minus zone is the remainder, which makes the column add up.
- * Units: mass (Micro / MICRO), like the rest of the results card. Null when I am not in the log.
+ * Units: mass (Micro / MICRO), like the rest of the results card. Null when I am not in the log
+ * or the log is not finished: the server saves entries as they happen, so a fetch right at the bell
+ * can miss the bell CASHOUTs, which would read as "you keep 0" with the payout dumped on food.
  */
 export function receiptFromLog(log: readonly LogEntry[], me: string): { start: number; end: number; lines: Line[] } | null {
+  if (log.at(-1)?.type !== "MATCH_END") return null;
   const u = (x: number): number => x / MICRO;
   const names = new Map<string, string>();
   const sum = new Map<string, number>();
