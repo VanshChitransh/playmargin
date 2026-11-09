@@ -1,7 +1,7 @@
 // A2 done-when: drones hunt red blobs only, pop them within seconds, never touch green ones,
 // and a second drone flanks instead of queueing behind the first.
 import { describe, expect, it } from "vitest";
-import { boostTap, hitSpike, newWorld, ring, startMatch, step, type AgentView, type Blob, type InputCmd } from "@margin/core";
+import { boostHold, flushBoost, hitSpike, newWorld, ring, startMatch, step, type AgentView, type Blob, type InputCmd } from "@margin/core";
 import { Drone } from "./drone";
 import { agentView, createBrain } from "./index";
 
@@ -15,7 +15,8 @@ describe("Drone", () => {
     let t = 1;
     while (t < 300) step(w, new Map(), ++t); // wait out the paid 3 s shield
     const h0 = w.blobs.get("h0")!;
-    for (let i = 0; i < 3; i++) boostTap(w, h0, t);
+    while (boostHold(w, h0, t) > 0); // hold BOOST to the cap
+    flushBoost(w, h0, t);
     hitSpike(w, h0, 0, true, t);
     expect(ring(h0)).toBe("red");
     const pops: string[] = [];
@@ -37,8 +38,8 @@ describe("Drone", () => {
 
   it("flanks: a second drone aims beside the target, not at the rival's back", () => {
     const blob = (id: string, kind: Blob["kind"], x: number, y: number, mass: number, debt: number): Blob => ({
-      id, kind, label: id, accountId: null, x, y, dirX: 0, dirY: 0, mass, debt, boostFees: 0, payout: 0, pips: 0,
-      pipReadyAt: [], boostUntil: 0, repayReadyAt: 0, shieldUntil: 0, spikeImmuneUntil: 0, redSince: 0,
+      id, kind, label: id, accountId: null, x, y, dirX: 0, dirY: 0, mass, debt, boostFees: 0, payout: 0, pendingBorrow: 0,
+      boostUntil: 0, repayReadyAt: 0, shieldUntil: 0, spikeImmuneUntil: 0, redSince: 0,
       lastThreatAt: 0, cashout: null, state: "alive", lastInput: null, lastInputAt: 0,
     });
     const red = blob("r", "human", 500, 500, 142_500_000, 120_000_000);

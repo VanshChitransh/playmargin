@@ -2,7 +2,8 @@
 // never positions or money; the server answers with display-only views and events.
 import type { BlobKind, Mode, Phase, Ring } from "./types";
 
-/** Client to server, at most 30/s. boost/repay/cashout are edge-triggered taps. */
+/** Client to server, at most 30/s. boost is HELD state (send true every message while held, it
+ *  expires after 250 ms), repay/cashout are edge-triggered taps. */
 export interface InputCmd {
   seq: number;
   dirX: number;
@@ -45,6 +46,10 @@ export interface BlobView {
   y: number;
   radius: number;
   ring: Ring;
+  /** BOOST capacity left, 0 to 1: the fuel ring. Always set by the engine; optional only until the
+   *  server schema and client carry it (S2/S3, BOOST hold-to-nitro). */
+  fuel?: number;
+  /** Deprecated, for the old pip HUD: fuel in segments of BOOST_CHARGE_EQUITY (0 to BOOST_PIPS). */
   pips: number;
   /** Display units owed, for the "owe 40" badge. */
   owe: number;

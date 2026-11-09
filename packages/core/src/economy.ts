@@ -9,8 +9,6 @@ import { mulBps, mulDivUp } from "./units";
 
 const BPS = 10_000;
 const BOOST_LOCKOUT_T = C.sToTicks(C.R.BOOST_LOCKOUT_S);
-const PIP_RECHARGE_T = C.sToTicks(C.R.BOOST_RECHARGE_S);
-const BOOST_BURST_T = C.sToTicks(C.R.BOOST_SPEED_S);
 const REPAY_COOLDOWN_T = C.sToTicks(C.R.REPAY_COOLDOWN_S);
 /** Interest food lands at least this far from the payer, so nobody re-eats their own drain. */
 const INTEREST_FOOD_MIN_DIST = 400;
@@ -47,45 +45,61 @@ export function boostRoom(b: Blob): Micro {
   return Math.max(0, mulBps(borrowBase(b), C.LEVERAGE_CAP_BPS - BPS) - b.debt);
 }
 
-/** Relight pips whose 3 s refill is done. */
-export function refillPips(b: Blob, tick: number): void {
-  while (b.pipReadyAt.length > 0 && (b.pipReadyAt[0] ?? Infinity) <= tick) {
-    b.pipReadyAt.shift();
-    b.pips++;
-  }
-}
-
 const vaultLeft = (w: World): Micro => w.vault.budget - (w.vault.lent - w.vault.repaid);
 
-/** True when a BOOST tap would borrow something right now (a lit pip always works). */
+/** Share of the full 2.5x room still free, 0 to 1: the fuel ring. Refills as REPAY or eating raise equity. */
+export function fuel(b: Blob): number {
+  const full = mulBps(borrowBase(b), C.LEVERAGE_CAP_BPS - BPS);
+  return full > 0 ? Math.min(1, boostRoom(b) / full) : 0;
+}
+
+/** True when holding BOOST would borrow something this tick. */
 export function canBoost(w: World, b: Blob, tick: number): boolean {
   return (
-    w.phase === "LIVE" && b.state === "alive" && b.pips > 0 && !b.cashout &&
+    w.phase === "LIVE" && b.state === "alive" && b.kind !== "drone" && !b.cashout &&
     tick >= b.shieldUntil && matchT(w, tick) < BOOST_LOCKOUT_T && ring(b) !== "red" && boostRoom(b) > 0 && vaultLeft(w) > 0
   );
 }
 
-/** One BOOST charge: borrow 0.5x own money (last tap takes what is left), 1% fee from mass. Returns Micro borrowed. */
-export function boostTap(w: World, b: Blob, tick: number): Micro {
+/**
+ * One tick of held BOOST (nitro): borrow NITRO_RATE x own money per second, capped at 2.5x, and
+ * go x1.5 fast. The loan builds up in pendingBorrow and is logged with its fee by flushBoost, so a
+ * 2 s hold is one BOOST entry, not 120. Not allowed (red, cap, lockout...) = the hold ends here.
+ * Returns Micro borrowed this tick.
+ */
+export function boostHold(w: World, b: Blob, tick: number): Micro {
   if (!canBoost(w, b, tick)) return 0;
-  const amt = Math.min(mulBps(borrowBase(b), C.BOOST_CHARGE_BPS), boostRoom(b), vaultLeft(w));
-  if (amt <= 0) return 0;
+  const perTick = Math.max(1, Math.floor((borrowBase(b) * C.NITRO_RATE_BPS) / (BPS * C.R.TICK_HZ)));
+  const amt = Math.min(perTick, boostRoom(b), vaultLeft(w));
+  b.mass += amt;
+  b.debt += amt;
+  b.pendingBorrow += amt;
+  w.vault.lent += amt;
+  b.boostUntil = tick + 1;
+  return amt;
+}
+
+/**
+ * Log the loan built up by a hold, with its 1% fee from mass. Called when the hold ends and before
+ * any event that settle checks against the debt (REPAY, pop, eat, cash-out). Mass always covers the
+ * fee: a blob still alive owes at most mass / 0.9 * 0.8, far above 1% of its loan. Returns Micro logged.
+ */
+export function flushBoost(w: World, b: Blob, tick: number): Micro {
+  const amt = b.pendingBorrow;
+  if (amt === 0) return 0;
   const fee = mulDivUp(amt, C.BORROW_FEE_BPS, BPS);
   const feeVault = mulBps(fee, C.BORROW_FEE_VAULT_BPS);
-  b.mass += amt - fee;
-  b.debt += amt;
+  b.pendingBorrow = 0;
+  b.mass -= fee;
   b.boostFees += fee;
-  w.vault.lent += amt;
   w.fees += feeVault;
   w.reserve += fee - feeVault;
-  b.pips--;
-  b.pipReadyAt.push(tick + PIP_RECHARGE_T);
-  b.boostUntil = tick + BOOST_BURST_T;
   w.pendingLog.push({ type: "BOOST", tick, data: { blob: b.id, borrowed: amt, fee } });
   return amt;
 }
 
 function repayFromMass(w: World, b: Blob, amt: Micro, tick: number): Micro {
+  flushBoost(w, b, tick);
   const paid = Math.min(amt, b.debt, b.mass);
   if (paid <= 0) return 0;
   b.mass -= paid;
@@ -124,6 +138,8 @@ export function takeMass(b: Blob, amount: Micro): Micro {
 /** One second of interest, from mass only; split food 80 / vault 15 / reserve rest. Returns Micro charged. */
 export function accrueInterest(w: World, b: Blob, tick: number): Micro {
   if (b.state !== "alive" || b.debt === 0) return 0;
+  // Interest runs on the whole debt, so a hold in progress is logged first: one BOOST a second.
+  flushBoost(w, b, tick);
   const amount = takeMass(b, mulDivUp(b.debt, w.ratePerMinBps, BPS * 60));
   if (amount === 0) return 0;
   const toFood = mulBps(amount, C.INTEREST_FOOD_BPS);
@@ -185,6 +201,7 @@ function closeBlob(b: Blob): void {
 
 /** Liquidation waterfall: vault first, 8% bounty to popper (reserve on a keeper pop), 2% fee, rest scatters. */
 export function liquidate(w: World, victim: Blob, popper: Blob | null, tick: number): PopResult {
+  flushBoost(w, victim, tick);
   const debtRepaid = Math.min(victim.debt, victim.mass);
   let rest = victim.mass - debtRepaid;
   const bounty = Math.min(mulBps(victim.debt, C.BOUNTY_BPS), rest);
@@ -219,6 +236,7 @@ export const outweighs = (a: Blob, b: Blob): boolean => a.mass * BPS >= b.mass *
 
 /** A eats B: B's debt repaid first, A gets 70% of B's equity, 30% scatters. Returns Micro gained. */
 export function eat(w: World, eater: Blob, victim: Blob, tick: number): Micro {
+  flushBoost(w, victim, tick);
   const debtRepaid = Math.min(victim.debt, victim.mass);
   const eq = victim.mass - debtRepaid;
   const gained = mulBps(eq, C.EAT_TRANSFER_BPS);

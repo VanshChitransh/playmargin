@@ -4,11 +4,11 @@ import { MICRO } from "./constants";
 import { seedRng } from "./rng";
 import type { Blob, World } from "./types";
 
-/** A live, unshielded human at (500, 500) with 80 mass and full pips. */
+/** A live, unshielded human at (500, 500) with 80 mass and a full BOOST tank. */
 export function makeBlob(over: Partial<Blob> = {}): Blob {
   return {
     id: "a", kind: "human", label: "a", accountId: null, x: 500, y: 500, dirX: 0, dirY: 0,
-    mass: 80 * MICRO, debt: 0, boostFees: 0, payout: 0, pips: 3, pipReadyAt: [],
+    mass: 80 * MICRO, debt: 0, boostFees: 0, payout: 0, pendingBorrow: 0,
     boostUntil: 0, repayReadyAt: 0, shieldUntil: 0, spikeImmuneUntil: 0, redSince: null,
     lastThreatAt: -1e9, cashout: null, state: "alive", lastInput: null, lastInputAt: -1e9,
     ...over,

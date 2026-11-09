@@ -3,7 +3,7 @@
 // threats push by edge distance, food pulls, spikes push. On top, the MARGIN money habits a
 // careful human would have: BOOST to chase, REPAY when not green, cash out when ahead.
 import {
-  equity, leverageBps, outweighs, R, radius, rand, randRange, ring, seedRng, sToTicks, type AgentView, type Blob, type Brain, type InputCmd,
+  equity, fuel, leverageBps, outweighs, R, radius, rand, randRange, ring, seedRng, sToTicks, type AgentView, type Blob, type Brain, type InputCmd,
 } from "@margin/core";
 
 /** How this bot plays; the commander (A6) may nudge these later. Values in 0..1. */
@@ -28,6 +28,8 @@ export class FreeBot implements Brain {
   private rng: { rngState: number };
   private nextAt = 0;
   private held: { x: number; y: number } = { x: 0, y: 0 };
+  /** BOOST is held from one decision to the next (200 to 400 ms of nitro), like a held key. */
+  private boosting = false;
   private liveSince: number | null = null;
   private startEquity = 0;
   readonly personality: Personality;
@@ -41,9 +43,9 @@ export class FreeBot implements Brain {
     };
   }
 
-  /** Steer every tick with the held heading; think (and maybe tap) only every 200 to 400 ms. */
+  /** Steer (and hold BOOST) every tick as last decided; think, and maybe tap, only every 200 to 400 ms. */
   decide(v: AgentView, tick: number): InputCmd {
-    const cmd: InputCmd = { seq: tick, dirX: this.held.x, dirY: this.held.y, boost: false, repay: false, cashout: false };
+    const cmd: InputCmd = { seq: tick, dirX: this.held.x, dirY: this.held.y, boost: this.boosting, repay: false, cashout: false };
     if (v.phase === "LIVE" && this.liveSince === null) {
       this.liveSince = tick;
       this.startEquity = equity(v.self);
@@ -53,8 +55,10 @@ export class FreeBot implements Brain {
 
     const { dir, prey } = this.field(v, tick);
     this.held = dir;
+    this.boosting = false;
     cmd.dirX = dir.x;
     cmd.dirY = dir.y;
+    cmd.boost = false;
     if (v.phase !== "LIVE" || this.liveSince === null) return cmd;
 
     const me = v.self;
@@ -65,8 +69,8 @@ export class FreeBot implements Brain {
     const appetiteBps = 10_000 + Math.round(this.personality.greed * 15_000);
     // Careful bots deleverage at once; reckless ones hesitate, as panicking humans do.
     if (state !== "green" && me.debt > 0 && rand(this.rng) < 0.3 + 0.6 * Math.min(1, this.personality.caution)) cmd.repay = true;
-    else if (state === "green" && me.pips > 0 && (prey ? rand(this.rng) < this.personality.greed : leverageBps(me) < appetiteBps && rand(this.rng) < 0.25)) {
-      cmd.boost = true;
+    else if (state === "green" && fuel(me) > 0 && (prey ? rand(this.rng) < this.personality.greed : leverageBps(me) < appetiteBps && rand(this.rng) < 0.25)) {
+      this.boosting = cmd.boost = true;
     }
     const ahead = equity(me) * 10_000 >= this.startEquity * CASHOUT_GAIN_BPS;
     if (ahead && state === "green" && t >= CASHOUT_OPEN_T && t < CASHOUT_CLOSE_T && !this.threatened(v) && rand(this.rng) < 0.3) {

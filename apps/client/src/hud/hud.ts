@@ -12,6 +12,10 @@ const LB_MS = 1000 / R.LEADERBOARD_HZ;
 const ROW_PX = 22;
 const C = { gold: "#F5B83D", liq: "#FF3D5A", dim: "#1A2742", paper: "#EEF2FF" };
 
+// S1 one-off (BOOST hold-to-nitro removed R.BOOST_RECHARGE_S): keeps the old pip animation compiling
+// until S3 swaps the pips for the fuel ring from BlobView.fuel.
+const PIP_ANIM_MS = 3000;
+
 export class Hud {
   private el: HTMLElement;
   private q = <T extends HTMLElement>(s: string): T => this.el.querySelector<T>(`[data-h=${s}]`)!;
@@ -203,11 +207,11 @@ export class Hud {
     const max = R.BOOST_PIPS;
     const lit = Math.min(max, me.pips);
     // The server only sends the lit count: start a 3 s refill per spent pip on our side.
-    if (lit < this.prevPips) for (let i = lit; i < this.prevPips; i++) this.recharge.push(now + R.BOOST_RECHARGE_S * 1000);
+    if (lit < this.prevPips) for (let i = lit; i < this.prevPips; i++) this.recharge.push(now + PIP_ANIM_MS);
     if (lit > this.prevPips) this.recharge.splice(0, lit - this.prevPips);
     this.prevPips = lit;
     this.recharge = this.recharge.slice(-(max - lit));
-    const spent = [...this.recharge].sort((a, b) => a - b).map((t) => 1 - Math.max(0, t - now) / (R.BOOST_RECHARGE_S * 1000));
+    const spent = [...this.recharge].sort((a, b) => a - b).map((t) => 1 - Math.max(0, t - now) / (PIP_ANIM_MS));
     const fills = Array.from({ length: max }, (_, i) => (i < lit ? 1 : (spent[i - lit] ?? 0)));
     this.pipRing.style.background = pipGradient(fills, blocked ? "#8391B3" : C.gold, C.dim);
     this.els.boost.classList.toggle("blocked", blocked);

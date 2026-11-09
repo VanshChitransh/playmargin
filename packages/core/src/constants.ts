@@ -26,9 +26,8 @@ export const R = {
   "BOOST_CHARGE_EQUITY": 0.5,
   "BOOST_PIPS": 3,
   "BOOST_PIPS_GOLD": 4,
-  "BOOST_RECHARGE_S": 3,
   "BOOST_SPEED_MULT": 1.5,
-  "BOOST_SPEED_S": 1,
+  "NITRO_RATE_EQUITY_PER_S": 1.0,
   "ROOM_VAULT_BUDGET": "(LEVERAGE_CAP - 1) * pot",
   "BORROW_FEE": 0.01,
   "BORROW_FEE_SPLIT": {
@@ -115,7 +114,7 @@ export const HF_GREEN_BPS = bps(R.HF_GREEN);
 export const HF_RED_BPS = bps(R.HF_RED);
 export const HF_ULTRA_BPS = bps(R.HF_ULTRA);
 export const LEVERAGE_CAP_BPS = bps(R.LEVERAGE_CAP);
-export const BOOST_CHARGE_BPS = bps(R.BOOST_CHARGE_EQUITY);
+export const NITRO_RATE_BPS = bps(R.NITRO_RATE_EQUITY_PER_S);
 export const BORROW_FEE_BPS = bps(R.BORROW_FEE);
 export const BORROW_FEE_VAULT_BPS = bps(R.BORROW_FEE_SPLIT.vault);
 export const RATE_BASE_BPS = bps(R.RATE_PER_MIN.base);
