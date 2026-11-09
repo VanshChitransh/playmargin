@@ -14,11 +14,11 @@ export function bakeSpikeTextures(renderer: Renderer): { grey: Texture; red: Tex
     const pts: number[] = [];
     for (let i = 0; i < POINTS * 2; i++) {
       const a = (Math.PI * i) / POINTS;
-      const r = i % 2 ? 0.86 : 1;
+      const r = i % 2 ? 0.8 : 1; // deep teeth: reads as sharp, never as food
       pts.push(Math.cos(a) * r * 32, Math.sin(a) * r * 32);
     }
     // Brand rule: no glows. Danger reads as colour plus a thick ink outline and the warning sign.
-    g.poly(pts).fill({ color }).stroke({ width: thick ? 6 : 4, color: thick ? 0x070a12 : C.virusLine, join: "round" });
+    g.poly(pts).fill({ color }).stroke({ width: thick ? 6 : 4, color: 0x070a12, join: "miter" });
     return renderer.generateTexture({ target: g, resolution: 2 });
   };
   return { grey: make(C.virus, false), red: make(C.liq, true) };
@@ -43,6 +43,8 @@ export class SpikeSprite extends Container {
     this.sprite.tint = danger || !big ? 0xffffff : 0x9ccf9c;
     this.sprite.width = this.sprite.height = r * 2;
     this.sprite.rotation = reducedMotion ? 0 : tS * 0.15;
+    // A slow breathe: alive and armed, even when it cannot turn me red.
+    if (!reducedMotion) this.sprite.scale.set(this.sprite.scale.x * (0.97 + 0.03 * Math.sin(tS * 2.4 + x))); // never past the hitbox
     this.warn.visible = danger;
     if (danger && !reducedMotion) this.alpha = 0.75 + 0.25 * Math.sin(tS * 8 * Math.PI);
     else this.alpha = 1;

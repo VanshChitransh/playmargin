@@ -56,8 +56,9 @@ export function play(s: Sfx, pitch = 1): void {
       noise(t, 0.25, 2000, 300, 0.5);
       tone(t, 140, 40, 0.3, "sine", 0.5);
       break;
-    case "spike":
+    case "spike": // crack plus a dull thud: it hurt
       noise(t, 0.12, 4000, 1500, 0.35);
+      tone(t, 110, 50, 0.18, "sine", 0.45);
       break;
     case "clink": // REPAY coin, pitch rises over a run of taps
       tone(t, 1320 * pitch, 1320 * pitch, 0.07, "triangle", 0.12);

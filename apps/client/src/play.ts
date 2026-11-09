@@ -161,9 +161,10 @@ export const play: Screen = (root, params) => {
       case "spikeHit": {
         const p = at(e.blob);
         if (!p) break;
-        arena.fx.shards(p.x, p.y, Math.max(4, Math.min(18, Math.round(e.damage / 2))), C.muted, p.r);
+        arena.fx.shards(p.x, p.y, Math.max(6, Math.min(18, Math.round(e.damage / 2))), C.ink, p.r);
         if (e.blob === me) {
-          arena.fx.floatText(p.x, p.y - p.r, `\u2212${num(e.damage)}`, C.liq, z);
+          // Say the cause: a spike costs even with no loan, and a bare "-8" read as a mystery.
+          arena.fx.floatText(p.x, p.y - p.r, `\u2212${num(e.damage)} SPIKE`, C.liq, z);
           sfx("spike");
         }
         break;
