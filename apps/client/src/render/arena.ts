@@ -11,13 +11,14 @@ import { SPIKE_R, SpikeSprite, bakeSpikeTextures } from "./spike";
 import { boostBlocked, boostPreview } from "../hud/logic";
 import { FxLayer } from "./fx";
 
-const CELL = 50;
+/** ~35 grid cells across the screen at start size (agar.io measured). */
+const CELL = 60;
 /** Grid drawn this far past the arena so the camera never shows a void. */
 const BEYOND = 3000;
 /** Spikes further than this from my edge never warn: "within reach" (RULES, Spikes). */
 const WARN_REACH = 500;
-/** World px visible across the short screen side at start size. */
-const VIEW_AT_START = 720;
+/** World units across the LONG screen side at start size: a start blob is ~5.5% of it (agar.io). */
+const VIEW_AT_START = 2100;
 
 export type FrameSource = (nowMs: number) => Frame | null;
 
@@ -98,11 +99,12 @@ export class ArenaRenderer {
       .lineTo(CELL, 0.5)
       .moveTo(0.5, 0)
       .lineTo(0.5, CELL)
-      .stroke({ width: 1, color: C.floorLine });
+      .stroke({ width: 2, color: C.floorLine });
     this.grid = new TilingSprite({ texture: this.app.renderer.generateTexture(cell), width: 1, height: 1 });
     this.dot = this.app.renderer.generateTexture({
       // White body with a grey rim: the tint makes it one vivid colour with a darker edge.
-      target: new Graphics().circle(0, 0, 16).fill(0xffffff).stroke({ width: 3, color: 0xb0b0b0 }),
+      // Flat pellet, no outline (agar.io); the tint gives each one its colour.
+      target: new Graphics().circle(0, 0, 16).fill(0xffffff),
       resolution: 2,
     });
     this.spikeTex = bakeSpikeTextures(this.app.renderer);
@@ -217,9 +219,9 @@ export class ArenaRenderer {
 
   private follow(x: number, y: number, r: number): void {
     const { width, height } = this.app.screen;
-    const base = Math.min(width, height) / this.view;
+    const base = Math.max(width, height) / this.view;
     // Zoom out as I grow so a boosted blob still sees its threats (agar.io feel).
-    const target = base * Math.min(1.2, Math.max(0.4, Math.pow(57 / Math.max(r, 1), 0.5)));
+    const target = base * Math.min(1.2, Math.max(0.35, Math.pow(57 / Math.max(r, 1), 0.4)));
     this.zoom += (target - this.zoom) * 0.08;
     this.world.scale.set(this.zoom);
     this.world.position.set(width / 2 - x * this.zoom, height / 2 - y * this.zoom);

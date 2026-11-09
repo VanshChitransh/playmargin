@@ -11,8 +11,8 @@ export const C = {
   gold: 0xf5b83d,
   agent: 0x3be3ff,
   // Light arena (agar.io canvas feel); the dark brand stays on HUD, panels and screens.
-  floor: 0xf2f7fb,
-  floorLine: 0xdce3ec,
+  floor: 0xeefafd, // measured from agar.io
+  floorLine: 0xd9e6ea,
   edge: 0xc9d3df,
   virus: 0x5fd068,
   virusLine: 0x2f8f3d,

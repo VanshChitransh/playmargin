@@ -105,7 +105,7 @@ export const landing: Screen = (root) => {
         if (f.match.phase === "ENDED" || me?.state !== "alive") match = newHero();
         return f;
       },
-      { fit: box, view: 520 },
+      { fit: box, view: 1200 },
     )
     .then(() => {
       mounted = true;

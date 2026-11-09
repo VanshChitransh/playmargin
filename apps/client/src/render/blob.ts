@@ -18,6 +18,9 @@ export class BlobSprite extends Container {
   private nameText: Text;
   private warnSign: Text;
   private drawn = { r: -1, ring: "" as Ring | "", kind: "" };
+  private prev = { x: 0, y: 0, speed: 0 };
+  private fill = 0;
+  private calm = false;
 
   constructor(v: BlobView, isMe: boolean) {
     super();
@@ -34,6 +37,8 @@ export class BlobSprite extends Container {
 
   /** Sync to a view; tS is seconds since start (pulses), zoom keeps text a fixed screen size. */
   update(v: BlobView, tS: number, isMe: boolean, zoom: number): void {
+    const moved = Math.hypot(v.x - this.prev.x, v.y - this.prev.y);
+    this.prev = { x: v.x, y: v.y, speed: this.prev.speed * 0.85 + Math.min(moved, 20) * 0.15 };
     this.position.set(v.x, v.y);
     this.visible = v.state === "alive";
     if (!this.visible) return;
@@ -43,8 +48,9 @@ export class BlobSprite extends Container {
     }
     const r = v.radius + RING_GAP;
     const k = 1 / zoom;
+    if (v.kind !== "drone") this.membrane(v.radius, tS);
     // Name inside the blob, sized with it (agar.io), never under ~11 px on screen.
-    const ns = Math.max(v.radius * 0.38, 11 / zoom) / 28;
+    const ns = Math.max(v.radius * 0.5, 11 / zoom) / 28;
     this.nameText.scale.set(ns);
     this.warnSign.scale.set(k);
     this.nameText.position.set(0, v.kind === "drone" ? r + 14 * k : 0);
@@ -59,6 +65,21 @@ export class BlobSprite extends Container {
     this.warnSign.alpha = 0.6 + 0.4 * p;
   }
 
+  /** agar.io membrane: a flat vivid body with a darker rim that ripples while moving. */
+  private membrane(r: number, tS: number, force = false): void {
+    const amp = wobble(r, this.prev.speed);
+    if (amp < 0.3 && !force && this.calm) return;
+    this.calm = amp < 0.3;
+    const n = 48;
+    const pts: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const rr = r + amp * Math.sin(a * 5 + tS * 6) * Math.sin(a * 3 - tS * 4);
+      pts.push(Math.cos(a) * rr, Math.sin(a) * rr);
+    }
+    this.body.clear().poly(pts).fill(this.fill).stroke({ width: Math.max(3, r * 0.06), color: darken(this.fill) });
+  }
+
   private redraw(v: BlobView, isMe: boolean): void {
     this.drawn = { r: v.radius, ring: v.ring, kind: v.kind };
     const r = v.radius;
@@ -70,13 +91,18 @@ export class BlobSprite extends Container {
       this.body.poly(hex(r)).fill({ color: C.agent, alpha: 0.18 }).stroke({ width: 4, color: C.navy });
       return;
     }
-    const fill = vivid(v.id);
-    this.body.circle(0, 0, r).fill(fill).stroke({ width: Math.max(3, r * 0.07), color: darken(fill) });
+    this.fill = vivid(v.id);
+    this.membrane(r, 0, true);
     const rr = r + RING_GAP;
     if (v.ring === "yellow") dashed(this.ring, rr, C.warn);
     else this.ring.circle(0, 0, rr).stroke({ width: v.ring === "red" ? RING_W + 2 : RING_W, color: v.ring === "red" ? C.liq : C.safe });
     this.shield.circle(0, 0, rr + 7).stroke({ width: 2, color: C.navy, alpha: 0.35 });
   }
+}
+
+/** Wobble amplitude in world units grows with speed, so a blob at rest is a clean circle. */
+function wobble(r: number, speed: number): number {
+  return Math.min(r * 0.035, speed * 0.25);
 }
 
 function dashed(g: Graphics, r: number, color: number): void {
