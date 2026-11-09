@@ -41,3 +41,13 @@ export function agentFill(humans: number): PlayerSeed[] {
     accountId: null,
   }));
 }
+
+/** Paid rooms: unstaked liquidator drones, DRONES_PER_ROOM = min(3, ceil(humans / 3)), labelled. */
+export function droneFill(humans: number): PlayerSeed[] {
+  return Array.from({ length: Math.min(3, Math.ceil(humans / 3)) }, (_, i) => ({
+    id: `drone-${i + 1}`,
+    kind: "drone" as const,
+    label: `Drone-${i + 1} (liquidator)`,
+    accountId: null,
+  }));
+}

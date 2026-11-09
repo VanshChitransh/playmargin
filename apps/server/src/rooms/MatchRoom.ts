@@ -1,13 +1,17 @@
 // One match: WARMUP (ghosts, nothing charged) -> COUNTDOWN 3-2-1 -> GO -> LIVE 90 s -> ENDED
 // -> settle -> dispose. Every timer reads this.phase. Registered as "match" (public, by mode)
 // and "private" (also by 4-letter roomCode), so a public joinOrCreate never lands in a friend's room.
+// "judge" is the Judge Run: one human, the published JUDGE_SEED, judgeLineup and applyJudgeLayout.
 // Rules live in @margin/core; this shell owns sockets, timers, credits and the log.
 import { randomInt } from "node:crypto";
 import { Room, type Client } from "colyseus";
 import {
+  JUDGE_SEED,
   R,
   TICK_MS,
   addPlayer,
+  applyJudgeLayout,
+  judgeLineup,
   matchT,
   newWorld,
   removePlayer,
@@ -28,7 +32,7 @@ import { admitFree, chargeEntry } from "./freeMatch";
 import { admitPaid } from "./paidMatch";
 import { InputQueue } from "./input";
 import { MatchRecord } from "./matchRecord";
-import { agentFill, parseRoomKey, warmupNext, type RoomKey } from "./lobby";
+import { agentFill, droneFill, parseRoomKey, warmupNext, type RoomKey } from "./lobby";
 import { MatchState, syncState } from "./schema";
 
 const WARMUP_TICKS = sToTicks(R.WARMUP_S);
@@ -45,7 +49,7 @@ export const drain = { on: false };
 
 export class MatchRoom extends Room {
   override state = new MatchState();
-  override maxClients = R.ROOM_SIZE;
+  override maxClients: number = R.ROOM_SIZE;
   override patchRate = 1000 / R.SEND_HZ;
   /** Far above the 30/s game limit: only a broken or hostile client hits this and gets dropped. */
   override maxMessagesPerSecond = 120;
@@ -53,7 +57,9 @@ export class MatchRoom extends Room {
   private phase: Phase = "WARMUP";
   private phaseTick = 0;
   private roomTick = 0;
-  private readonly seed = randomInt(2 ** 31);
+  private seed = randomInt(2 ** 31);
+  /** Judge Run room: a single human against the published scenario, no late joins. */
+  private judge = false;
   /** Warm-up world for ghosts; replaced at GO by one sized for the final head count. */
   private world!: World;
   private log!: MatchRecord;
@@ -78,6 +84,12 @@ export class MatchRoom extends Room {
     this.key = parseRoomKey(opts);
     if (this.roomName === "private" && !this.key.roomCode) throw new Error("private room needs a 4-letter roomCode");
     if (this.roomName !== "private") this.key.roomCode = null;
+    if (this.roomName === "judge") {
+      this.judge = true;
+      this.key = { mode: "free", roomCode: null };
+      this.maxClients = 1;
+      this.seed = JUDGE_SEED;
+    }
     this.world = newWorld(this.seed, this.key.mode, [], this.roomId);
     const db = sharedDb();
     this.log = new MatchRecord(db, this.roomId, this.key.mode, settlementFor(this.key.mode, db, this.users));
@@ -187,7 +199,7 @@ export class MatchRoom extends Room {
       case "LIVE":
         this.log.drain(w);
         if (this.phaseTick % LOG_FLUSH_TICKS === 0) this.log.flush();
-        if (this.key.mode === "free" && this.phaseTick === LATE_JOIN_TICKS) void this.lock();
+        if (this.key.mode === "free" && !this.judge && this.phaseTick === LATE_JOIN_TICKS) void this.lock();
         if (w.phase === "ENDED") {
           this.enter("ENDED", false); // core already sent the ENDED phase event
           void this.settle();
@@ -199,10 +211,12 @@ export class MatchRoom extends Room {
     }
   }
 
-  /** Lock the room; free rooms fill the empty seats with labelled agents who appear for the 3-2-1. */
+  /** Lock the room; free rooms fill the empty seats with labelled agents, paid rooms add liquidator drones. */
   private countdown(): void {
     void this.lock();
-    if (this.key.mode === "free") for (const p of agentFill(this.state.humans)) addPlayer(this.world, p);
+    const human = [...this.world.blobs.values()].find((b) => b.kind === "human");
+    const fill = this.judge && human ? judgeLineup(human).slice(1) : this.key.mode === "free" ? agentFill(this.state.humans) : droneFill(this.state.humans);
+    for (const p of fill) addPlayer(this.world, p);
     this.world.phase = "COUNTDOWN";
     this.countHeads();
     this.enter("COUNTDOWN");
@@ -220,12 +234,14 @@ export class MatchRoom extends Room {
     const players = [...this.world.blobs.values()].map(({ id, kind, label, accountId }) => ({ id, kind, label, accountId }));
     this.world = newWorld(this.seed, this.key.mode, players, this.roomId);
     startMatch(this.world, this.roomTick);
+    const human = players.find((p) => p.kind === "human");
+    if (this.judge && human) applyJudgeLayout(this.world, human.id);
     for (const b of this.world.blobs.values()) {
       const brain = createBrain(b, this.seed);
       if (brain) this.brains.set(b.id, brain);
     }
     this.autoDispose = false;
-    if (this.key.mode === "free") void this.unlock(); // late joins for 15 s
+    if (this.key.mode === "free" && !this.judge) void this.unlock(); // late joins for 15 s
     this.log.drain(this.world);
     this.log.open(this.world, this.seed, this.key.mode === "free" ? this.users : this.accountSeats());
     this.enter("LIVE");

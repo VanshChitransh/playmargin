@@ -1,7 +1,7 @@
 // Matchmaking timing and agent fill (RULES: Matchmaking, Paid rooms).
 import { R, sToTicks } from "@margin/core";
 import { describe, expect, it } from "vitest";
-import { agentFill, parseRoomKey, warmupNext } from "./lobby";
+import { agentFill, droneFill, parseRoomKey, warmupNext } from "./lobby";
 
 const at = (s: number) => sToTicks(s);
 
@@ -33,5 +33,12 @@ describe("agentFill", () => {
     expect(a).toHaveLength(R.ROOM_SIZE - 2);
     expect(a.every((p) => p.kind === "agent" && p.label.includes("Agent-"))).toBe(true);
     expect(agentFill(R.ROOM_SIZE)).toHaveLength(0);
+  });
+});
+
+describe("droneFill", () => {
+  it("min(3, ceil(humans / 3)) labelled drones with no account", () => {
+    expect([2, 3, 4, 9, 12].map((h) => droneFill(h).length)).toEqual([1, 1, 2, 3, 3]);
+    expect(droneFill(4).every((d) => d.kind === "drone" && d.accountId === null && d.label.endsWith("(liquidator)"))).toBe(true);
   });
 });

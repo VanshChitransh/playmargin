@@ -15,6 +15,7 @@ const server = defineServer({
   rooms: {
     match: defineRoom(MatchRoom).filterBy(["mode"]),
     private: defineRoom(MatchRoom).filterBy(["mode", "roomCode"]),
+    judge: defineRoom(MatchRoom),
   },
   express: (app) => {
     mountApi(app, sharedDb);
