@@ -4,7 +4,7 @@ import { MICRO, R } from "./constants";
 import { blobSpeed, move, radius, speed, BASE_SPEED_PX_S } from "./motion";
 import { rand, randInt, seedRng } from "./rng";
 import type { Blob } from "./types";
-import { mulBps, mulDiv, toMicro, assertMicro } from "./units";
+import { mulBps, mulDiv, mulDivUp, toMicro, assertMicro } from "./units";
 
 function blob(over: Partial<Blob> = {}): Blob {
   return {
@@ -37,6 +37,10 @@ describe("units", () => {
     expect(mulBps(120 * MICRO, 800)).toBe(9.6 * MICRO);
     expect(() => mulBps(Number.MAX_SAFE_INTEGER, 10_000)).toThrow();
     expect(mulDiv(10, 1, 3)).toBe(3);
+    // Regression (npm run sim): fees x debt of a big blob passes 2^53; must stay exact.
+    expect(mulDiv(9_580_665, 958_066_032, 958_066_032)).toBe(9_580_665);
+    expect(mulDivUp(9_580_665, 958_066_031, 958_066_032)).toBe(9_580_665);
+    expect(mulDiv(2 ** 40, 2 ** 30, 2 ** 30)).toBe(2 ** 40);
     expect(toMicro(1.5)).toBe(1_500_000);
     expect(() => assertMicro(1.5)).toThrow();
     expect(() => assertMicro(-1)).toThrow();
