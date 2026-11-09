@@ -5,7 +5,7 @@ import { MATCH_TICKS, MICRO, sToTicks } from "./constants";
 import type { InputCmd } from "./protocol";
 import { rand, seedRng } from "./rng";
 import { step } from "./step";
-import { makeBlob, makeWorld } from "./testkit";
+import { leak, makeBlob, makeWorld } from "./testkit";
 import type { PlayerSeed, World } from "./types";
 import { newWorld, startMatch } from "./world";
 
@@ -64,6 +64,43 @@ describe("step", () => {
     startMatch(w, 2);
     expect(w.pot).toBe(4 * 100 * MICRO);
     expect(w.vault.budget).toBe(4 * 150 * MICRO);
+  });
+
+  describe("leftover food at the bell (Vansh, 9 Nov)", () => {
+    // Two humans; food worth 10 units lies far from both, so nobody eats it on the last tick.
+    const bell = (states: Array<"alive" | "popped" | "cashed">) => {
+      const bs = states.map((st, i) => makeBlob({ id: `h${i}`, mass: u(50), x: 100 + i * 300, state: st }));
+      const w = makeWorld(bs);
+      for (const b of bs) if (b.state !== "alive") { w.pot -= b.mass; b.mass = 0; }
+      w.food.push({ id: 99, x: 1900, y: 1900, mass: u(10) });
+      w.pot += u(10);
+      step(w, new Map(), MATCH_TICKS);
+      const end = w.pendingLog.at(-1);
+      return { w, bs, end: end?.type === "MATCH_END" ? end.data : null };
+    };
+
+    it("nobody survives: all of it goes to the vault, popped players get nothing more", () => {
+      const { w, bs, end } = bell(["popped", "popped"]);
+      expect(end?.toVault).toBe(u(10));
+      expect(w.vault.interest).toBe(u(10));
+      expect(bs.map((b) => b.payout)).toEqual([0, 0]);
+      expect(leak(w)).toBe(0);
+    });
+
+    it("all cashed out early: nobody alive at the bell, so the vault takes it", () => {
+      const { w, end } = bell(["cashed", "cashed"]);
+      expect(end?.toVault).toBe(u(10));
+      expect(w.vault.interest).toBe(u(10));
+      expect(leak(w)).toBe(0);
+    });
+
+    it("one survivor takes all of it, the vault nothing", () => {
+      const { w, bs, end } = bell(["alive", "popped"]);
+      expect(end?.toVault).toBe(0);
+      expect(bs[0]?.payout).toBe(u(60));
+      expect(w.vault.interest).toBe(0);
+      expect(leak(w)).toBe(0);
+    });
   });
 
   it("a drone holding bounty mass can't BOOST, REPAY or cash out (settle would refuse it)", () => {

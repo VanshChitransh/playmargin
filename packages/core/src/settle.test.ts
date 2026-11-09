@@ -36,7 +36,7 @@ describe("hand logs", () => {
       { type: "REPAY", tick: 5401, data: { blob: "a", amount: u(40) } },
       { type: "CASHOUT", tick: 5401, data: { blob: "a", amount: u(120) } },
       { type: "CASHOUT", tick: 5401, data: { blob: "b", amount: u(79.576) } },
-      { type: "MATCH_END", tick: 5401, data: { tick: 5401, finalMasses: { a: u(120), b: u(79.576) }, dust: 0 } },
+      { type: "MATCH_END", tick: 5401, data: { tick: 5401, finalMasses: { a: u(120), b: u(79.576) }, dust: 0, toVault: 0 } },
     ]);
     expect(settle(log)).toMatchObject({
       matchId: "hand", vaultRepaid: u(40), interestToVault: u(0.018), fees: u(0.3), reserve: u(0.106),
@@ -52,23 +52,36 @@ describe("hand logs", () => {
       { type: "SPIKE", tick: 100, data: { blob: "a", spike: 7, damage: u(56.3) } },
       { type: "POP", tick: 130, data: { by: "b", victim: "a", debtRepaid: u(120), badDebt: 0, bounty: u(9.6), fee: u(2.4), scattered: u(10.5) } },
       { type: "CASHOUT", tick: 5401, data: { blob: "b", amount: u(196.4) } },
-      { type: "MATCH_END", tick: 5401, data: { tick: 5401, finalMasses: { a: 0, b: u(196.4) }, dust: 0 } },
+      { type: "MATCH_END", tick: 5401, data: { tick: 5401, finalMasses: { a: 0, b: u(196.4) }, dust: 0, toVault: 0 } },
     ]);
     expect(settle(log)).toMatchObject({
       vaultRepaid: u(120), fees: u(0.9), reserve: u(2.7), payouts: [{ id: "b", amount: u(196.4) }],
     });
   });
 
-  it("cash-out: leaves with equity, leftover split with 1 Micro of dust to reserve", async () => {
+  it("cash-out: two survivors at the bell split the leftover equally, 1 Micro of dust to reserve", async () => {
     const log = await chain([
       ...open(),
       { type: "BOOST", tick: 10, data: { blob: "a", borrowed: u(40), fee: u(0.4) } },
-      { type: "REPAY", tick: 3000, data: { blob: "a", amount: u(40) } },
-      { type: "CASHOUT", tick: 3000, data: { blob: "a", amount: u(79.6) } },
-      { type: "CASHOUT", tick: 5401, data: { blob: "b", amount: u(119.999999) } },
-      { type: "MATCH_END", tick: 5401, data: { tick: 5401, finalMasses: { a: u(79.6), b: u(119.999999) }, dust: 1 } },
+      { type: "REPAY", tick: 5401, data: { blob: "a", amount: u(40) } },
+      { type: "CASHOUT", tick: 5401, data: { blob: "a", amount: u(79.6) } },
+      { type: "CASHOUT", tick: 5401, data: { blob: "b", amount: u(100.000001) } },
+      { type: "CASHOUT", tick: 5401, data: { blob: "a", amount: 9_999_999 } },
+      { type: "CASHOUT", tick: 5401, data: { blob: "b", amount: 9_999_999 } },
+      { type: "MATCH_END", tick: 5401, data: { tick: 5401, finalMasses: { a: 89_599_999, b: 110_000_000 }, dust: 1, toVault: 0 } },
     ]);
-    expect(settle(log)).toMatchObject({ vaultRepaid: u(40), fees: u(0.3), reserve: u(0.1) + 1 });
+    expect(settle(log)).toMatchObject({ vaultRepaid: u(40), fees: u(0.3), reserve: u(0.1) + 1, interestToVault: 0 });
+  });
+
+  it("nobody alive at the bell: the leftover goes to the vault", async () => {
+    const log = await chain([
+      ...open(),
+      { type: "BOOST", tick: 10, data: { blob: "a", borrowed: u(40), fee: u(0.4) } },
+      { type: "POP", tick: 100, data: { by: "b", victim: "a", debtRepaid: u(40), badDebt: 0, bounty: u(3.2), fee: u(0.8) } as never },
+      { type: "CASHOUT", tick: 3000, data: { blob: "b", amount: u(150) } },
+      { type: "MATCH_END", tick: 5401, data: { tick: 5401, finalMasses: { b: u(150) }, dust: 0, toVault: u(48.8) } },
+    ]);
+    expect(settle(log)).toMatchObject({ interestToVault: u(48.8), vaultRepaid: u(40) });
   });
 });
 
@@ -89,7 +102,7 @@ describe("tamper", () => {
       ...open(),
       { type: "CASHOUT", tick: 5401, data: { blob: "a", amount: u(101) } },
       { type: "CASHOUT", tick: 5401, data: { blob: "b", amount: u(99) } },
-      { type: "MATCH_END", tick: 5401, data: { tick: 5401, finalMasses: { a: u(101), b: u(99) }, dust: 0 } },
+      { type: "MATCH_END", tick: 5401, data: { tick: 5401, finalMasses: { a: u(101), b: u(99) }, dust: 0, toVault: 0 } },
     ]);
     expect(settle(log).payouts).toHaveLength(2);
     const forged = await chain(log.map(({ seq: _s, prevHash: _p, hash: _h, ...e }) => e as PendingLog).map((e) =>
@@ -120,7 +133,7 @@ describe("settle(log) == live world", () => {
 });
 
 describe("forgeries a live room cannot produce (money-auditor C5)", () => {
-  const end = (fm: Record<string, number>, dust = 0): PendingLog => ({ type: "MATCH_END", tick: 5401, data: { tick: 5401, finalMasses: fm, dust } });
+  const end = (fm: Record<string, number>, dust = 0, toVault = 0): PendingLog => ({ type: "MATCH_END", tick: 5401, data: { tick: 5401, finalMasses: fm, dust, toVault } });
   const cash = (blob: string, amount: number, tick = 5401): PendingLog => ({ type: "CASHOUT", tick, data: { blob, amount } });
   const bad: Array<[string, PendingLog[]]> = [
     ["borrow and walk away", [{ type: "BOOST", tick: 10, data: { blob: "a", borrowed: u(150), fee: u(1.5) } }, cash("a", u(248.5)), cash("b", u(100)), end({ a: u(248.5), b: u(100) })]],
@@ -138,6 +151,16 @@ describe("forgeries a live room cannot produce (money-auditor C5)", () => {
       { type: "BOOST", tick: 10, data: { blob: "a", borrowed: u(40), fee: u(0.4) } },
       { type: "POP", tick: 100, data: { by: "b", victim: "a", debtRepaid: u(40), badDebt: 0, bounty: u(3.2), fee: u(0.8) } as never },
       cash("a", u(10), 200), cash("b", u(149.6)), end({ a: u(10), b: u(149.6) })]],
+    ["leftover paid to the vault AND to a popped player", [
+      { type: "BOOST", tick: 10, data: { blob: "a", borrowed: u(40), fee: u(0.4) } },
+      { type: "POP", tick: 100, data: { by: "b", victim: "a", debtRepaid: u(40), badDebt: 0, bounty: u(3.2), fee: u(0.8) } as never },
+      cash("a", u(5)), cash("b", u(139.6)), end({ a: u(5), b: u(139.6) }, 0, u(10))]],
+    ["leftover to a popped player at the bell", [
+      { type: "BOOST", tick: 10, data: { blob: "a", borrowed: u(40), fee: u(0.4) } },
+      { type: "POP", tick: 100, data: { by: "b", victim: "a", debtRepaid: u(40), badDebt: 0, bounty: u(3.2), fee: u(0.8) } as never },
+      cash("b", u(194.2)), cash("a", u(5)), end({ a: u(5), b: u(194.2) })]],
+    ["leftover to the vault while a human is alive at the bell", [cash("a", u(100)), cash("b", u(90)), end({ a: u(100), b: u(90) }, 0, u(10))]],
+    ["dust alongside a vault leftover", [cash("a", u(100), 3000), cash("b", u(99.999997), 3000), end({ a: u(100), b: u(99.999997) }, 1, 2)]],
     ["non-integer charge", [{ type: "CHARGE", tick: 1, data: { blob: "a", entry: 0.5 } }, cash("a", u(100)), cash("b", u(100)), end({ a: u(100), b: u(100) })]],
   ];
   for (const [name, tail] of bad) {
