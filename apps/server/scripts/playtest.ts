@@ -6,13 +6,14 @@
 //   npx tsx apps/server/scripts/playtest.ts runs [n=10] [strategy=food] [--par 5]   n fresh-server matches
 //   npx tsx apps/server/scripts/playtest.ts survival [n=10]        n staggered matches, no BOOST
 //   npx tsx apps/server/scripts/playtest.ts edges                   reload, late join, 2 tabs, credits, freeze
-//   npx tsx apps/server/scripts/playtest.ts walls                   4 walls, a corner, blob on blob: r/2 clamp
+//   npx tsx apps/server/scripts/playtest.ts walls                   4 walls, a corner, blob on blob: wall inset clamp
 // strategies: wander | food | flee | boost | redrepay | cashout. Output: playtest-out/<run>/ (json, png, mp4)
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { R } from "@margin/core";
 import { Client, type Room } from "@colyseus/sdk";
 import { chromium, type Browser, type Page } from "playwright-core";
 
@@ -374,9 +375,10 @@ async function edges() {
 /**
  * Walls: one room, 7 browser players. Four push into a wall, one into the nearest corner, two push
  * into each other; each holds 2 s and screenshots. A spectator checks every synced blob, every
- * patch, against the edge clamp: centre at least r/2 inside each wall.
+ * patch, against core's edge clamp: centre at least WALL_INSET_RADII x r inside each wall.
  */
 async function walls(o: { w: number; h: number }) {
+  const INSET = R.WALL_INSET_RADII;
   const env = await boot();
   const browser = await chromium.launch({ executablePath: CHROME, headless: true, args: ["--use-angle=metal", "--enable-gpu"] });
   const roles = ["left", "right", "top", "bottom", "corner", "pushA", "pushB"] as const;
@@ -407,8 +409,8 @@ async function walls(o: { w: number; h: number }) {
     for (const b of s.blobs.values()) {
       if (b.state !== "alive") continue;
       checked++;
-      const gap = Math.min(b.x, s.arenaW - b.x, b.y, s.arenaH - b.y) - b.radius / 2;
-      if (gap < -1 && breaches.length < 20) breaches.push(`${b.label} r=${Math.round(b.radius)} at (${Math.round(b.x)},${Math.round(b.y)}) is ${Math.round(-gap)} px past r/2`);
+      const gap = Math.min(b.x, s.arenaW - b.x, b.y, s.arenaH - b.y) - b.radius * INSET;
+      if (gap < -1 && breaches.length < 20) breaches.push(`${b.label} r=${Math.round(b.radius)} at (${Math.round(b.x)},${Math.round(b.y)}) is ${Math.round(-gap)} px past ${INSET} r`);
     }
   });
   const mine = (label: string) => [...st().blobs.values()].find((b) => b.label === label);
@@ -457,12 +459,12 @@ async function walls(o: { w: number; h: number }) {
       const rec = pressed.get(pg.role) ?? { gap: [], dist: [] };
       pressed.set(pg.role, rec);
       if (other) rec.dist.push(Math.round((Math.hypot(other.x - me.x, other.y - me.y) / (me.radius + other.radius)) * 100) / 100);
-      else rec.gap.push(Math.round(Math.min(me.x, s.arenaW - me.x, me.y, s.arenaH - me.y) - me.radius / 2));
+      else rec.gap.push(Math.round(Math.min(me.x, s.arenaW - me.x, me.y, s.arenaH - me.y) - me.radius * INSET));
       if (Date.now() - holdStart.get(pg.role)! < 2000) continue;
       await pg.page.screenshot({ path: join(OUT, `wall-${pg.role}.png`) });
       results[pg.role] = other
         ? { reachedS: Math.round((holdStart.get(pg.role)! - t0) / 100) / 10, centreDistOverRadiiSum: { min: Math.min(...rec.dist), max: Math.max(...rec.dist) }, bothAlive: other.state === "alive" }
-        : { reachedS: Math.round((holdStart.get(pg.role)! - t0) / 100) / 10, radius: Math.round(me.radius), minGapPastHalfR: Math.min(...rec.gap), at: `(${Math.round(me.x)},${Math.round(me.y)})` };
+        : { reachedS: Math.round((holdStart.get(pg.role)! - t0) / 100) / 10, radius: Math.round(me.radius), minGapPastInset: Math.min(...rec.gap), at: `(${Math.round(me.x)},${Math.round(me.y)})` };
       done.add(pg.role);
     }
   }
