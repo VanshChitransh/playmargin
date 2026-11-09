@@ -27,8 +27,9 @@ interface Source {
 const JOIN_TIMEOUT_MS = 2500;
 
 /** A paid seat handed over by #/cash after the ticket is bought; used once. */
-let paidSeat: JoinOpts | null = null;
-export const setPaidSeat = (o: JoinOpts): void => void (paidSeat = o);
+// A function, so every join attempt signs a fresh one-use proof (valid 60 s).
+let paidSeat: (() => JoinOpts) | null = null;
+export const setPaidSeat = (o: () => JoinOpts): void => void (paidSeat = o);
 
 async function connect(roomCode?: string): Promise<Source> {
   const paid = paidSeat;
@@ -36,7 +37,7 @@ async function connect(roomCode?: string): Promise<Source> {
   // A paid seat never falls back to offline practice: the ticket is real, so the error must show.
   if (paid) {
     const conn = new MatchConnection();
-    await conn.join(paid);
+    await conn.join(paid());
     return conn;
   }
   if (!new URLSearchParams(location.search).has("local")) {

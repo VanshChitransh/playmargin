@@ -8,6 +8,7 @@ import { NeedFunds, payToPlay, type PaidStep } from "../chain/paid";
 import { onAccount, signIn, signOut } from "../chain/wallet";
 import { setPaidSeat } from "../play";
 import type { Screen } from "../router";
+import type { JoinOpts } from "@margin/core";
 
 const STEP: Record<PaidStep, string> = { "quick-play": "Approve quick play", ticket: "Buying ticket", ready: "Joining" };
 const usd = (base: bigint): string => (Number(base) / 1e6).toFixed(2);
@@ -68,7 +69,9 @@ export const cash: Screen = (root) => {
       try {
         const entry = await payToPlay(acc!, (s) => (b.textContent = STEP[s]));
         if (entry.ticketTx) say(`Ticket bought. ${EXPLORER}/txns/${entry.ticketTx}`);
-        setPaidSeat({ mode: "paid", accountId: acc!, ticketId: entry.ticketTx ?? "held" });
+        const accountId = acc!;
+        // join = S4's NEP-413 proof, checked by S2's paid onAuth (not in core JoinOpts yet).
+        setPaidSeat(() => ({ mode: "paid", accountId, ticketId: entry.ticketTx ?? "held", join: entry.join() }) as JoinOpts);
         location.hash = "#/play";
       } catch (e) {
         b.textContent = "PLAY $1";
