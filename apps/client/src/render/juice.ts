@@ -39,6 +39,23 @@ export const JUICE = {
   REPAY_SQUASH: 0.06,
   REPAY_SQUASH_MS: 120,
 
+  // Camera (agar-numbers + feel spec 2.1). Zoom z = max(FLOOR, min(R0 / r, 1) ^ POW): no zoom-out
+  // until full-BOOST size, so players see themselves grow.
+  ZOOM_R0: 89,
+  ZOOM_POW: 0.4,
+  ZOOM_FLOOR: 0.6,
+  /** Ease time constant for size zoom (about 0.3 s to settle). */
+  ZOOM_TAU_S: 0.1,
+  /** While boosting: extra zoom-out, eased in over ~180 ms and back over ~450 ms. */
+  BOOST_ZOOM_OUT: 0.08,
+  BOOST_ZOOM_IN_TAU_S: 0.06,
+  BOOST_ZOOM_BACK_TAU_S: 0.15,
+  /** Camera leads this many screen px in the heading while boosting. */
+  BOOST_LEAD_PX: 60,
+  /** One kick against the heading on press, in screen px; no shake while held. */
+  BOOST_KICK_PX: 2,
+  KICK_TAU_S: 0.05,
+
   // Red state (feel spec 2.2): heartbeat speeds up as the margin thins (health 1.0 to 0.9).
   BEAT_SLOW_MS: 900,
   BEAT_FAST_MS: 350,

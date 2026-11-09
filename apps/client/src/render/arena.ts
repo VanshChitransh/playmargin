@@ -13,6 +13,7 @@ import { FxLayer } from "./fx";
 import { NitroFeel } from "./nitro";
 import type { Shot } from "./director";
 import { reducedMotion } from "./motion";
+import { JUICE } from "./juice";
 
 /** ~35 grid cells across the screen at start size (agar.io measured). */
 const CELL = 60;
@@ -54,6 +55,12 @@ export class ArenaRenderer {
   /** Spectator camera: where to look when there is no player blob (#/watch). */
   director?: (f: Frame, tS: number) => Shot | null;
   private cam: Shot | null = null;
+  /** Boost camera: extra zoom-out (0..1 of BOOST_ZOOM_OUT), lead and kick offsets in screen px. */
+  private bz = 0;
+  private lead = { x: 0, y: 0 };
+  private kick = { x: 0, y: 0 };
+  private wasBoosting = false;
+  private last: { x: number; y: number; h: number } | null = null;
   private view = VIEW_AT_START;
 
   async mount(root: HTMLElement, source: FrameSource, opts: { fps?: boolean; fit?: HTMLElement; view?: number } = {}): Promise<void> {
@@ -146,7 +153,8 @@ export class ArenaRenderer {
     const dt = Math.min(0.1, tS - this.lastDraw);
     this.lastDraw = tS;
     this.nitro.update(meView, meView && this.blobs.get(meView.id), f.match.phase, this.held, this.fx, this.zoom, dt);
-    if (meView) this.follow(meView.x, meView.y, meView.radius);
+    if (meView) this.boostCam(meView, f.match.phase === "LIVE" && this.held && (meView.fuel ?? 1) > 0.001, dt);
+    if (meView) this.follow(meView.x, meView.y, meView.radius, dt);
     else this.direct(f, tS);
   }
 
@@ -159,7 +167,7 @@ export class ArenaRenderer {
     c.x += (s.x - c.x) * k;
     c.y += (s.y - c.y) * k;
     c.r += (s.r - c.r) * k;
-    this.follow(c.x, c.y, c.r);
+    this.follow(c.x, c.y, c.r, 1 / 60);
   }
 
   private drawZone(f: Frame): void {
@@ -257,14 +265,37 @@ export class ArenaRenderer {
     this.preview.stroke({ width: 2 / this.zoom, color: C.ink, alpha: 0.25 });
   }
 
-  private follow(x: number, y: number, r: number): void {
+  /** Boost camera: a touch wider and leading the way while boosting, with one small kick on press. */
+  private boostCam(me: Frame["blobs"][number], boosting: boolean, dt: number): void {
+    const prev = this.last;
+    const moved = prev ? Math.hypot(me.x - prev.x, me.y - prev.y) : 0;
+    const h = prev && moved > 0.5 ? Math.atan2(me.y - prev.y, me.x - prev.x) : (prev?.h ?? 0);
+    this.last = { x: me.x, y: me.y, h };
+    const ease = (tau: number): number => 1 - Math.exp(-dt / tau);
+    this.bz += ((boosting ? 1 : 0) - this.bz) * ease(boosting ? JUICE.BOOST_ZOOM_IN_TAU_S : JUICE.BOOST_ZOOM_BACK_TAU_S);
+    if (reducedMotion) return;
+    const lx = boosting ? Math.cos(h) * JUICE.BOOST_LEAD_PX : 0;
+    const ly = boosting ? Math.sin(h) * JUICE.BOOST_LEAD_PX : 0;
+    const k = ease(boosting ? JUICE.BOOST_ZOOM_IN_TAU_S : JUICE.BOOST_ZOOM_BACK_TAU_S);
+    this.lead.x += (lx - this.lead.x) * k;
+    this.lead.y += (ly - this.lead.y) * k;
+    if (boosting && !this.wasBoosting) this.kick = { x: -Math.cos(h) * JUICE.BOOST_KICK_PX, y: -Math.sin(h) * JUICE.BOOST_KICK_PX };
+    this.wasBoosting = boosting;
+    const kd = 1 - ease(JUICE.KICK_TAU_S);
+    this.kick = { x: this.kick.x * kd, y: this.kick.y * kd };
+  }
+
+  private follow(x: number, y: number, r: number, dt: number): void {
     const { width, height } = this.app.screen;
     const base = Math.max(width, height) / this.view;
-    // Zoom out as I grow so a boosted blob still sees its threats (agar.io feel).
-    const target = base * Math.min(1.2, Math.max(0.35, Math.pow(57 / Math.max(r, 1), 0.4)));
-    this.zoom += (target - this.zoom) * 0.08;
+    // agar.io: no zoom-out until full-BOOST size (r 89), then (89/r)^0.4, never under 0.6.
+    const size = Math.max(JUICE.ZOOM_FLOOR, Math.pow(Math.min(JUICE.ZOOM_R0 / Math.max(r, 1), 1), JUICE.ZOOM_POW));
+    const target = base * size * (1 - JUICE.BOOST_ZOOM_OUT * this.bz);
+    this.zoom += (target - this.zoom) * (1 - Math.exp(-dt / JUICE.ZOOM_TAU_S));
     this.world.scale.set(this.zoom);
-    this.world.position.set(width / 2 - x * this.zoom, height / 2 - y * this.zoom);
+    const ox = this.lead.x + this.kick.x;
+    const oy = this.lead.y + this.kick.y;
+    this.world.position.set(width / 2 - ox - x * this.zoom, height / 2 - oy - y * this.zoom);
   }
 }
 
