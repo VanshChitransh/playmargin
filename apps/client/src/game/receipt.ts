@@ -44,7 +44,7 @@ export interface Stats {
 }
 
 /** A pellet that vanished this close to my edge was eaten by me. */
-const FOOD_REACH = 12;
+const FOOD_REACH = R.FOOD_RADIUS_PX + 12; // core eats when my edge touches the pellet edge
 
 export class Receipt {
   private stats: Stats = { foodEaten: 0, aliveS: 0, blobsEaten: 0, topRank: 0, peakEquity: 0 };
