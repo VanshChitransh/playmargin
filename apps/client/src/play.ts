@@ -36,7 +36,11 @@ const JOIN_TIMEOUT_MS = 2500;
 let paidSeat: (() => JoinOpts) | null = null;
 export const setPaidSeat = (o: () => JoinOpts): void => void (paidSeat = o);
 
+/** Why the last join fell back offline, in game words (empty = server just did not answer). */
+let offlineWhy = "";
+
 async function connect(roomCode?: string, judge = false): Promise<Source> {
+  offlineWhy = "";
   const paid = paidSeat;
   paidSeat = null;
   // A paid seat never falls back to offline practice: the ticket is real, so the error must show.
@@ -54,6 +58,13 @@ async function connect(roomCode?: string, judge = false): Promise<Source> {
     } catch (e) {
       conn.leave();
       console.warn("server unreachable, offline practice", e);
+      // The server said no (not just silence): tell the player why they are offline.
+      const msg = (e as Error).message ?? "";
+      offlineWhy = /credit/i.test(msg)
+        ? "Out of free credits for today, playing offline practice. Credits top up tomorrow."
+        : /full|restarting|too many/i.test(msg)
+          ? "Arenas are busy right now, playing offline practice."
+          : "";
     }
   }
   return new LocalMatch({ seed: (Date.now() >>> 0) % 1e9, withMe: true, bots: 11, warmupS: 8 });
@@ -170,7 +181,7 @@ export const play: Screen = (root, params) => {
     src = s;
     status.textContent =
       s instanceof LocalMatch
-        ? "Offline practice: real rules, local bots"
+        ? offlineWhy || "Offline practice: real rules, local bots"
         : params.judge === "1"
           ? "Judge Run: a 90 s scenario. Seeded map, normal rules, Drone-1 hunts red blobs. Most first-timers get greedy. Will you?"
           : "";
