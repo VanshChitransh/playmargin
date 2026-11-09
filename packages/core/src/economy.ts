@@ -231,7 +231,8 @@ export function keeperCheck(w: World, b: Blob, tick: number): PopResult | null {
 }
 
 /** True when a's mass is at least 1.15x b's (geometry is the caller's job). */
-export const outweighs = (a: Blob, b: Blob): boolean => a.mass * BPS >= b.mass * C.EAT_RATIO_BPS;
+/** agar.io eat rule: the eater's radius is at least EAT_RADIUS_RATIO x the victim's (about 1.32x mass). */
+export const outweighs = (a: Blob, b: Blob): boolean => radius(a.mass) >= C.R.EAT_RADIUS_RATIO * radius(b.mass);
 
 /** A eats B: B's debt repaid first, A gets 70% of B's equity, 30% scatters. Returns Micro gained. */
 export function eat(w: World, eater: Blob, victim: Blob, tick: number): Micro {

@@ -1,5 +1,5 @@
-// Blob size and movement. Formulas adapted from owenashurst/agar.io-clone (MIT):
-// util.massToRadius and the log slow-down in player.js. Unlike the original this is
+// Blob size and movement. Radius from owenashurst/agar.io-clone (MIT, util.massToRadius); the
+// speed curve is agar.io's (research/margin/feel/agar-numbers.md). Unlike the original this is
 // dt-based, so distance per second is the same at any tick rate.
 import { R } from "./constants";
 import type { Blob, Micro } from "./types";
@@ -8,11 +8,6 @@ import { toUnits } from "./units";
 // Feel numbers live in R (constants.ts, mirrored in RULES.html) so a feel spec is one edit there.
 /** Speed in px/s of a blob at START mass with no boost. */
 export const BASE_SPEED_PX_S = R.BASE_SPEED_PX_S;
-/** agar.io-clone slowBase: bigger blobs are slower by log base 4.5 of their mass. */
-const SLOW_BASE = R.SPEED_SLOW_BASE;
-/** Start mass in units; the slow-down is anchored here so everyone starts at base speed. */
-const START_UNITS = R.ENTRY_FREE * R.START_MASS_RATIO;
-const START_LOG = Math.log(START_UNITS) / Math.log(SLOW_BASE);
 const CASHOUT_SPEED_MULT = R.CASHOUT_SPEED_MULT;
 /** Liquidator drones must out-run a red blob in its few hundred ms of red, at any bounty mass. */
 export const DRONE_SPEED_MULT = R.DRONE_SPEED_MULT;
@@ -22,18 +17,23 @@ export function radius(mass: Micro): number {
   return 4 + Math.sqrt(toUnits(mass)) * 6;
 }
 
-/** Base speed in px/s for a mass in Micro, before burst and cash-out multipliers. */
+/**
+ * Base speed in px/s for a mass in Micro: agar.io's curve, 480 x (r / 58)^-0.45, so bigger is gently
+ * slower. Capped at the start speed: a blob shrunk by losses (or boosting on little equity) never darts.
+ */
 export function speed(mass: Micro): number {
-  const units = Math.max(toUnits(mass), 1);
-  const slowDown = Math.max(1, Math.log(units) / Math.log(SLOW_BASE) - START_LOG + 1);
-  return BASE_SPEED_PX_S / slowDown;
+  return BASE_SPEED_PX_S * Math.min(1, Math.pow(radius(mass) / R.SPEED_REF_RADIUS_PX, -R.SPEED_SIZE_EXP));
 }
 
-/** Effective px/s for this blob right now (BOOST burst x1.5, cash-out channel x0.5). */
+/**
+ * Effective px/s right now. Boosting runs at 1.5x speed(equity), not speed(mass): BOOST adds mass,
+ * so sizing it on mass made holding nitro slow you down. Unboosted is speed(mass), so a loan you
+ * still carry weighs you down after release. Plus the decaying press burst; cash-out halves it.
+ */
 export function blobSpeed(b: Blob, tick: number): number {
   if (b.kind === "drone") return BASE_SPEED_PX_S * DRONE_SPEED_MULT;
-  let s = speed(b.mass);
-  if (tick < b.boostUntil) s *= R.BOOST_SPEED_MULT;
+  let s = tick < b.boostUntil ? R.BOOST_SPEED_MULT * speed(Math.max(0, b.mass - b.debt)) : speed(b.mass);
+  s += b.burst;
   if (b.cashout) s *= CASHOUT_SPEED_MULT;
   return s;
 }
@@ -42,8 +42,14 @@ export function blobSpeed(b: Blob, tick: number): number {
  * Seconds for velocity to close ~63% of the gap to its target: small blobs answer the mouse fast,
  * big ones are heavy (agar feel, no twitch, no float). Drones are machines and turn sharply.
  */
-export function easeS(b: Blob): number {
-  return b.kind === "drone" ? R.DRONE_EASE_S : R.EASE_BASE_S + radius(b.mass) * R.EASE_PER_RADIUS_PX_S;
+export function easeS(b: Blob, tick = 0): number {
+  if (b.kind === "drone") return R.DRONE_EASE_S;
+  const r = radius(b.mass);
+  // Boosting ramps fast (about 70 ms for a start blob); an empty tank sputters down over ~300 ms;
+  // release eases back at the normal, heavier rate.
+  if (tick < b.boostUntil) return R.BOOST_EASE_BASE_S + r * R.BOOST_EASE_PER_RADIUS_PX_S;
+  if (tick < b.sputterUntil) return R.BOOST_EMPTY_EASE_S;
+  return R.EASE_BASE_S + r * R.EASE_PER_RADIUS_PX_S;
 }
 
 /** Ease velocity toward dir * speed, move by it, and keep the blob's centre inside the arena. */
@@ -56,7 +62,8 @@ export function move(b: Blob, dtS: number, tick: number, arena: { w: number; h: 
     dirY /= len;
   }
   const s = blobSpeed(b, tick);
-  const k = 1 - Math.exp(-dtS / easeS(b));
+  const k = 1 - Math.exp(-dtS / easeS(b, tick));
+  if (b.burst > 0) b.burst = b.burst * Math.exp(-dtS / R.BOOST_BURST_TAU_S) < 1 ? 0 : b.burst * Math.exp(-dtS / R.BOOST_BURST_TAU_S);
   b.vx += (dirX * s - b.vx) * k;
   b.vy += (dirY * s - b.vy) * k;
   b.x = Math.min(arena.w, Math.max(0, b.x + b.vx * dtS));

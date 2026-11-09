@@ -33,6 +33,18 @@ export interface Blob {
   payout: Micro;
   /** Borrowed during the current BOOST hold, not yet logged (its fee is charged when logged). */
   pendingBorrow: Micro;
+  /** BOOST was held last tick (press detection for the burst and the minimum hold). */
+  boostHeld: boolean;
+  /** A press borrows at least BOOST_MIN_HOLD_S: held until this tick even if released sooner. */
+  boostMinUntil: number;
+  /** Extra px/s from the press burst, decaying with BOOST_BURST_TAU_S. */
+  burst: number;
+  /** Tick the next press burst is allowed (BOOST_BURST_COOLDOWN_S). */
+  burstReadyAt: number;
+  /** Tick the empty-tank sputter (slow ease down from boost speed) ends. */
+  sputterUntil: number;
+  /** A REPAY press arrived within REPAY_BUFFER_MS of the cooldown end: fire it when the cooldown ends. */
+  repayQueued: boolean;
   /** Tick the BOOST speed ends: the tick after the last held tick that borrowed. */
   boostUntil: number;
   /** Tick the next REPAY tap is allowed (0.4 s cooldown). */

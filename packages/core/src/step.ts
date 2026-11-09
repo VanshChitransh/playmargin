@@ -3,11 +3,11 @@
 // `inputs` holds commands that arrived since the last tick: repay/cashout are taps, boost is held.
 import * as C from "./constants";
 import {
-  accrueInterest, boostHold, cashOut, eat, flushBoost, hitSpike, keeperCheck, liquidate, matchT, outweighs,
+  accrueInterest, boostHold, canBoost, cashOut, eat, flushBoost, hitSpike, keeperCheck, liquidate, matchT, outweighs,
   repayTap, ring, zoneTick,
 } from "./economy";
 import { checkInvariant } from "./invariant";
-import { move, radius } from "./motion";
+import { move, radius, speed } from "./motion";
 import type { GameEventMsg, InputCmd } from "./protocol";
 import type { Blob, Micro, World } from "./types";
 import { toUnits } from "./units";
@@ -42,6 +42,12 @@ function canStartCashout(w: World, b: Blob, tick: number): boolean {
   );
 }
 
+const REPAY_BUFFER_T = Math.round((C.R.REPAY_BUFFER_MS * C.R.TICK_HZ) / 1000);
+const BOOST_MIN_HOLD_T = T(C.R.BOOST_MIN_HOLD_S);
+const BURST_COOLDOWN_T = T(C.R.BOOST_BURST_COOLDOWN_S);
+const SPUTTER_T = T(C.R.BOOST_EMPTY_SPUTTER_S);
+const R_BURST = C.R.BOOST_BURST_MULT;
+
 // 1 + 3: store fresh inputs, apply taps, then zero any held input older than 250 ms and run held
 // BOOST off what is left, so a lost "release" message can't keep borrowing past 250 ms.
 function applyInputs(w: World, inputs: Map<string, InputCmd>, tick: number, ev: Ev): void {
@@ -52,10 +58,8 @@ function applyInputs(w: World, inputs: Map<string, InputCmd>, tick: number, ev: 
     b.lastInputAt = tick;
     // Drones hold no stake: they only steer, so BOOST, REPAY and cash-out never apply to them.
     if (w.phase !== "LIVE" || b.kind === "drone") continue;
-    if (cmd.repay) {
-      let amt = 0;
-      boostEvent(b, () => (amt = repayTap(w, b, tick)), ev);
-      if (amt > 0) ev.push({ type: "repay", blob: b.id, amount: toUnits(amt) });
+    if (cmd.repay && !repay(w, b, tick, ev) && tick < b.repayReadyAt && b.repayReadyAt - tick <= REPAY_BUFFER_T) {
+      b.repayQueued = true; // mashing never drops a tap: it fires the moment the cooldown ends
     }
     if (cmd.cashout && canStartCashout(w, b, tick)) {
       b.cashout = { startedAt: tick };
@@ -67,11 +71,54 @@ function applyInputs(w: World, inputs: Map<string, InputCmd>, tick: number, ev: 
     b.dirX = cmd ? cmd.dirX : 0;
     b.dirY = cmd ? cmd.dirY : 0;
     if (w.phase !== "LIVE" || b.state !== "alive" || b.kind === "drone") continue;
+    if (b.repayQueued && tick >= b.repayReadyAt) {
+      b.repayQueued = false;
+      repay(w, b, tick, ev);
+    }
+    // A press holds for at least BOOST_MIN_HOLD_S, so a tap always borrows something you can see.
+    const pressed = cmd?.boost === true;
+    if (pressed && !b.boostHeld && canBoost(w, b, tick)) {
+      b.boostMinUntil = tick + BOOST_MIN_HOLD_T;
+      if (tick >= b.burstReadyAt) {
+        // Answer the press inside one frame: a burst on top of velocity, decaying in motion.move.
+        const kick = R_BURST * speed(Math.max(0, b.mass - b.debt));
+        const len = Math.hypot(b.dirX, b.dirY);
+        if (len > 0) [b.vx, b.vy] = [b.vx + (b.dirX / len) * kick, b.vy + (b.dirY / len) * kick];
+        b.burst = kick;
+        b.burstReadyAt = tick + BURST_COOLDOWN_T;
+      }
+    }
+    const holding = pressed || tick < b.boostMinUntil;
+    b.boostHeld = pressed;
     // Held and allowed: borrow this tick. Released, or not allowed any more: the hold is logged.
-    if (cmd?.boost && boostHold(w, b, tick) > 0) continue;
+    if (holding && boostHold(w, b, tick) > 0) continue;
+    // Still held but the tank ran dry (or BOOST got blocked): sputter down instead of a hard stop.
+    if (holding && b.boostUntil === tick) b.sputterUntil = tick + SPUTTER_T;
     const amt = flushBoost(w, b, tick);
     if (amt > 0) ev.push({ type: "boost", blob: b.id, amount: toUnits(amt) });
   }
+}
+
+/**
+ * One REPAY tap plus its events. Leaving red on it is a "clutch save" (server-confirmed, never
+ * predicted), flagged clutch when a bigger blob or a drone was within CLUTCH_RADIUS_PX. Returns
+ * whether anything was repaid.
+ */
+function repay(w: World, b: Blob, tick: number, ev: Ev): boolean {
+  const wasRed = ring(b) === "red";
+  let amt = 0;
+  boostEvent(b, () => (amt = repayTap(w, b, tick)), ev);
+  if (amt <= 0) return false;
+  b.repayQueued = false; // a press that went through replaces any buffered one
+  ev.push({ type: "repay", blob: b.id, amount: toUnits(amt) });
+  if (wasRed && ring(b) !== "red") {
+    const r = radius(b.mass);
+    const clutch = live(w).some(
+      (o) => o !== b && (o.kind === "drone" || outweighs(o, b)) && dist(o, b) - radius(o.mass) - r <= C.R.CLUTCH_RADIUS_PX,
+    );
+    ev.push({ type: "clutchSave", blob: b.id, clutch });
+  }
+  return true;
 }
 
 /** Run fn and tell clients about any held loan it logged first, so "+N" shows every part of a long hold. */
