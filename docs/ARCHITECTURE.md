@@ -109,7 +109,7 @@ LIVE matches finish and settle first, and systemd waits up to 120 s.
 | Player (browser) | send inputs (dir, BOOST, REPAY, cash out) | change rules or positions: `parseInput` validates every message, 30 a second per player, and the server is authoritative |
 | Player (paid join) | join a paid room with its own ticket | play someone else's ticket. The NEP-413 signature over `margin-join:paid:<account>` must come from a key of that account scoped to the contract. Nonces are single-use within 60 s. One live room per account (`paidMatch.ts`) |
 | Session key | `enter_arena` only | withdraw: `withdraw` needs 1 yoctoNEAR, which a function-call key cannot attach |
-| Game server (settler key) | `open_match`, `settle`, `refund_ticket`, `anchor` | create money (exact conservation), pay anyone outside the match, overspend the reserved budget or the 10% bad debt cap, settle twice, roll an anchor back (seq must grow), touch idle balances or the vault (owner only) |
+| Game server (settler key) | `open_match`, `settle`, `refund_ticket`, `anchor` | create money (exact conservation), pay anyone outside the match except owner-registered drone accounts (at most 12% of the stakes), overspend the reserved budget or the 10% bad debt cap, settle twice, roll an anchor back (seq must grow), touch idle balances or the vault (owner only) |
 | Game server (outcomes) | run the simulation | hide what happened: the full hash-chained log is public (`GET /api/matches/:id/log`). Anyone can replay it with core on `/verify` and compare the head with the settle transaction or the Merkle proof (`/api/matches/:id/proof`) |
 | Relayer | pay gas for allow-listed calls, fund new email-login accounts (daily cap) | sign for players. It only wraps a gas-capped, zero-deposit `enter_arena` signed by the player (`services/relayer/validate.ts`) |
 | NEAR AI Commander | retune agent personalities (greed, caution, drone focus) | move a blob or touch money: it gets only ids and numbers, and its output is parsed and clamped (`apps/server/src/agents/commander.ts`) |
@@ -142,7 +142,73 @@ p99 of 0.3 ms and peak memory of 227 MB. `npm run e2e:local` plays a full match 
 server in CI.
 
 ## Core rules and agents (S1)
-_To be written by S1: tick order, economy, hash-chained log, settle, agents and drones._
+
+### One pure engine (`packages/core`)
+
+The server, the browser (Verify page, offline practice) and every sim run the same code.
+- **Deterministic.** Integer money (`Micro`, scaled with basis points, dust to the reserve), a seeded
+  RNG carried in the world (`rng.ts`), and time measured in ticks (60 a second). No clock, no
+  `Math.random`, no I/O.
+- **Rules as data.** Every gameplay number is in `constants.ts`, mirrored from RULES.html, and
+  `constants.test.ts` fails if it drifts from `rules.snapshot.json`.
+- **Ports.** Bots, settlement and storage plug in through `ports.ts` (`Brain`, `Settlement`,
+  `CreditsRepo`), so the core never imports the server.
+
+### Tick order (`step.ts`)
+
+Every tick runs the same 13 steps. The order is a rule, not an accident:
+
+1. Store inputs and expire any held input older than 250 ms (a lost "release" can't keep borrowing).
+2. Phase timers (LAST CALL at 75 s).
+3. Held REPAY, then held BOOST (REPAY wins if both are held).
+4. Move. The blob's centre stays at least 0.65 of its radius from every wall (`motion.ts`).
+5. Interest, once per whole second.
+6. Spikes. 7. Zone.
+8. Ring: start or clear the 150 ms red grace clock.
+9. Pops: a red blob touched after its grace is popped by the heaviest toucher, and the keeper closes
+   any loan below HF 0.90.
+10. Eats, heaviest eater first. Red blobs eat nothing, and agents may not eat a human in the first 30 s.
+11. Cash-out channels.
+12. The bell: survivors settle at equity, the ranking is taken, and the leftover pot is split.
+13. Conservation check (`invariant.ts`).
+
+### Money (`economy.ts`)
+
+- **BOOST** borrows 1x your own money a second up to 2.5x leverage, with a 1% fee.
+- **REPAY** clears the loan the hold started on in 0.8 s.
+- **Interest** drains mass every second: 80% goes to food, 15% to the vault, 5% to the reserve.
+- **Liquidation:** the vault is repaid first, the popper gets 8%, the reserve gets 2%, and the rest
+  scatters as food.
+- **Conservation is exact.** Every function moves Micro between blobs, the vault, fees, the reserve
+  and the food pool. Nothing is minted: food only comes from the pot.
+- **The log is the books.** A BOOST or REPAY hold is logged as one entry, on release, at payoff, at
+  each interest second, and before any event that settle checks against the debt.
+
+### Log and settle (`log.ts`, `settle.ts`)
+
+- Every money event is appended to a SHA-256 hash-chained log.
+- `settle(log)` replays only the log and checks every rule it can see:
+  - every fee is exactly 1% and every interest split is 80/15/5;
+  - no repayment is larger than the debt;
+  - the vault never lends past its budget;
+  - no agent eats a human early;
+  - nothing happens after the bell.
+- `settleVerified` also checks the chain. A match pays only if the replay equals the live room to the
+  Micro (`settle == live`). Otherwise it is refused and nobody is paid.
+- `settleargs.ts` converts the result to USDC base units for the contract's exact equality.
+- Proof: `npm run sim -- --matches 500` shows 0 Micro leaked and `settle == live` in 500 of 500.
+  `settle.test.ts` covers forged logs a live room cannot produce.
+
+### Agents (`apps/server/src/agents`)
+
+Every agent plays through the same `Brain.decide(view) -> InputCmd` port as a human's inputs. It
+sees only what is near it (`AgentView`) and gets no rule a human does not have.
+
+| Agent | Does | May not (enforced by) |
+|---|---|---|
+| FreeBot (`freebot.ts`), free rooms, labelled `Agent-N 🤖` | Steers with a potential field (port of MultiOgar's BotPlayer, Apache-2.0). Holds BOOST to chase or grow, holds REPAY when not green, cashes out from 70 s when ahead. One skill constant, `AGENT_SKILL` 0.6, so a careful newcomer can win (`tools/sim/human.ts`: median rank 4 of 12) | Eat a human in the first 30 s (engine and settle), or BOOST before 30 s (bot). It plays only in free rooms, for credits |
+| Liquidator drone (`drone.ts`), paid rooms, labelled `Drone-N` | Steers by 32-slot context steering toward red blobs and the most leveraged one. Pops a blob only when it is red. Earns the victim-funded 8% bounty, paid on chain to `drone-N.<contract>` | Hold a stake, eat, be eaten, or touch a non-red blob: drones pass through those, and the engine ignores a drone's BOOST, REPAY and cash-out. The contract caps all agent payouts in one match at 12% of its stakes |
+| Commander (`commander.ts`), NEAR AI Cloud | Every 15 s, one LLM call retunes the agents' greed, caution and drone focus. Its one-line rationale is shown to spectators | Move a blob or touch money. It sees only ids and numbers (no usernames, so no prompt injection through names). Its JSON is parsed and clamped, unknown ids are dropped, and a failed call keeps the last plan |
 
 ## Client (S3)
 _To be written by S3: rendering, prediction and interpolation, screens, Verify page._
