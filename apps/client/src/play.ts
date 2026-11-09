@@ -34,6 +34,9 @@ interface Source {
 }
 
 const JOIN_TIMEOUT_MS = 2500;
+/** No server state for this long (a dead room, a hung socket, a drop that never reconnects): stop
+ *  pretending and show the can't-join card. The server sends state every tick, so 5 s is a real stall. */
+const STALL_MS = 5000;
 
 /** A paid seat handed over by #/cash after the ticket is bought; used once. */
 // A function, so every join attempt signs a fresh one-use proof (valid 60 s).
@@ -51,7 +54,9 @@ async function connect(roomCode?: string, judge = false): Promise<Source> {
   // Reloaded or came back mid-match: take the held seat back before anything else.
   if (!paid) {
     const back = new MatchConnection();
-    if (await back.resume()) return back;
+    const late = new Promise<boolean>((r) => setTimeout(() => r(false), JOIN_TIMEOUT_MS));
+    if (await Promise.race([back.resume(), late])) return back;
+    back.leave(); // a resume that answers after the timeout must not keep a second seat alive
   }
   // A paid seat never falls back to offline practice: the ticket is real, so the error must show.
   if (paid) {
@@ -258,6 +263,17 @@ export const play: Screen = (root, params) => {
     if (params.code && !(s instanceof LocalMatch)) roomChip(root, params.code);
     receipt = new Receipt(s.me);
     if (import.meta.env.DEV) (window as unknown as { __receipt: Receipt }).__receipt = receipt;
+    if (s instanceof MatchConnection) {
+      const dog = setInterval(() => {
+        if (left || ended) return clearInterval(dog);
+        if (performance.now() - s.lastStateAt < STALL_MS) return;
+        clearInterval(dog);
+        ended = true;
+        s.leave(); // the server keeps the seat a while, so Retry can still take it back
+        overlay?.remove();
+        refusedCard(root, "Lost the connection to the match server.");
+      }, 1000);
+    }
     s.onCommander = (r) => hud.commander(r);
     s.onAborted = (reason) => {
       ended = true;
@@ -332,10 +348,12 @@ function refusedCard(root: HTMLElement, why: string): void {
     <h2 class="font-display text-4xl">Can't join right now</h2>
     <p data-why class="mt-2"></p>
     <div class="mt-5 flex flex-wrap justify-center gap-3">
-      <button data-off class="sticker sticker-press rounded-box bg-ink px-5 py-3 font-display text-lg text-paper">Practice offline</button>
-      <a href="#/" class="sticker sticker-press rounded-box bg-paper px-5 py-3 font-display text-lg">Home</a></div>
+      <button data-retry class="sticker sticker-press rounded-box bg-ink px-5 py-3 font-display text-lg text-paper">Retry</button>
+      <button data-off class="sticker sticker-press rounded-box bg-paper px-5 py-3 font-display text-lg">Practice offline</button>
+      <a href="#/" class="tag basis-full underline">Home</a></div>
     <p class="mt-3 text-xs text-ink/60">Offline practice runs the real rules against local bots. Nothing counts.</p></div>`;
   el.querySelector("[data-why]")!.textContent = why;
+  el.querySelector("[data-retry]")!.addEventListener("click", () => rerender());
   el.querySelector("[data-off]")!.addEventListener("click", () => {
     offlineOnPurpose = true;
     rerender();

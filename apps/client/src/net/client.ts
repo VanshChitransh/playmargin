@@ -39,6 +39,8 @@ export class MatchConnection {
   private listeners = new Set<(e: GameEventMsg) => void>();
   onCommander?: (rationale: string | null) => void;
   onAborted?: (reason: string) => void;
+  /** performance.now() of the last server state: the play screen's stall watchdog reads it. */
+  lastStateAt = 0;
 
   /** Join a match (free or paid); rejects if the server is unreachable or refuses the seat. */
   async join(opts: JoinOpts, judge = false): Promise<void> {
@@ -72,9 +74,11 @@ export class MatchConnection {
 
   private wire(room: Room, keepSeat = true): void {
     this.room = room;
+    this.lastStateAt = performance.now(); // the clock for "no state yet" starts at the seat
     if (keepSeat) seat.set(room.reconnectionToken); // a spectator has no seat to come back to
     this.room.onStateChange((raw) => {
       const s = raw as RoomState;
+      this.lastStateAt = performance.now();
       this.buffer.push({ at: this.stamp(s.tick), frame: this.toFrame(s) });
     });
     this.room.onMessage("me", (m: { owe: number; ratePerMinBps?: number }) => {
