@@ -19,7 +19,7 @@ interface Loaded {
 }
 
 const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-const ICON = { ok: ["✓", "bg-safe"], bad: ["✗", "bg-liq"], skip: ["–".replace("–", "·"), "bg-muted"] } as const;
+const ICON = { ok: ["✓", "bg-safe"], bad: ["✗", "bg-liq"], skip: ["·", "bg-muted"] } as const;
 
 export const verify: Screen = (root, { id = "" }) => {
   root.innerHTML = `
