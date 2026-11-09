@@ -63,9 +63,16 @@ export class MatchConnection {
     }
   }
 
-  private wire(room: Room): void {
+  /** Watch a live room as a spectator (S2 /api/watch): no blob, no credits, full state and events. */
+  async spectate(): Promise<void> {
+    const r = await fetch(`${ENDPOINT}/api/watch`);
+    if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { error?: string }).error ?? `HTTP ${r.status}`);
+    this.wire(await new Client(ENDPOINT).consumeSeatReservation(await r.json()), false);
+  }
+
+  private wire(room: Room, keepSeat = true): void {
     this.room = room;
-    seat.set(room.reconnectionToken);
+    if (keepSeat) seat.set(room.reconnectionToken); // a spectator has no seat to come back to
     this.room.onStateChange((raw) => {
       const s = raw as RoomState;
       this.buffer.push({ at: this.stamp(s.tick), frame: this.toFrame(s) });

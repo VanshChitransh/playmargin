@@ -1,9 +1,10 @@
 // #/watch: a spectator view for trailers and B-roll. A director camera follows the action
 // (a pop that just happened, a red blob about to be popped, a cash-out, else the biggest blob)
-// with smooth pans. It spectates a live server room when the server supports it, otherwise a
-// local match of labelled bots on the real rules. /?clean=1#/watch hides the HUD and keeps
+// with smooth pans. It spectates a real server match (S2 /api/watch: the busiest public room,
+// or an agents-only one), and only if the server cannot be reached a local match of labelled
+// bots on the real rules. /?clean=1#/watch hides the HUD and keeps
 // only the stamp moments. Real gameplay only: nothing here is scripted or staged.
-import type { GameEventMsg, JoinOpts } from "@margin/core";
+import type { GameEventMsg } from "@margin/core";
 import type { Frame } from "../game/frame";
 import { LocalMatch } from "../game/local";
 import { Hud } from "../hud/hud";
@@ -24,14 +25,12 @@ const JOIN_TIMEOUT_MS = 2500;
 
 async function liveFeed(): Promise<Feed | null> {
   const conn = new MatchConnection();
-  // ICR S2: {spectate: true} joins with no blob and no credits. A server without it refuses
-  // (no guest key), and the watch view falls back to local bots.
-  const opts = { mode: "free", spectate: true } as unknown as JoinOpts;
   const timeout = new Promise<never>((_, no) => setTimeout(() => no(new Error("timeout")), JOIN_TIMEOUT_MS));
   try {
-    await Promise.race([conn.join(opts), timeout]);
+    await Promise.race([conn.spectate(), timeout]);
     return conn;
-  } catch {
+  } catch (e) {
+    console.warn("watch: no live room, local bots", e);
     conn.leave();
     return null;
   }
@@ -70,7 +69,7 @@ export const watch: Screen = (root) => {
     off();
     feed = f;
     endedAt = 0;
-    label.textContent = live ? "Live room, spectating" : "Bots on the real rules, spectating";
+    label.textContent = live ? "Live match, spectating" : "Server unreachable: local bots on the real rules";
     f.onCommander = (r) => hud?.commander(r);
     off = f.onEvent((e) => {
       director.event(e, last, performance.now() / 1000);
@@ -91,10 +90,10 @@ export const watch: Screen = (root) => {
       const f: Frame = { ...raw, me: "" }; // a spectator has no blob: the director drives the camera
       last = f;
       hud?.update(f, now);
-      // Local bots: start a fresh match a few seconds after the bell, so recording never stalls.
-      if (f.match.phase === "ENDED" && feed instanceof LocalMatch) {
+      // After the bell, move on to the next match a few seconds later so recording never stalls.
+      if (f.match.phase === "ENDED") {
         endedAt ||= now;
-        if (now - endedAt > 4000) attach(localFeed(), false);
+        if (now - endedAt > 4000 && !switching) next();
       }
       if (import.meta.env.DEV) Object.assign(window, { __frame: f });
       return f;
@@ -104,10 +103,18 @@ export const watch: Screen = (root) => {
       if (left) arena.destroy();
     });
 
-  void liveFeed().then((f) => {
-    if (left) return f?.leave?.();
-    attach(f ?? localFeed(), !!f);
-  });
+  let switching = false;
+  const next = (): void => {
+    switching = true;
+    const old = feed;
+    void liveFeed().then((f) => {
+      switching = false;
+      if (left) return f?.leave?.();
+      old?.leave?.();
+      attach(f ?? localFeed(), !!f);
+    });
+  };
+  next();
 
   return () => {
     left = true;
