@@ -166,28 +166,30 @@ function cashouts(w: World, tick: number, ev: Ev): void {
   }
 }
 
-// 12: survivors settle at equity; leftover food goes to humans alive at the bell,
-// or pro-rata (equal entries) to every entrant if none survived. Dust to reserve.
+// 12: survivors settle at equity; leftover food goes to humans alive at the bell (dust to reserve).
+// No human alive at the bell: it all goes to the vault as LP yield, since paying popped players
+// would refund the very greed that got them liquidated (Vansh, 9 Nov).
 function endMatch(w: World, tick: number, ev: Ev): void {
   const survivors = players(w).filter((b) => b.kind === "human");
   for (const b of players(w)) cashOut(w, b, tick);
   for (const d of live(w)) cashOut(w, d, tick); // drones leave with their bounties
   const leftover: Micro = w.food.reduce((s, f) => s + f.mass, 0);
   w.food = [];
-  const to = survivors.length > 0 ? survivors : [...w.blobs.values()].filter((b) => b.kind !== "drone");
-  const each = to.length > 0 ? Math.floor(leftover / to.length) : 0;
-  for (const b of to) {
+  const toVault = survivors.length > 0 ? 0 : leftover;
+  w.vault.interest += toVault;
+  const each = survivors.length > 0 ? Math.floor(leftover / survivors.length) : 0;
+  for (const b of survivors) {
     if (each === 0) break;
     b.payout += each;
     w.cashedOut += each;
     w.pendingLog.push({ type: "CASHOUT", tick, data: { blob: b.id, amount: each } });
   }
-  const dust = leftover - each * to.length;
+  const dust = leftover - toVault - each * survivors.length;
   w.reserve += dust;
   w.phase = "ENDED";
   const finalMasses: Record<string, Micro> = {};
   for (const b of w.blobs.values()) finalMasses[b.id] = b.payout;
-  w.pendingLog.push({ type: "MATCH_END", tick, data: { tick, finalMasses, dust } });
+  w.pendingLog.push({ type: "MATCH_END", tick, data: { tick, finalMasses, dust, toVault } });
   ev.push({ type: "phase", phase: "ENDED", tick }, { type: "matchEnd", tick });
 }
 

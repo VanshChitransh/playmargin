@@ -14,7 +14,7 @@ export type LogEvent =
   | { type: "POP"; data: { by: string; victim: string; debtRepaid: Micro; badDebt: Micro; bounty: Micro; fee: Micro; scattered: Micro } }
   | { type: "KEEPER_POP"; data: { victim: string; debtRepaid: Micro; badDebt: Micro; fee: Micro; scattered: Micro } }
   | { type: "CASHOUT"; data: { blob: string; amount: Micro } }
-  | { type: "MATCH_END"; data: { tick: number; finalMasses: Record<string, Micro>; dust: Micro } };
+  | { type: "MATCH_END"; data: { tick: number; finalMasses: Record<string, Micro>; dust: Micro; toVault: Micro } };
 
 export type LogType = LogEvent["type"];
 
