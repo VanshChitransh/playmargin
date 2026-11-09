@@ -11,7 +11,7 @@ import { move, radius } from "./motion";
 import type { GameEventMsg, InputCmd } from "./protocol";
 import type { Blob, Micro, World } from "./types";
 import { toUnits } from "./units";
-import { respawnSpikes, SPIKE_RADIUS } from "./world";
+import { respawnSpikes, spikeRadius } from "./world";
 
 const T = C.sToTicks;
 const INPUT_EXPIRE_T = Math.round((C.R.INPUT_EXPIRE_MS * C.R.TICK_HZ) / 1000);
@@ -91,7 +91,7 @@ function spikes(w: World, tick: number, ev: Ev): void {
   for (const b of players(w)) {
     if (tick < b.spikeImmuneUntil || shielded(b, tick)) continue;
     const r = radius(b.mass);
-    const s = w.spikes.find((s) => s.respawnAt === null && dist(s, b) < r + SPIKE_RADIUS);
+    const s = w.spikes.find((s) => s.respawnAt === null && dist(s, b) < r + spikeRadius(s));
     if (!s) continue;
     const dmg = hitSpike(w, b, s.id, s.big, tick);
     s.respawnAt = tick + T(C.R.SPIKE_RESPAWN_S);
@@ -147,10 +147,13 @@ function pops(w: World, tick: number, ev: Ev): void {
 // nothing: REPAY is the only way out of red, or greedy players eat their way back (balance B, 9 Nov).
 function eats(w: World, tick: number, ev: Ev): void {
   const ps = players(w).sort(byMassDesc);
+  // Free-room agents can't eat a human in the first 30 s: a first-timer gets to find their feet.
+  const humanSafe = matchT(w, tick) < T(C.R.AGENT_NO_EAT_HUMAN_S);
   for (const e of ps) {
     if (e.state !== "alive" || ring(e) === "red" || shielded(e, tick)) continue;
     for (const v of ps) {
       if (v === e || v.state !== "alive" || shielded(v, tick) || !outweighs(e, v)) continue;
+      if (humanSafe && e.kind === "agent" && v.kind === "human") continue;
       if (dist(e, v) >= radius(e.mass)) continue;
       const gained = eat(w, e, v, tick);
       ev.push({ type: "eat", by: e.id, victim: v.id, gained: toUnits(gained) });

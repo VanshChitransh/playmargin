@@ -116,6 +116,16 @@ describe("step", () => {
     });
   });
 
+  it("an agent can't eat a human in the first 30 s, then can", () => {
+    const agent = makeBlob({ id: "ag", kind: "agent", mass: u(200) });
+    const human = makeBlob({ id: "hu", mass: u(80), x: 510 });
+    const w = makeWorld([agent, human]);
+    step(w, new Map(), sToTicks(29));
+    expect(human.state).toBe("alive");
+    step(w, new Map(), sToTicks(30));
+    expect(human.state).toBe("popped");
+  });
+
   it("a drone holding bounty mass can't BOOST, REPAY or cash out (settle would refuse it)", () => {
     const drone = makeBlob({ id: "d", kind: "drone", mass: u(30), x: 100 });
     const w = makeWorld([drone, makeBlob({ id: "p" })]);
