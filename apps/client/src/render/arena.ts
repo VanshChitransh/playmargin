@@ -7,7 +7,7 @@ import type { Frame } from "../game/frame";
 import { BlobSprite } from "./blob";
 import { C, vivid } from "./colors";
 import { spikeWouldRedden } from "./danger";
-import { SPIKE_R, SpikeSprite, bakeSpikeTextures } from "./spike";
+import { SpikeSprite, bakeSpikeTextures } from "./spike";
 import { boostBlocked, boostPreview } from "../hud/logic";
 import { FxLayer } from "./fx";
 import { NitroFeel } from "./nitro";
@@ -184,9 +184,9 @@ export class ArenaRenderer {
         this.spikeLayer.addChild(s);
       }
       const near =
-        !!me && Math.hypot(sp.x - me.x, sp.y - me.y) - me.radius - (sp.big ? SPIKE_R.big : SPIKE_R.small) < WARN_REACH;
+        !!me && Math.hypot(sp.x - me.x, sp.y - me.y) - me.radius - sp.r < WARN_REACH;
       const danger = near && me!.state === "alive" && spikeWouldRedden(me!.equity, me!.owe, sp.big);
-      s.update(sp.x, sp.y, sp.big, danger, tS);
+      s.update(sp.x, sp.y, sp.r, sp.big, danger, tS);
     }
     prune(this.spikes, seen);
   }

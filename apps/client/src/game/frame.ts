@@ -15,6 +15,8 @@ export interface SpikeView {
   x: number;
   y: number;
   big: boolean;
+  /** Core hitbox radius: drawn exactly this size. */
+  r: number;
 }
 
 export interface Frame {

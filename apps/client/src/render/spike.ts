@@ -4,7 +4,6 @@
 import { Container, Graphics, Sprite, Text, Texture, type Renderer } from "pixi.js";
 import { C } from "./colors";
 
-export const SPIKE_R = { small: 18, big: 30 } as const;
 const POINTS = 18;
 
 /** Bake the grey and red spike textures once per renderer. */
@@ -36,11 +35,12 @@ export class SpikeSprite extends Container {
     this.addChild(this.sprite, this.warn);
   }
 
-  update(x: number, y: number, big: boolean, danger: boolean, tS: number): void {
+  /** r is the core hitbox: drawn at exactly that size. Big spikes (harder hit) read darker. */
+  update(x: number, y: number, r: number, big: boolean, danger: boolean, tS: number): void {
     this.position.set(x, y);
-    const r = big ? SPIKE_R.big : SPIKE_R.small;
     this.sprite.texture = danger ? this.tex.red : this.tex.grey;
-    this.sprite.width = this.sprite.height = r * 2 * (danger ? 1.25 : 1);
+    this.sprite.tint = danger || !big ? 0xffffff : 0x9ccf9c;
+    this.sprite.width = this.sprite.height = r * 2;
     this.sprite.rotation = tS * 0.15;
     this.warn.visible = danger;
     if (danger) this.alpha = 0.75 + 0.25 * Math.sin(tS * 8 * Math.PI);

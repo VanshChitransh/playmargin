@@ -2,7 +2,7 @@
 // patch into a plain Frame snapshot, and exposes my private "owe" and the event stream.
 // The server is the only authority; this file never computes game state.
 import { Client, type Room } from "@colyseus/sdk";
-import { R, TICK_MS, type BlobView, type GameEventMsg, type InputCmd, type JoinOpts, type MatchView, type Phase, type RateTier, type Ring } from "@margin/core";
+import { R, SPIKE_RADIUS, TICK_MS, type BlobView, type GameEventMsg, type InputCmd, type JoinOpts, type MatchView, type Phase, type RateTier, type Ring } from "@margin/core";
 import type { Frame } from "../game/frame";
 import { SnapshotBuffer } from "./interp";
 
@@ -25,7 +25,7 @@ interface RoomState {
   zoneR: number;
   blobs: Each<Omit<BlobView, "owe">>;
   food: Each<{ x: number; y: number; radius: number }>;
-  spikes: Each<{ x: number; y: number; big: boolean; live: boolean }>;
+  spikes: Each<{ x: number; y: number; big: boolean; live: boolean; radius?: number }>;
   leaderboard: Each<string>;
 }
 
@@ -135,11 +135,10 @@ export class MatchConnection {
       }),
     );
     const food: Frame["food"] = [];
-    // Core eats a pellet at exactly R.FOOD_RADIUS_PX (FoodView.r), whatever its mass; the schema's
-    // radius is mass-based, so draw the hitbox size instead (ICR S2: send foodView r).
-    s.food.forEach((f, k) => food.push({ id: Number(k), x: f.x, y: f.y, r: R.FOOD_RADIUS_PX }));
+    // The schema sends core hitbox radii (S2 b784118); older servers sent a mass radius, so fall back.
+    s.food.forEach((f, k) => food.push({ id: Number(k), x: f.x, y: f.y, r: f.radius >= R.FOOD_RADIUS_PX ? f.radius : R.FOOD_RADIUS_PX }));
     const spikes: Frame["spikes"] = [];
-    s.spikes.forEach((p, k) => p.live && spikes.push({ id: Number(k), x: p.x, y: p.y, big: p.big }));
+    s.spikes.forEach((p, k) => p.live && spikes.push({ id: Number(k), x: p.x, y: p.y, big: p.big, r: p.radius || SPIKE_RADIUS }));
     const leaderboard: string[] = [];
     s.leaderboard.forEach((id) => leaderboard.push(id));
     const arena = { w: s.arenaW || 2000, h: s.arenaH || 2000 };
