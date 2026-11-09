@@ -36,7 +36,7 @@ export function showDeath(root: HTMLElement, d: NonNullable<Outcome["death"]>, a
       <div class="stamp inline-block rounded-box border-[6px] border-liq px-6 py-2 font-display text-6xl text-liq sm:text-7xl">${d.eaten ? "EATEN" : "LIQUIDATED"}</div>
       <p class="tag mt-6 text-paper">${why}</p>
       <p class="mt-2 text-lg text-paper">${greed}</p>
-      <p class="mt-1 text-sm text-muted">${d.eaten ? "A blob 15% bigger eats you on touch. Run, or grow first." : "Tap REPAY earlier, or run before you go red."}</p>
+      <p class="mt-1 text-sm text-muted">${d.eaten ? "A blob 15% bigger eats you on touch. Run, or grow first." : "Hold REPAY earlier, or run before you go red."}</p>
       <div class="mt-6 flex justify-center gap-4">${onDark(btn("again", "Play again", true))}${onDark(btn("watch", "Watch", false))}</div>
       ${d.eaten ? "" : `<button data-act="share" class="tag mt-5 text-paper underline">Get your Liquidation Certificate</button>`}
     </div>`,

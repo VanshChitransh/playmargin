@@ -57,8 +57,8 @@ export class Hud {
       <span data-h=off class="tag absolute left-3 top-12 mt-[max(0px,env(safe-area-inset-top))] hidden rounded-field bg-navy/90 px-2 py-0.5 text-[11px] text-gold">offline practice</span>
       <p data-h=cmd style="display:none" class="absolute left-0 top-12 m-3 hidden max-w-[min(22rem,60vw)] rounded-field bg-navy/90 px-2 py-1 text-xs text-agent max-sm:line-clamp-3 max-sm:max-w-[calc(100vw-180px)] max-sm:text-[11px]"></p>
       <button data-h=mute class="tag pointer-events-auto absolute left-0 top-0 m-3 mt-[max(12px,env(safe-area-inset-top))] rounded-field bg-navy/80 px-2 py-1 text-muted"></button>
-      <div data-h=tap class="pointer-events-none absolute left-1/2 top-[calc(50%+64px)] hidden -translate-x-1/2"><span class="sticker rounded-field bg-paper px-3 py-1 font-display text-xl text-ink">${this.touch ? "TAP REPAY" : "TAP R"}</span></div>
-      <div data-h=call class="tag absolute inset-x-0 bottom-28 hidden text-center"><span class="rounded-field bg-liq px-3 py-1 text-paper">Margin call: tap REPAY to get out</span></div>
+      <div data-h=tap class="pointer-events-none absolute left-1/2 top-[calc(50%+64px)] hidden -translate-x-1/2"><span class="sticker rounded-field bg-paper px-3 py-1 font-display text-xl text-ink">${this.touch ? "HOLD REPAY" : "HOLD R"}</span></div>
+      <div data-h=call class="tag absolute inset-x-0 bottom-28 hidden text-center"><span class="rounded-field bg-liq px-3 py-1 text-paper">Margin call: hold REPAY to get out</span></div>
       <div data-h=money class="pointer-events-none hidden items-baseline gap-2 rounded-field bg-navy/90 px-2 py-0.5">
         <span data-h=owe class="num text-gold"></span>
         <span data-h=drain class="num hidden text-xs text-liq"></span>
@@ -84,6 +84,7 @@ export class Hud {
   }
 
   destroy(): void {
+    clearInterval(this.stream);
     this.el.remove();
     this.pipRing.remove();
     this.q("money")?.remove();
@@ -131,6 +132,8 @@ export class Hud {
     const cash = cashoutOpen(me, m);
     this.set("cash", String(cash), () => this.onCashoutWindow(cash));
     this.els.repay.classList.toggle("blocked", me.owe <= 0 || m.phase !== "LIVE");
+    this.oweNow = me.owe;
+    this.repayFill();
     const owe = Math.round(me.owe);
     this.set("owe", String(owe), () => {
       const o = this.q("owe");
@@ -280,8 +283,8 @@ export class Hud {
   /** Warm-up teaching, no numbers: one line per rule, worded for the player's controls. */
   private hints(): string {
     const lines = this.touch
-      ? ["Hold BOOST to grow (you borrow)", "Red? You can't eat. Tap REPAY", "Cash out from 0:45"]
-      : ["Hold SPACE to boost (you borrow)", "Red? You can't eat. Hit R to repay", "Cash out from 0:45"];
+      ? ["Hold BOOST to grow (you borrow)", "Red? You can't eat. Hold REPAY", "Cash out from 0:45"]
+      : ["Hold SPACE to boost (you borrow)", "Red? You can't eat. Hold R to repay", "Cash out from 0:45"];
     return `<ul class="mx-auto mt-3 flex max-w-sm flex-col items-center gap-1.5 text-sm">${lines
       .map((l) => `<li class="rounded-field bg-navy/85 px-3 py-1 text-paper">${l}</li>`)
       .join("")}<li class="text-xs text-ink/60">Try BOOST now: it is free practice until GO.</li></ul>`;
@@ -320,26 +323,51 @@ export class Hud {
     this.els.repay.classList.remove("urgent");
   }
 
-  /** REPAY: a few gold coins fly from my blob (screen centre) into the owe badge. */
+  private oweNow = 0;
+  private oweAtPress = 0;
+  private stream = 0;
+
+  /** Held REPAY: a steady coin stream into the owe badge and a gold fill rising on the button. */
+  repayHold(on: boolean): void {
+    clearInterval(this.stream);
+    this.oweAtPress = on ? this.oweNow : 0;
+    this.repayFill();
+    if (!on || reducedMotion) return;
+    this.stream = window.setInterval(() => this.oweNow > 0 && this.coin(0), JUICE.REPAY_STREAM_MS);
+  }
+
+  /** Share of the debt paid since the press: 0 just pressed, 1 cleared. */
+  repayProgress(): number {
+    return this.oweAtPress > 0 ? Math.max(0, Math.min(1, 1 - this.oweNow / this.oweAtPress)) : 0;
+  }
+
+  private repayFill(): void {
+    const p = Math.round(this.repayProgress() * 100);
+    this.els.repay.style.backgroundImage = this.oweAtPress > 0 ? `linear-gradient(to top, var(--color-gold) ${p}%, transparent ${p}%)` : "";
+  }
+
+  /** A quick REPAY press: a few gold coins fly from my blob (screen centre) into the owe badge. */
   coinsToOwe(): void {
     if (reducedMotion) return;
+    for (let i = 0; i < JUICE.REPAY_COINS; i++) this.coin(i * 40);
+  }
+
+  private coin(delay: number): void {
     const to = this.q("owe").getBoundingClientRect();
     if (!to.width) return;
-    for (let i = 0; i < JUICE.REPAY_COINS; i++) {
-      const c = document.createElement("span");
-      c.className = "pointer-events-none fixed z-20 size-3 rounded-full border-2 border-ink bg-gold";
-      c.style.left = `${innerWidth / 2 + (Math.random() - 0.5) * 30}px`;
-      c.style.top = `${innerHeight / 2 + (Math.random() - 0.5) * 30}px`;
-      document.body.appendChild(c);
-      const dx = to.left + to.width / 2 - parseFloat(c.style.left);
-      const dy = to.top + to.height / 2 - parseFloat(c.style.top);
-      c.animate([{ transform: "translate(0,0) scale(1)" }, { transform: `translate(${dx}px, ${dy}px) scale(0.6)`, opacity: 0.4 }], {
-        duration: JUICE.COIN_FLY_MS,
-        delay: i * 40,
-        easing: "cubic-bezier(0.5, 0, 0.8, 0.4)",
-        fill: "forwards",
-      }).onfinish = () => c.remove();
-    }
+    const c = document.createElement("span");
+    c.className = "pointer-events-none fixed z-20 size-3 rounded-full border-2 border-ink bg-gold";
+    c.style.left = `${innerWidth / 2 + (Math.random() - 0.5) * 30}px`;
+    c.style.top = `${innerHeight / 2 + (Math.random() - 0.5) * 30}px`;
+    document.body.appendChild(c);
+    const dx = to.left + to.width / 2 - parseFloat(c.style.left);
+    const dy = to.top + to.height / 2 - parseFloat(c.style.top);
+    c.animate([{ transform: "translate(0,0) scale(1)" }, { transform: `translate(${dx}px, ${dy}px) scale(0.6)`, opacity: 0.4 }], {
+      duration: JUICE.COIN_FLY_MS,
+      delay,
+      easing: "cubic-bezier(0.5, 0, 0.8, 0.4)",
+      fill: "both",
+    }).onfinish = () => c.remove();
   }
 
   /** Once per match, the first time I go red: point at the one button that saves me. */

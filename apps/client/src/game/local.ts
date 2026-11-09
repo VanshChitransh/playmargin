@@ -44,9 +44,9 @@ export class LocalMatch {
   }
 
   send(cmd: InputCmd): void {
-    // BOOST is held: the latest command wins. REPAY and cash-out are edges kept until a tick uses them.
+    // BOOST and REPAY are held: the latest command wins. Cash-out is an edge kept until a tick uses it.
     const prev = this.myCmd;
-    this.myCmd = prev ? { ...cmd, repay: cmd.repay || prev.repay, cashout: cmd.cashout || prev.cashout } : cmd;
+    this.myCmd = prev ? { ...cmd, cashout: cmd.cashout || prev.cashout } : cmd;
   }
 
   onEvent(cb: (e: GameEventMsg) => void): () => void {
@@ -73,7 +73,7 @@ export class LocalMatch {
     if (this.w.phase === "WARMUP" && this.tick >= this.warmTicks) startMatch(this.w, this.tick);
     const inputs = new Map<string, InputCmd>();
     if (this.myCmd && this.o.withMe) inputs.set(ME, this.myCmd);
-    this.myCmd = this.myCmd ? { ...this.myCmd, repay: false, cashout: false } : null;
+    this.myCmd = this.myCmd ? { ...this.myCmd, cashout: false } : null;
     if (this.tick % 6 === 0) for (const b of this.w.blobs.values()) if (b.kind === "agent") inputs.set(b.id, this.brain(b));
     const ev = step(this.w, inputs, this.tick);
     this.events.push(...this.w.pendingLog.splice(0));

@@ -19,7 +19,7 @@ import { rerender, type Screen } from "./router";
 import { showAborted, showDeath, showResults } from "./screens/overlays";
 import { setLocalLog } from "./screens/verify";
 import { C } from "./render/colors";
-import { engine, engineFuel, play as sfx } from "./audio";
+import { engine, engineFuel, play as sfx, repayLevel, repayTone } from "./audio";
 import { JUICE } from "./render/juice";
 
 interface Source {
@@ -103,6 +103,13 @@ export const play: Screen = (root, params) => {
     sfx(on ? "press" : "release");
     hud.speedLines(on && !controls.els.boost.classList.contains("blocked"));
   };
+  let repayHeld = false;
+  controls.onRepayHold = (on) => {
+    repayHeld = on;
+    repaySum = 0;
+    hud.repayHold(on);
+    repayTone(on && !controls.els.repay.classList.contains("blocked"));
+  };
   const status = document.createElement("div");
   // Phones: the clock pill carries an "offline" tag instead, so this line never crowds the bottom.
   status.className = "tag pointer-events-none fixed bottom-3 left-3 max-w-[55vw] text-muted max-sm:hidden";
@@ -111,8 +118,9 @@ export const play: Screen = (root, params) => {
 
   /** Event to effect: every money moment gets a visible number or burst where it happened. */
   arena.onPickup = () => sfx("blip", 1 + (Math.random() * 2 - 1) * JUICE.PICKUP_PITCH_JITTER);
-  let repayRun = 0;
-  let lastRepayAt = -Infinity;
+  // Held REPAY sends a stream of repay events: sum them into one floating number per window.
+  let repaySum = 0;
+  let repayFloatAt = -Infinity;
   // Nitro sound follows the tank: pitch rises, a coin ticks per 10% borrowed, a clunk when dry.
   let lastStep = -1;
   let dry = false;
@@ -143,15 +151,16 @@ export const play: Screen = (root, params) => {
       // BOOST feel (engine sound, trail, ticking +N) comes from the held state, not this event.
       case "repay": {
         const p = e.blob === me ? at(me) : undefined;
-        if (p) {
-          const now = performance.now();
-          repayRun = now - lastRepayAt < JUICE.REPAY_RUN_MS ? repayRun + 1 : 0;
-          lastRepayAt = now;
-          sfx("clink", JUICE.REPAY_PITCH[Math.min(repayRun, JUICE.REPAY_PITCH.length - 1)]);
-          hud.coinsToOwe();
-        }
-        if (p) arena.squashMe(me);
-        if (p) arena.fx.floatText(p.x, p.y - p.r, `\u2212${num(e.amount)}`, C.paper, z);
+        if (!p) break;
+        const now = performance.now();
+        repaySum += e.amount;
+        if (now - repayFloatAt < JUICE.REPAY_FLOAT_MS) break;
+        // A quick press gets the full burst; a hold already has its coin stream and tone.
+        if (!repayHeld) (sfx("clink"), hud.coinsToOwe());
+        repayFloatAt = now;
+        arena.squashMe(me);
+        arena.fx.floatText(p.x, p.y - p.r, `\u2212${num(repaySum)}`, C.paper, z);
+        repaySum = 0;
         break;
       }
       case "clutchSave": {
@@ -234,6 +243,10 @@ export const play: Screen = (root, params) => {
     lastFrame = f;
     hud.update(f, now);
     nitroSound(f);
+    if (repayHeld) {
+      repayLevel(hud.repayProgress());
+      if (controls.els.repay.classList.contains("blocked")) repayTone(false); // debt cleared: the tone ends
+    }
     receipt?.frame(f.blobs, f.match.rateTier, now, dt, f.rateBps, f.match.phase === "LIVE" ? elapsedS(f.match) : undefined, f.food);
     if (f.match.phase === "ENDED") finish();
     // Dev-only hook so tests and agent-browser can read the drawn frame (stripped from builds).
@@ -312,6 +325,7 @@ export const play: Screen = (root, params) => {
     left = true;
     src?.leave?.();
     engine(false);
+    repayTone(false);
     controls.destroy();
     hud.destroy();
     overlay?.remove();

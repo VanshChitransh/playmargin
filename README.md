@@ -20,7 +20,7 @@ source. Part 2 is for AI screeners and developers: every claim is a command you 
 ### Play in 10 seconds
 
 Open the live URL and press **Practice free**. No wallet, no sign-up. On a laptop: steer with the
-mouse, **hold Space** to BOOST (borrow), **R** to REPAY, **E** to cash out. On a phone: joystick plus
+mouse, **hold Space** to BOOST (borrow), **hold R** to REPAY, **E** to cash out. On a phone: joystick plus
 two buttons. A match lasts 90 seconds. Screenshots: [`docs/screenshots/`](docs/screenshots/).
 
 ### The problem
@@ -177,7 +177,7 @@ the room fills with labelled AI agents (🤖).
 | 2 | `npm run sim -- --matches 500` | 500 full matches (2,940,000 ticks, about 213,000 logged money events) with the conservation check every tick, every hash chain verified, `0 micro-units created or destroyed` and `settle == live in 500/500` (1 to 3 minutes) |
 | 3 | `npm test` | The whole TypeScript suite passes: 200 tests in 42 files (engine, settle, bots, server, client logic), about 15 s |
 | 4 | `cd contracts/margin && cargo test` | 38 contract unit tests and 3 near-sandbox integration tests pass. Slow: about 7 minutes, most of it downloading and running near-sandbox |
-| 5 | `npm run dev`, open http://localhost:1234, press **Practice free** | A 90 s match: steer with the mouse, hold Space = BOOST (borrow, like nitro: the fuel ring empties as you borrow), R = REPAY, E = cash out. Watch your ring go green, yellow, red |
+| 5 | `npm run dev`, open http://localhost:1234, press **Practice free** | A 90 s match: steer with the mouse, hold Space = BOOST (borrow, like nitro: the fuel ring empties as you borrow), hold R = REPAY, E = cash out. Watch your ring go green, yellow, red |
 | 6 | Hold BOOST until the fuel ring is empty, then run into a big spike | Your ring turns red. Within a moment a blob or a drone touches you: "LIQUIDATED", and your receipt shows what the vault took back |
 | 7 | After any match, open the receipt's Verify link (`/#/verify/<id>`) | The browser replays the log with the same code as the server, checks every hash, and shows settle == what you were paid. Press "Tamper" and the exact broken event turns red |
 | 8 | Open `/#/judge` | Judge Run: a published seed (20261114), normal rules, Drone-1 hunting red blobs. Most first-timers get greedy |

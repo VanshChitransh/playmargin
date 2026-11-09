@@ -171,3 +171,35 @@ function noise(t: number, dur: number, f0: number, f1: number, vol: number): voi
   src.connect(bp).connect(env(t, dur, vol));
   src.start(t);
 }
+
+let repayNodes: { o: OscillatorNode; g: GainNode } | null = null;
+
+/** Held REPAY: a soft tone that climbs as the debt is paid down (repayLevel), cut on release. */
+export function repayTone(on: boolean): void {
+  if (!ctx || ctx.state !== "running") return;
+  const t = ctx.currentTime;
+  if (on && !muted && !repayNodes) {
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = "triangle";
+    o.frequency.setValueAtTime(JUICE.REPAY_HZ, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(JUICE.REPAY_GAIN, t + 0.06);
+    o.connect(g).connect(ctx.destination);
+    o.start(t);
+    repayNodes = { o, g };
+  } else if (!on && repayNodes) {
+    const { o, g } = repayNodes;
+    g.gain.cancelScheduledValues(t);
+    g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+    o.stop(t + 0.15);
+    repayNodes = null;
+  }
+}
+
+/** Repay tone pitch from progress: 0 = just pressed, 1 = debt cleared (an octave up). */
+export function repayLevel(k: number): void {
+  if (!ctx || !repayNodes) return;
+  repayNodes.o.frequency.setTargetAtTime(JUICE.REPAY_HZ * (1 + Math.max(0, Math.min(1, k))), ctx.currentTime, 0.05);
+}

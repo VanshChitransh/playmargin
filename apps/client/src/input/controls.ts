@@ -1,16 +1,17 @@
 // Player input as Commands (never positions). Desktop: mouse steers, Space = BOOST,
 // R = REPAY, E = cash out. Phone: nipplejs joystick on the left, buttons on the right.
-// Sends at most 30/s. BOOST is HELD state (hold-to-nitro): true in every command while Space
-// or the button is down. REPAY and cash-out stay edge taps. Any blur or tab switch sends a zero
+// Sends at most 30/s. BOOST and REPAY are HELD state: true in every command while the key or
+// button is down (hold-to-nitro, hold-to-repay). Cash-out stays an edge tap. Any blur or tab switch sends a zero
 // command at once so nothing stays held (EDGE-CASES: stuck BOOST, plus the 250 ms server expiry).
 import { play as sfx } from "../audio";
 import nipplejs from "nipplejs";
-import { R, type InputCmd } from "@margin/core";
-import { JUICE } from "../render/juice";
+import type { InputCmd } from "@margin/core";
 import { dirFromPointer } from "./dir";
 
 const SEND_MS = 1000 / 30;
+const HOLD_KEYS: Record<string, "boost" | "repay" | undefined> = { Space: "boost", KeyR: "repay" };
 type Tap = "boost" | "repay" | "cashout";
+type Hold = "boost" | "repay";
 
 export interface ControlsEls {
   boost: HTMLButtonElement;
@@ -23,10 +24,12 @@ export class Controls {
   readonly touch = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
   readonly els: ControlsEls;
   private dir = { x: 0, y: 0 };
-  private taps = { repay: false, cashout: false };
-  private boostHeld = false;
+  private cashTap = false;
+  private held = { boost: false, repay: false };
   /** Fired when BOOST starts or stops being held (sound, nitro feel). */
   onHold?: (on: boolean) => void;
+  /** Fired when REPAY starts or stops being held (coin stream, repay tone). */
+  onRepayHold?: (on: boolean) => void;
   private seq = 0;
   private lastSent = 0;
   private timer: number;
@@ -51,15 +54,13 @@ export class Controls {
       // pointerdown, not click: answers on touch-down instead of ~100 ms later on release.
       this.listen(this.els[t], "pointerdown", (e) => {
         e.preventDefault();
-        if (t === "boost") {
-          this.els.boost.setPointerCapture(e.pointerId); // a finger sliding off still counts until lifted
-          return this.hold(true);
-        }
-        if (t === "repay") return this.repay();
-        this.tap(t);
+        if (t === "cashout") return this.tap();
+        this.els[t].setPointerCapture(e.pointerId); // a finger sliding off still counts until lifted
+        this.hold(t, true);
       });
     }
-    for (const type of ["pointerup", "pointercancel", "lostpointercapture"] as const) this.listen(this.els.boost, type, () => this.hold(false));
+    for (const t of ["boost", "repay"] as const)
+      for (const type of ["pointerup", "pointercancel", "lostpointercapture"] as const) this.listen(this.els[t], type, () => this.hold(t, false));
     if (this.touch) this.joystick(layer.querySelector<HTMLElement>("[data-zone]")!);
     this.desktop();
     this.listen(window, "blur", () => this.release());
@@ -84,19 +85,17 @@ export class Controls {
       if (e.pointerType === "mouse") this.dir = dirFromPointer(e.clientX, e.clientY, innerWidth, innerHeight);
     });
     this.listen(window, "keydown", (e) => {
-      if (e.code === "Space") {
-        e.preventDefault();
-        if (!e.repeat) this.hold(true);
-        return;
-      }
-      if (e.repeat) return; // REPAY and cash-out are one press, one tap
-      const t: Tap | null = e.code === "KeyR" ? "repay" : e.code === "KeyE" ? "cashout" : null;
-      if (!t) return;
+      const h = HOLD_KEYS[e.code];
+      if (!h && e.code !== "KeyE") return;
       e.preventDefault();
-      if (t === "repay") return this.repay();
-      this.tap(t);
+      if (e.repeat) return; // the OS key repeat must not re-fire a press
+      if (h) this.hold(h, true);
+      else this.tap();
     });
-    this.listen(window, "keyup", (e) => e.code === "Space" && this.hold(false));
+    this.listen(window, "keyup", (e) => {
+      const h = HOLD_KEYS[e.code];
+      if (h) this.hold(h, false);
+    });
   }
 
   private joystick(zone: HTMLElement): void {
@@ -114,73 +113,30 @@ export class Controls {
     this.off.push(() => stick.destroy());
   }
 
-  /** Nitro on or off; the change goes out at once, then every 33 ms while held. */
-  private hold(on: boolean): void {
-    if (this.boostHeld === on) return;
-    // Every press answers, even a refused one: a short "denied" buzz when BOOST is locked.
-    if (on && this.els.boost.classList.contains("blocked")) sfx("denied");
-    this.boostHeld = on;
-    this.els.boost.classList.toggle("holding", on);
-    this.onHold?.(on);
+  /** A held input on or off; the change goes out at once, then every 33 ms while held. */
+  private hold(t: Hold, on: boolean): void {
+    if (this.held[t] === on) return;
+    // Every press answers, even a refused one: a short "denied" buzz when the button is locked.
+    if (on && this.els[t].classList.contains("blocked")) sfx("denied");
+    this.held[t] = on;
+    this.els[t].classList.toggle("holding", on);
+    (t === "boost" ? this.onHold : this.onRepayHold)?.(on);
     this.lastSent = 0;
     this.flush(false);
   }
 
-  private lastRepay = -Infinity;
-  private repayQueued = false;
-
-  /** REPAY honours the 0.4 s cooldown: a press within 150 ms of its end is kept, not dropped. */
-  private repay(): void {
-    const cd = R.REPAY_COOLDOWN_S * 1000;
-    const left = cd - (performance.now() - this.lastRepay);
-    if (left <= 0) return this.fireRepay();
-    if (left <= JUICE.REPAY_BUFFER_MS && !this.repayQueued) {
-      this.repayQueued = true;
-      setTimeout(() => ((this.repayQueued = false), this.fireRepay()), left);
-    }
-  }
-
-  private fireRepay(): void {
-    this.lastRepay = performance.now();
-    this.tap("repay");
-    this.wipe();
-  }
-
-  /** Cooldown shown as a radial wipe over the REPAY button. */
-  private wipe(): void {
-    const b = this.els.repay;
-    let w = b.querySelector<HTMLElement>(".wipe");
-    if (!w) {
-      w = document.createElement("span");
-      w.className = "wipe pointer-events-none absolute inset-0 rounded-full";
-      b.classList.add("relative");
-      b.appendChild(w);
-    }
-    const el = w;
-    const t0 = performance.now();
-    const cd = R.REPAY_COOLDOWN_S * 1000;
-    const step = (): void => {
-      const k = Math.min(1, (performance.now() - t0) / cd);
-      el.style.background = k >= 1 ? "" : `conic-gradient(rgb(7 10 18 / 0.55) ${(1 - k) * 360}deg, transparent 0)`;
-      if (k < 1) requestAnimationFrame(step);
-    };
-    step();
-  }
-
-  private tap(t: Exclude<Tap, "boost">): void {
+  private tap(): void {
     // Answer the press locally at once (< 100 ms rule); the server's result follows.
-    this.els[t].animate([{ transform: "scale(0.86)" }, { transform: "scale(1)" }], { duration: 140, easing: "ease-out" });
-    this.taps[t] = true;
+    this.els.cashout.animate([{ transform: "scale(0.86)" }, { transform: "scale(1)" }], { duration: 140, easing: "ease-out" });
+    this.cashTap = true;
     this.flush(false);
   }
 
   /** Zero everything and tell the server now, so a lost focus never leaves input held. */
   private release(): void {
     this.dir = { x: 0, y: 0 };
-    this.taps = { repay: false, cashout: false };
-    if (this.boostHeld) this.onHold?.(false);
-    this.boostHeld = false;
-    this.els.boost.classList.remove("holding");
+    this.cashTap = false;
+    for (const t of ["boost", "repay"] as const) this.hold(t, false);
     this.lastSent = 0;
     this.flush(false);
   }
@@ -189,8 +145,8 @@ export class Controls {
     const now = performance.now();
     if (!fromTimer && now - this.lastSent < SEND_MS) return; // the interval picks it up within 33 ms
     this.lastSent = now;
-    this.send({ seq: ++this.seq, dirX: this.dir.x, dirY: this.dir.y, boost: this.boostHeld, ...this.taps });
-    this.taps = { repay: false, cashout: false };
+    this.send({ seq: ++this.seq, dirX: this.dir.x, dirY: this.dir.y, boost: this.held.boost, repay: this.held.repay, cashout: this.cashTap });
+    this.cashTap = false;
   }
 
   private listen<K extends keyof (WindowEventMap & DocumentEventMap)>(

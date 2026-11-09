@@ -12,7 +12,7 @@ import { showStake } from "../stake";
 // Each card plays a few seconds of real play (scripts/clips.sh, offline practice on the real rules).
 const STEPS: Array<[string, string, string]> = [
   ["BOOST = borrow", "Hold BOOST to borrow from the vault: bigger and faster while it burns. The ring is your fuel.", "nitro"],
-  ["Red? REPAY", "Losses eat your margin. Go red and you cannot eat. Tap REPAY to pay the loan back and get out.", "repay"],
+  ["Red? REPAY", "Losses eat your margin. Go red and you cannot eat. Hold REPAY to pay the loan back and get out.", "repay"],
   ["Stay red, get popped", "Any blob that touches a red blob pops it and takes a bounty. Cash out from 0:45 to keep your winnings.", "liquidated"],
 ];
 // Autoplay only for players who did not ask for less motion; the rest get a tap-to-play video.

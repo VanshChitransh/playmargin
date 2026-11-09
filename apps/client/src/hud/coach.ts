@@ -50,7 +50,7 @@ export function coachMarks(root: HTMLElement, touch: boolean): Coach {
     const boost = s === "boost";
     const text = boost
       ? `<b>${touch ? "Hold" : "Hold SPACE:"} BOOST</b>. Grow fast, on a loan.`
-      : `<b>${touch ? "Tap" : "R:"} REPAY</b> pays it back.`;
+      : `<b>${touch ? "Hold" : "Hold R:"} REPAY</b> pays it back.`;
     // Each bubble sits just left of its own button (BOOST bottom-right, REPAY above it).
     const pos = boost ? "bottom:max(28px,calc(env(safe-area-inset-bottom) + 28px));right:122px" : "bottom:120px;right:98px";
     shownAt = lastE;

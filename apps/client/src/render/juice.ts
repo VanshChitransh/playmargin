@@ -78,20 +78,22 @@ export const JUICE = {
   /** A refill eases in over this long, with a gold shimmer. */
   FUEL_REFILL_MS: 300,
 
-  // REPAY per tap (feel spec 2.2)
-  /** Clink pitch over a run of taps (a tap within REPAY_RUN_MS of the last continues the run). */
-  REPAY_PITCH: [1, 1.12, 1.25],
-  REPAY_RUN_MS: 1200,
-  /** Coins that fly from my blob to the owe badge, and their flight time. */
-  REPAY_COINS: 5,
+  // REPAY (hold-to-repay)
+  /** One coin leaves my blob for the owe badge this often while REPAY is held, flight time below. */
+  REPAY_STREAM_MS: 80,
   COIN_FLY_MS: 450,
-  /** A press this close to the end of the cooldown is kept and fires when it ends. */
-  REPAY_BUFFER_MS: 150,
+  /** Coins on a single quick press (the server repays one chunk). */
+  REPAY_COINS: 5,
+  /** Repay tone: starts here and climbs an octave as the debt clears. */
+  REPAY_HZ: 440,
+  REPAY_GAIN: 0.06,
+  /** While held, the floating minus number sums the repay events over this window. */
+  REPAY_FLOAT_MS: 300,
 
   // Red state (feel spec 2.2): heartbeat speeds up as the margin thins (health 1.0 to 0.9).
   BEAT_SLOW_MS: 900,
   BEAT_FAST_MS: 350,
-  /** The "TAP R" hint beside my blob, once per match. */
+  /** The "HOLD R" hint beside my blob, once per match. */
   TAP_HINT_MS: 2500,
 
   // Clutch save (feel spec 2.2): fired only on the server's clutchSave event, never predicted.
