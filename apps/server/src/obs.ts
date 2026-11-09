@@ -3,6 +3,14 @@
 
 type Fields = Record<string, unknown>;
 
+// A closed log pipe (soak/e2e stopped reading, journald restarted) must not kill or spam the server:
+// drop the line, keep running. Any other stream error is still fatal.
+for (const out of [process.stdout, process.stderr]) {
+  out.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code !== "EPIPE") throw err;
+  });
+}
+
 function line(level: "info" | "warn" | "error", event: string, fields: Fields = {}): string {
   const f: Fields = {};
   for (const [k, v] of Object.entries(fields)) f[k] = v instanceof Error ? v.message : v;
