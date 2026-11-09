@@ -144,8 +144,12 @@ hash chain: 343 events, head 5dfd176e111ab055...
 5880 ticks · 0 micro-units created or destroyed · settle == live ✓ · 10.1 s
 ```
 
-`npm install` takes about a minute. npm 11 may warn that some install scripts were skipped and list
-audit findings in dev dependencies: everything below still runs.
+`npm install` takes about a minute. npm 11 may warn that some install scripts were skipped, and
+`npm audit` lists 27 findings: **0 high or critical**, 20 low and 7 moderate. They sit in build tooling
+(`vite-plugin-pwa` and `workbox-build`: glob, minimatch, deepmerge), in Colyseus modules MARGIN does
+not use (`@colyseus/auth` and `@colyseus/playground`: grant, uuid, elliptic), and in near-js's secp256k1
+path (MARGIN keys are ed25519). Every fix npm offers is a major version change, so none is applied.
+Everything below still runs.
 
 To play in a browser:
 
