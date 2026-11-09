@@ -54,6 +54,22 @@ export interface BlobView {
   state: "alive" | "cashed" | "popped";
 }
 
+/** A food piece as drawn; r comes from the same mass-to-radius curve as blobs. */
+export interface FoodView {
+  id: number;
+  x: number;
+  y: number;
+  r: number;
+}
+
+/** A live spike. Size only; the red warning colour is personal, so the client computes it. */
+export interface SpikeView {
+  id: number;
+  x: number;
+  y: number;
+  big: boolean;
+}
+
 export interface MatchView {
   mode: Mode;
   phase: Phase;

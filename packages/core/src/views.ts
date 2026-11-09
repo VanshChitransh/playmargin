@@ -3,8 +3,8 @@
 import { MATCH_TICKS, R } from "./constants";
 import { equity, matchT, ring } from "./economy";
 import { radius } from "./motion";
-import type { BlobView, MatchView, RateTier } from "./protocol";
-import type { Blob, World } from "./types";
+import type { BlobView, FoodView, MatchView, RateTier, SpikeView } from "./protocol";
+import type { Blob, Food, Spike, World } from "./types";
 import { toUnits } from "./units";
 import { ranking } from "./world";
 
@@ -32,4 +32,19 @@ export function matchView(w: World): MatchView {
     rateTier: rateTier(w.ratePerMinBps), zone: { cx: w.zone.cx, cy: w.zone.cy, r: w.zone.r },
     leaderboard: ranking(w).slice(0, R.LEADERBOARD_TOP),
   };
+}
+
+/** A food piece as drawn. */
+export function foodView(f: Food): FoodView {
+  return { id: f.id, x: f.x, y: f.y, r: radius(f.mass) };
+}
+
+/** Live spikes only; a consumed spike is invisible until it respawns. */
+export function spikeViews(w: World): SpikeView[] {
+  return w.spikes.filter((s: Spike) => s.respawnAt === null).map((s) => ({ id: s.id, x: s.x, y: s.y, big: s.big }));
+}
+
+/** This blob's own interest drain in display units per second (the "-0.12/s" under the ring). */
+export function drainPerS(w: World, b: Blob): number {
+  return toUnits(Math.ceil((b.debt * w.ratePerMinBps) / (10_000 * 60)));
 }

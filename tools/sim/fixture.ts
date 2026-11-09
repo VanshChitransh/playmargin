@@ -4,7 +4,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import {
-  blobView, matchView, newWorld, rand, R, seedRng, startMatch, step, toUnits,
+  blobView, foodView, matchView, newWorld, spikeViews, rand, R, seedRng, startMatch, step,
   type GameEventMsg, type InputCmd, type World,
 } from "@margin/core";
 
@@ -52,8 +52,8 @@ while (tick < WARMUP_TICKS + LIVE_TICKS) {
     match: matchView(w),
     arena: w.arena,
     blobs: [...w.blobs.values()].map((b) => blobView(b, tick)),
-    food: w.food.map((f) => ({ id: f.id, x: f.x, y: f.y, mass: toUnits(f.mass) })),
-    spikes: w.spikes.filter((s) => s.respawnAt === null).map((s) => ({ id: s.id, x: s.x, y: s.y, big: s.big })),
+    food: w.food.map(foodView),
+    spikes: spikeViews(w),
     events,
   });
   events = [];
