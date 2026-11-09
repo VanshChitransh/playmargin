@@ -115,6 +115,7 @@ export class Hud {
     const k = Math.max(0, Math.min(1, (1 - health) / 0.1));
     const beatMs = JUICE.BEAT_SLOW_MS - (JUICE.BEAT_SLOW_MS - JUICE.BEAT_FAST_MS) * k;
     if (ring === "red" && !this.tapHinted) this.tapHint();
+    if (ring !== "red") this.q("tap").classList.add("hidden"); // out of red, the hint has done its job
     if (ring === "red" && now - this.lastBeat > beatMs) {
       this.lastBeat = now;
       sfx("beat");
@@ -299,6 +300,7 @@ export class Hud {
     this.lastBeat = now + JUICE.SAVE_CALM_MS;
     this.q("frame").dataset.ring = "yellow";
     this.q("call").classList.add("hidden");
+    this.q("tap").classList.add("hidden");
     this.els.repay.classList.remove("urgent");
   }
 
