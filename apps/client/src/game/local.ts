@@ -1,7 +1,7 @@
 // A whole match in the browser on the real rules (core newWorld/startMatch/step), with
 // simple labelled bots. Drives offline practice and the landing hero, so both show the
 // actual game instead of a mock. The server stays the only authority for real matches.
-import { R, TICK_MS, blobView, matchView, newWorld, radius, startMatch, step, type Blob, type GameEventMsg, type InputCmd, type PlayerSeed, type World } from "@margin/core";
+import { R, TICK_MS, appendLog, blobView, matchView, newWorld, radius, startMatch, step, type Blob, type GameEventMsg, type InputCmd, type LogEntry, type PlayerSeed, type World } from "@margin/core";
 import type { Frame } from "./frame";
 
 const ME = "me";
@@ -25,6 +25,8 @@ export class LocalMatch {
   private myCmd: InputCmd | null = null;
   private listeners = new Set<(e: GameEventMsg) => void>();
   private botSeq = 0;
+  /** Every engine event, kept so an offline match can be verified like a live one. */
+  private events: World["pendingLog"] = [];
 
   constructor(private o: LocalOpts) {
     const players: PlayerSeed[] = [];
@@ -34,6 +36,8 @@ export class LocalMatch {
     this.warmTicks = Math.round(o.warmupS * R.TICK_HZ);
     if (this.warmTicks === 0) startMatch(this.w, 0);
   }
+
+  readonly matchId = "local";
 
   get me(): string {
     return this.o.withMe ? ME : "bot0";
@@ -72,8 +76,13 @@ export class LocalMatch {
     this.myCmd = this.myCmd ? { ...this.myCmd, boost: false, repay: false, cashout: false } : null;
     if (this.tick % 6 === 0) for (const b of this.w.blobs.values()) if (b.kind === "agent") inputs.set(b.id, this.brain(b));
     const ev = step(this.w, inputs, this.tick);
-    this.w.pendingLog.length = 0; // nothing to anchor offline
+    this.events.push(...this.w.pendingLog.splice(0));
     for (const e of ev) this.listeners.forEach((l) => l(e));
+  }
+
+  /** The hash-chained log of everything so far (same format the server anchors). */
+  async log(): Promise<LogEntry[]> {
+    return appendLog([], this.events);
   }
 
   /** Simple bot: flee bigger blobs, chase red smaller ones, else graze; boost only when safe. */

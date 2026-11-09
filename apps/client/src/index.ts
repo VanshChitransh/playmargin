@@ -2,7 +2,8 @@
 import "./style.css";
 import { startRouter } from "./router";
 import { isAuthCallback, runAuthCallback } from "./auth-callback";
-import { judge, notFound, verify } from "./screens";
+import { judge, notFound } from "./screens";
+import { verify } from "./screens/verify";
 import { landing } from "./screens/landing";
 import { play } from "./play";
 import { unlockAudioOnGesture } from "./audio";

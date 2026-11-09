@@ -42,7 +42,7 @@ export function showDeath(root: HTMLElement, d: NonNullable<Outcome["death"]>, a
 }
 
 /** The bell: a receipt whose lines add up to the final number. */
-export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "home") => void): HTMLElement {
+export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "home" | "verify") => void): HTMLElement {
   const title = o.kind === "cashed" ? "CASHED OUT" : o.kind === "survived" ? "SURVIVED" : "LIQUIDATED";
   const rows = o.lines
     .map((l) => `<div class="flex justify-between gap-6"><span>${esc(l.label)}</span><span class="num ${l.amount < 0 ? "text-liq" : ""}">${fmt(l.amount)}</span></div>`)
@@ -63,7 +63,7 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
         <span class="num font-display text-5xl ${o.end > o.start ? "" : "text-liq"}">${o.end.toFixed(2)}</span>
       </div>
       <p class="mt-1 text-xs text-ink/60">Practice credits. Never cash, never bought.</p>
-      <div class="mt-5 flex gap-3">${btn("again", "Play again", true).replace("bg-paper", "bg-liq")}${btn("home", "Home", false)}</div>
+      <div class="mt-5 flex flex-wrap gap-3">${btn("again", "Play again", true).replace("bg-paper", "bg-liq")}${btn("verify", "Verify", false)}${btn("home", "Home", false)}</div>
     </div>`,
   );
   wire(el, act);

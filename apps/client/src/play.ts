@@ -11,11 +11,13 @@ import { MatchConnection, guestKey } from "./net/client";
 import { ArenaRenderer } from "./render/arena";
 import { rerender, type Screen } from "./router";
 import { showDeath, showResults } from "./screens/overlays";
+import { setLocalLog } from "./screens/verify";
 import { C } from "./render/colors";
 import { play as sfx } from "./audio";
 
 interface Source {
   readonly me: string;
+  readonly matchId: string;
   frameAt(nowMs: number): Frame | null;
   send(cmd: InputCmd): void;
   onEvent(cb: (e: GameEventMsg) => void): () => void;
@@ -108,13 +110,17 @@ export const play: Screen = (root, params) => {
 
   const again = (): void => rerender();
   const home = (): void => void (location.hash = "#/");
+  const toVerify = async (): Promise<void> => {
+    if (src instanceof LocalMatch) setLocalLog(await src.log());
+    location.hash = `#/verify/${encodeURIComponent(src?.matchId ?? "")}`;
+  };
   const finish = (): void => {
     if (ended || !lastFrame || !receipt) return;
     ended = true;
     const o = receipt.outcome(lastFrame.blobs);
     overlay?.remove();
     // A beat after the bell so the last pop or cash-out is seen before the receipt covers it.
-    setTimeout(() => !left && (overlay = showResults(root, o, (a) => (a === "again" ? again() : home()))), 900);
+    setTimeout(() => !left && (overlay = showResults(root, o, (a) => (a === "again" ? again() : a === "verify" ? void toVerify() : home()))), 900);
   };
 
   const draw = (now: number): Frame | null => {

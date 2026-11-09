@@ -6,7 +6,7 @@ import { TICK_MS, type BlobView, type GameEventMsg, type InputCmd, type MatchVie
 import type { Frame } from "../game/frame";
 import { SnapshotBuffer } from "./interp";
 
-const ENDPOINT = import.meta.env.VITE_SERVER_URL ?? `${location.protocol}//${location.hostname}:2567`;
+export const ENDPOINT = import.meta.env.VITE_SERVER_URL ?? `${location.protocol}//${location.hostname}:2567`;
 
 // Structural view of S2's MatchState schema, so the client never imports server code.
 interface Each<T> {
@@ -50,6 +50,11 @@ export class MatchConnection {
       this.rateBps = m.ratePerMinBps;
     });
     this.room.onMessage("ev", (e: GameEventMsg) => this.listeners.forEach((l) => l(e)));
+  }
+
+  /** The server uses the room id as the match id in the log and on chain. */
+  get matchId(): string {
+    return this.room?.roomId ?? "";
   }
 
   get me(): string {
