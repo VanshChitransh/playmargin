@@ -24,12 +24,18 @@ npm test
 chown -R margin:margin "$DIR"
 ln -sfn "$DIR" /opt/margin/current
 install -m 644 ops/margin-server.service /etc/systemd/system/margin-server.service
+install -m 644 ops/margin-relayer.service /etc/systemd/system/margin-relayer.service
 systemctl daemon-reload
-systemctl enable margin-server >/dev/null
+systemctl enable margin-server margin-relayer >/dev/null
 echo "restarting (drain can take up to 2 min if a match is LIVE)"
+systemctl restart margin-relayer
 systemctl restart margin-server
 for i in $(seq 1 30); do
-  curl -fsS localhost:2567/api/stats >/dev/null 2>&1 && { echo "healthy: $(curl -s localhost:2567/api/stats)"; exit 0; }
+  if curl -fsS localhost:2567/health >/dev/null 2>&1; then
+    echo "server: $(curl -s localhost:2567/health)"
+    echo "relayer: $(curl -s localhost:3030/health || echo DOWN)"
+    exit 0
+  fi
   sleep 2
 done
 echo "server did not come up, see: journalctl -u margin-server -n 100"; exit 1

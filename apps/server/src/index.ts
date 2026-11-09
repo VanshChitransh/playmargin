@@ -10,6 +10,7 @@ import { mountApi } from "./api";
 import { sharedDb } from "./db";
 import { anchorPending } from "./anchor/job";
 import { sharedChain } from "./settlement";
+import { log } from "./obs";
 
 const server = defineServer({
   rooms: {
@@ -29,13 +30,15 @@ const server = defineServer({
 // SIGTERM: Colyseus locks every room and waits for them to close; drain also blocks new rooms.
 server.onBeforeShutdown(() => {
   drain.on = true;
-  console.log("draining: no new matches, LIVE matches finish first");
+  log.info("drain", { note: "no new matches, LIVE matches finish first" });
 });
 
 // Hourly anchor: checked every 5 min so a finished hour goes on chain within minutes. unref() so a
 // drain exit never waits on it.
-const anchor = () => anchorPending(sharedDb(), sharedChain()).catch((err: unknown) => console.error("[anchor]", err));
+const anchor = () => anchorPending(sharedDb(), sharedChain()).catch((err: unknown) => log.error("anchor_failed", { err }));
 setInterval(anchor, 5 * 60_000).unref();
 void anchor();
 
-listen(server).then(() => console.log(`MARGIN server up on :${process.env.PORT ?? 2567} (match = ${MATCH_TICKS} ticks)`));
+listen(server).then(() =>
+  log.info("up", { port: Number(process.env.PORT ?? 2567), network: sharedChain()?.cfg.network ?? "off", matchTicks: MATCH_TICKS }),
+);

@@ -6,6 +6,7 @@ import {
   drainLog, entryFor, settleVerified, type LogEntry, type Mode, type SettleResult, type Settlement, type World,
 } from "@margin/core";
 import type { Db } from "../db";
+import { log } from "../obs";
 import { addMatchPlayer, createMatch, finishMatch, saveEvents } from "../matches";
 
 export class MatchRecord {
@@ -43,7 +44,7 @@ export class MatchRecord {
   open(w: World, seed: number, users: ReadonlyMap<string, string>, reserved = false): void {
     createMatch(this.db, { id: this.matchId, mode: this.mode, seed, pot: w.pot });
     for (const [blobId, userId] of users) this.seat(userId, blobId);
-    if (!reserved) this.reserve(w).catch((err: unknown) => console.error(`[open] ${this.matchId}:`, err));
+    if (!reserved) this.reserve(w).catch((err: unknown) => log.error("open_failed", { matchId: this.matchId, err }));
   }
 
   /** A human seat (also used for late joins). */
@@ -65,9 +66,10 @@ export class MatchRecord {
       const tx = await this.settlement.settle(result, result.head);
       const payouts = new Map(result.payouts.map((p) => [p.id, p.amount]));
       finishMatch(this.db, this.matchId, { status: "settled", head: result.head, txHash: tx?.hash, payouts });
+      log.info("settled", { matchId: this.matchId, mode: this.mode, tx: tx?.hash ?? null });
       return result;
     } catch (err) {
-      console.error(`[settle] ${this.matchId} refused:`, err);
+      log.error("settle_refused", { matchId: this.matchId, err });
       this.flush();
       finishMatch(this.db, this.matchId, { status: "refused", head: this.entries.at(-1)?.hash ?? null });
       return null;

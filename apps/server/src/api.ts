@@ -5,7 +5,10 @@ import { toUnits } from "@margin/core";
 import { creditsRepo, isGuestKey, topUpDaily } from "./credits";
 import { userForGuestKey, type Db } from "./db";
 import { loadLog } from "./matches";
-import { RateLimiter } from "./rooms/guard";
+import { RateLimiter, rooms } from "./rooms/guard";
+import { drain } from "./rooms/MatchRoom";
+import { ticks } from "./obs";
+import { sharedChain } from "./settlement";
 
 const DAY_MS = 86_400_000;
 /** Each new guestKey makes a user row, so cap credit lookups per IP. */
@@ -106,5 +109,13 @@ export function mountApi(app: Application, db: () => Db): void {
     return r ? void res.json(r) : void res.status(404).json({ error: "unknown match" });
   });
   app.get("/api/leaderboard", (_req, res) => void res.json(leaderboard(db())));
+  // Liveness for deploy.sh and uptime checks: 503 while draining so nothing new is routed here.
+  app.get("/health", (_req, res) => {
+    const c = sharedChain()?.cfg;
+    res.status(drain.on ? 503 : 200).json({
+      ok: !drain.on, draining: drain.on, network: c?.network ?? "off", contract: c?.contractId ?? null,
+      rooms: rooms.live, uptimeS: Math.round(process.uptime()), rssMB: Math.round(process.memoryUsage().rss / 2 ** 20), ticks: ticks.summary(),
+    });
+  });
   app.get("/api/stats", (_req, res) => void res.json(stats(db())));
 }

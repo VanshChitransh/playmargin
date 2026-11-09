@@ -32,6 +32,7 @@ import { admitFree, chargeEntry } from "./freeMatch";
 import { admitPaid, refundTickets, seatedAccounts } from "./paidMatch";
 import { InputQueue } from "./input";
 import { clientIp, joinLimit, rooms } from "./guard";
+import { log, ticks } from "../obs";
 import { MatchRecord } from "./matchRecord";
 import { agentFill, droneFill, parseRoomKey, warmupNext, type RoomKey } from "./lobby";
 import { MatchState, syncState } from "./schema";
@@ -116,7 +117,9 @@ export class MatchRoom extends Room {
       this.owedMs = Math.min(this.owedMs + dtMs, MAX_CATCHUP_TICKS * TICK_MS);
       while (this.owedMs >= TICK_MS) {
         this.owedMs -= TICK_MS;
+        const t0 = performance.now();
         this.tick();
+        ticks.record(performance.now() - t0);
       }
     }, TICK_MS);
     rooms.live++; // last, so a create that throws above never counts (onDispose won't run for it)
@@ -292,7 +295,7 @@ export class MatchRoom extends Room {
     this.log.reserve(preview).then(
       () => (this.opening = "ok"),
       (err: unknown) => {
-        console.error(`[open] ${this.roomId}:`, err);
+        log.error("open_failed", { matchId: this.roomId, err });
         this.opening = "failed";
       },
     );

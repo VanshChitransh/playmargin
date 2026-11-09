@@ -3,7 +3,13 @@
 # DNS first: an A record api.playmargin.fun -> droplet IP (Cloudflare proxy OFF so Caddy can get a cert).
 api.playmargin.fun {
 	encode gzip
-	# Gasless relayer (S4, services/relayer) joins here at S10: handle /relay* { reverse_proxy localhost:3030 }
+	# Relayer (S4, services/relayer): https://api.playmargin.fun/relay/<route> -> localhost:3030/<route>.
+	# Client: VITE_RELAYER_URL=https://api.playmargin.fun/relay. It rate-limits by X-Forwarded-For: set it here.
+	handle_path /relay/* {
+		reverse_proxy localhost:3030 {
+			header_up X-Forwarded-For {remote_host}
+		}
+	}
 	# The server rate-limits joins by X-Real-IP: set it here so a client can't send its own.
 	reverse_proxy localhost:2567 {
 		header_up X-Real-IP {remote_host}

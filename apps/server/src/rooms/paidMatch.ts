@@ -4,6 +4,7 @@
 // Colyseus fixes join options before it picks a room, so the client cannot sign the room id: the
 // message is bound to the mode instead, and a timestamped one-use nonce (60 s) stops replays.
 import { isValidAccountId, verifyNep413Signature } from "near-kit";
+import { log } from "../obs";
 import { sharedChain } from "../settlement";
 import type { Chain } from "../settlement/chain";
 
@@ -76,6 +77,6 @@ export async function refundTickets(accounts: string[]): Promise<void> {
   const chain = sharedChain();
   if (!chain) return;
   for (const account_id of accounts) {
-    await chain.call("refund_ticket", { account_id }).catch((err: unknown) => console.error(`[refund] ${account_id}:`, err));
+    await chain.call("refund_ticket", { account_id }).catch((err: unknown) => log.error("refund_failed", { account: account_id, err }));
   }
 }

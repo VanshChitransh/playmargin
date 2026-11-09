@@ -1,0 +1,25 @@
+# systemd unit for the NEP-366 relayer (services/relayer, S4). Install: sudo cp ops/margin-relayer.service /etc/systemd/system/
+# Stateless: a restart only drops in-flight HTTP requests, so no drain is needed. Caddy serves it at /relay/*.
+[Unit]
+Description=MARGIN relayer (gasless enter_arena, 1-Click quotes, email accounts)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=margin
+Group=margin
+WorkingDirectory=/opt/margin/current/services/relayer
+EnvironmentFile=/etc/margin/relayer.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node --import tsx server.ts
+Restart=always
+RestartSec=2
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
