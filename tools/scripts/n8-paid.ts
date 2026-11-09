@@ -48,7 +48,7 @@ for (const p of PLAYERS) {
 type Settle = { payouts: [string, string][] };
 async function settleEvent(hash: string): Promise<Settle> {
   const body = { jsonrpc: "2.0", id: 1, method: "tx", params: { tx_hash: hash, sender_account_id: settler, wait_until: "FINAL" } };
-  const r = (await (await fetch("https://rpc.testnet.near.org", { method: "POST", body: JSON.stringify(body) })).json()) as {
+  const r = (await (await fetch("https://rpc.testnet.near.org", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })).json()) as {
     result: { receipts_outcome: { outcome: { logs: string[] } }[] };
   };
   const line = r.result.receipts_outcome.flatMap((o) => o.outcome.logs).find((l) => l.includes('"event":"settle"'));
@@ -56,7 +56,18 @@ async function settleEvent(hash: string): Promise<Settle> {
   return (JSON.parse(line.slice("EVENT_JSON:".length)) as { data: Settle[] }).data[0]!;
 }
 
+/** A ticket still bound to a settling match blocks payToPlay: wait for the server's settle. */
+async function ticketsFree(): Promise<void> {
+  for (let i = 0; i < 40; i++) {
+    const ts = await Promise.all(PLAYERS.map((p) => ticketOf(p)));
+    if (ts.every((t) => !t || t.match_id === null)) return;
+    await sleep(5_000);
+  }
+  throw new Error("tickets still in a match after 200 s");
+}
+
 async function oneMatch(run: number): Promise<void> {
+  await ticketsFree();
   const before = await Promise.all(PLAYERS.map((p) => balanceOf(p)));
   const entries = await Promise.all(PLAYERS.map((p) => payToPlay(p)));
   // Two clients, two sockets: what two browsers do.
@@ -78,7 +89,7 @@ async function oneMatch(run: number): Promise<void> {
   let proof: { status?: string; settleTx?: string | null } = {};
   for (let i = 0; i < 48 && !proof.settleTx; i++) {
     await sleep(5_000);
-    proof = (await fetch(`${HTTP}/api/match/${id}/proof`).then((r) => r.json(), () => ({}))) as typeof proof;
+    proof = (await fetch(`${HTTP}/api/matches/${id}/proof`).then((r) => r.json()).catch(() => ({}))) as typeof proof;
   }
   clearInterval(iv);
   rooms.forEach((r) => void r.leave());
@@ -98,18 +109,42 @@ async function oneMatch(run: number): Promise<void> {
 await oneMatch(1);
 await oneMatch(2);
 
+// No survivors (core 8269608): payouts [], the leftover pot rides in interest_to_vault. Real
+// tickets, real settler, shape exactly as core emits it. Vault grows by leftover + fees.
+{
+  await ticketsFree();
+  await Promise.all(PLAYERS.map((p) => payToPlay(p)));
+  const id = `n8-wipe-${Date.now()}`;
+  await near.call(contract, "open_match", { match_id: id, players: PLAYERS }, { signerId: settler, ...fin });
+  type V = { free: string };
+  const v0 = BigInt((await near.view<V>(contract, "vault", {}))!.free);
+  const pot = 2n * stake;
+  const fees = pot / 50n;
+  const res = pot / 50n;
+  const leftover = pot - fees - res;
+  const r = await near.transaction(settler).functionCall(contract, "settle", {
+    match_id: id, payouts: [], lent: "0", vault_repaid: "0", interest_to_vault: String(leftover),
+    fees: String(fees), reserve: String(res), seq: 1, head: "n8-wipe",
+  }, { gas: "100 Tgas" }).send(fin);
+  const v1 = BigInt((await near.view<V>(contract, "vault", {}))!.free);
+  assert.equal(v1, v0 + 3n * stake + leftover + fees, "budget back plus leftover plus fees");
+  console.log(`ALL-POPPED PASS: ${link(r.transaction.hash)} vault +${leftover + fees} (leftover + fees)`);
+}
+
 // Stolen session key: it can buy tickets, never move money out.
 const victim = PLAYERS[0]!;
 const secret = store.get(`margin.session.testnet.${victim}`) as PrivateKey;
 const thief = new Near({ network: "testnet", privateKey: secret, defaultSignerId: victim });
 const bal = await balanceOf(victim);
-const direct = await thief.call(contract, "withdraw", { amount: String(bal) }, { attachedDeposit: "1 yocto" }).then(() => "sent", (e: Error) => e.message);
-const noYocto = await thief.call(contract, "withdraw", { amount: String(bal) }).then(() => "sent", (e: Error) => e.message);
+const why = (e: Error & { data?: unknown }) => JSON.stringify(e.data ?? e.message);
+// Expect InvalidAccessKeyError DepositWithFunctionCall, then MethodNameMismatch (protocol level).
+const direct = await thief.call(contract, "withdraw", { amount: String(bal) }, { attachedDeposit: "1 yocto" }).then(() => "sent", why);
+const noYocto = await thief.call(contract, "withdraw", { amount: String(bal) }).then(() => "sent", why);
 const { payload } = await thief.transaction(victim).functionCall(contract, "withdraw", { amount: String(bal) }, { gas: "30 Tgas" }).delegate({ blockHeightOffset: 100 });
 const relayed = await fetch(`${RELAYER}/relay`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ payload }) });
 assert.notEqual(direct, "sent", "withdraw with 1 yocto refused for a function-call key");
 assert.notEqual(noYocto, "sent", "withdraw without 1 yocto refused");
 assert.equal(relayed.status, 400, "relayer refuses withdraw");
 assert.equal(await balanceOf(victim), bal, "balance untouched");
-console.log(`STOLEN KEY PASS: direct withdraw refused (${direct.slice(0, 80)}), no-deposit refused (${noYocto.slice(0, 60)}), relayer ${relayed.status}`);
+console.log(`STOLEN KEY PASS: withdraw with 1 yocto ${direct}, without ${noYocto}, relayer ${relayed.status}`);
 process.exit(0);
