@@ -297,34 +297,25 @@ export class ArenaRenderer {
     prune(this.blobs, seen);
   }
 
-  /** Thin solid ring = my size after one BOOST tap; dotted ring = after every lit pip. Both
-   *  mold softly on the (invisible) wall like the membrane and fade there, so they never draw a straight wall line. */
+  /** While BOOST is held: one faint dotted outline of my size if I spend the rest of the
+   *  tank, molded on the (invisible) wall like the membrane. Hidden at rest (agar draws no rings). */
   private drawPreview(f: Frame, me: Frame["blobs"][number] | undefined): void {
     this.preview.clear();
-    const p = me && !boostBlocked(me, f.match) ? boostPreview(me) : null;
-    if (!me || !p) return;
-    const ring = (r: number): { pts: number[]; flat: boolean } => {
-      const pts: number[] = [];
-      let flat = false;
-      for (let i = 0; i < PREVIEW_PTS; i++) {
-        const a = (i / PREVIEW_PTS) * Math.PI * 2;
-        const c = Math.cos(a);
-        const s = Math.sin(a);
-        const rr = smoothMin(r, wallDistance(me.x, me.y, c, s, f.arena.w, f.arena.h), r * JUICE.MEMBRANE_WALL_SOFT);
-        flat ||= rr < r - 0.5;
-        pts.push(me.x + c * rr, me.y + s * rr);
-      }
-      return { pts, flat };
-    };
-    const next = ring(p.next);
-    this.preview.poly(next.pts).stroke({ width: 2 / this.zoom, color: C.ink, alpha: 0.4 * (next.flat ? JUICE.PREVIEW_WALL_FADE : 1) });
-    if (p.max - p.next < 1) return;
-    const max = ring(p.max);
+    const p = me && this.held && !boostBlocked(me, f.match) ? boostPreview(me) : null;
+    if (!me || !p || p.max - me.radius < 1) return;
+    const pts: number[] = [];
+    for (let i = 0; i < PREVIEW_PTS; i++) {
+      const a = (i / PREVIEW_PTS) * Math.PI * 2;
+      const c = Math.cos(a);
+      const s = Math.sin(a);
+      const rr = smoothMin(p.max, wallDistance(me.x, me.y, c, s, f.arena.w, f.arena.h), p.max * JUICE.MEMBRANE_WALL_SOFT);
+      pts.push(me.x + c * rr, me.y + s * rr);
+    }
     for (let i = 0; i < PREVIEW_PTS; i += 2) {
       const j = (i + 1) % PREVIEW_PTS;
-      this.preview.moveTo(max.pts[i * 2]!, max.pts[i * 2 + 1]!).lineTo(max.pts[j * 2]!, max.pts[j * 2 + 1]!);
+      this.preview.moveTo(pts[i * 2]!, pts[i * 2 + 1]!).lineTo(pts[j * 2]!, pts[j * 2 + 1]!);
     }
-    this.preview.stroke({ width: 2 / this.zoom, color: C.ink, alpha: 0.25 * (max.flat ? JUICE.PREVIEW_WALL_FADE : 1) });
+    this.preview.stroke({ width: 2 / this.zoom, color: C.ink, alpha: JUICE.PREVIEW_ALPHA });
   }
 
   /** Boost camera: a touch wider and leading the way while boosting, with one small kick on press. */

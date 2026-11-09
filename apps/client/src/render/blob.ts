@@ -26,7 +26,6 @@ export interface Surroundings {
 }
 
 const RING_GAP = 4;
-const RING_W = 4;
 const DASHES = 14;
 
 export class BlobSprite extends Container {
@@ -42,7 +41,7 @@ export class BlobSprite extends Container {
   private mem = new Membrane();
   /** Phase seed for this blob's lumps, from its id. */
   private seed = 0;
-  private ringStyle: { w: number; color: number; dashed: boolean } = { w: RING_W, color: C.ringSafe, dashed: false };
+  private rimStyle: Ring = "green";
   private lastR = -1;
   private dirty = true;
   /** Radius of my equity core inside the debt shell (0 = no loan). */
@@ -64,7 +63,7 @@ export class BlobSprite extends Container {
     this.seed /= 1000;
     this.warnSign = new Text({ text: "⚠", style: { fontSize: 18, fill: C.liq } });
     this.warnSign.anchor.set(0.5);
-    this.addChild(this.shield, this.body, this.ring, this.nameText, this.warnSign);
+    this.addChild(this.shield, this.ring, this.body, this.nameText, this.warnSign);
   }
 
   /** Sync to a view; tS is seconds since start (pulses), zoom keeps text a fixed screen size. */
@@ -141,23 +140,25 @@ export class BlobSprite extends Container {
   /** Body, debt shell, me ring, health ring and shield, all from the one outline. */
   private paint(r: number): void {
     const b = this.body.clear();
-    const rim = Math.max(3, r * 0.06);
+    const outer = this.mem.points();
+    // My blob: a soft drop shadow under the body, nothing concentric (agar draws one fill + rim).
+    if (this.isMe) b.poly(this.mem.points(1, 0).map((v, i) => v + (i % 2 ? r * JUICE.ME_SHADOW_DY : 0))).fill({ color: C.ink, alpha: JUICE.ME_SHADOW_ALPHA });
+    // Health lives in the rim: green = the fill's darker hue, yellow = amber dashes, red = brand red.
+    const rim = Math.max(3, r * JUICE.RIM_FRAC);
+    const st = this.rimStyle;
+    const base = this.core > 0 ? darken(JUICE.SHELL_COLOR) : darken(this.fill);
+    const rimColor = st === "red" ? C.liq : base;
     if (this.core > 0) {
       // Loan as shape: a translucent gold band outside a player-coloured equity core.
-      smooth(b, this.mem.points()).fill({ color: JUICE.SHELL_COLOR, alpha: JUICE.SHELL_ALPHA }).stroke({ width: rim, color: darken(JUICE.SHELL_COLOR) });
-      smooth(b, this.mem.points(this.core / r)).fill(this.fill).stroke({ width: Math.max(2, this.core * 0.05), color: darken(this.fill) });
+      smooth(b, outer).fill({ color: JUICE.SHELL_COLOR, alpha: JUICE.SHELL_ALPHA }).stroke({ width: rim, color: rimColor });
+      smooth(b, this.mem.points(this.core / r)).fill(this.fill).stroke({ width: Math.max(2, this.core * JUICE.RIM_FRAC * 0.7), color: darken(this.fill) });
     } else {
-      smooth(b, this.mem.points()).fill(this.fill).stroke({ width: rim, color: darken(this.fill) });
+      smooth(b, outer).fill(this.fill).stroke({ width: rim, color: rimColor });
     }
-    // My own blob: a thin paper ring just inside the rim, so "me" reads at a glance.
-    if (this.isMe) b.poly(this.mem.points(((this.core || r) * 0.84) / r)).stroke({ width: Math.max(4, r * 0.07), color: 0xffffff, alpha: 0.9 });
-    const ring = this.ring.clear();
-    const pts = this.mem.points(1, RING_GAP);
-    // Ink under every ring (sticker outline): green, amber and red read on any fill and floor.
-    // Rings are plain polygons: the points are a few px apart, and a poly builds far cheaper than curves.
-    ring.poly(pts).stroke({ width: this.ringStyle.w + 3, color: C.ink, alpha: 0.85, join: "round" });
-    if (this.ringStyle.dashed) dashed(ring, pts, this.ringStyle.color);
-    else ring.poly(pts).stroke({ width: this.ringStyle.w, color: this.ringStyle.color, join: "round" });
+    if (st === "yellow") dashed(b, outer, C.ringWarn, rim);
+    // Red: a pulsing liq glow just outside the rim (alpha and scale pulse in update()).
+    const g = this.ring.clear();
+    if (st === "red") g.poly(this.mem.points(1, rim)).stroke({ width: rim * 2.2, color: C.liq, alpha: 0.35, join: "round" });
     this.shield.clear().poly(this.mem.points(1, RING_GAP + 7)).stroke({ width: 2, color: C.navy, alpha: 0.35 });
   }
 
@@ -187,7 +188,7 @@ export class BlobSprite extends Container {
     }
     this.fill = vivid(v.id);
     this.isMe = isMe;
-    this.ringStyle = { w: v.ring === "red" ? RING_W * 2 : RING_W, color: v.ring === "red" ? C.liq : v.ring === "yellow" ? C.ringWarn : C.ringSafe, dashed: v.ring === "yellow" };
+    this.rimStyle = v.ring;
     this.dirty = true;
   }
 }
@@ -213,8 +214,8 @@ function smooth(g: Graphics, p: number[]): Graphics {
   return g.closePath();
 }
 
-/** Yellow ring: DASHES dashes along the outline, each 60% of its slot. */
-function dashed(g: Graphics, p: number[], color: number): void {
+/** Yellow rim: DASHES amber dashes along the outline, each 60% of its slot, over the darker rim. */
+function dashed(g: Graphics, p: number[], color: number, width: number): void {
   const n = p.length / 2;
   for (let d = 0; d < DASHES; d++) {
     const i0 = Math.round((d * n) / DASHES);
@@ -222,7 +223,7 @@ function dashed(g: Graphics, p: number[], color: number): void {
     g.moveTo(p[(i0 % n) * 2]!, p[(i0 % n) * 2 + 1]!);
     for (let i = i0 + 1; i <= i1; i++) g.lineTo(p[(i % n) * 2]!, p[(i % n) * 2 + 1]!);
   }
-  g.stroke({ width: RING_W, color, cap: "round" });
+  g.stroke({ width, color, cap: "round" });
 }
 
 function hex(r: number): number[] {

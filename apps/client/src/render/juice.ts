@@ -133,16 +133,20 @@ export const JUICE = {
   /** A sudden size jump (an eat, a hit) kicks the rim outward this much per world unit of change. */
   MEMBRANE_KICK: 6,
   /** Living outline (agar): smooth irregular lumps as a share of the radius, at rest and at full speed. */
-  MEMBRANE_NOISE_REST: 0.025,
-  MEMBRANE_NOISE_MOVE: 0.045,
+  MEMBRANE_NOISE_REST: 0.035,
+  MEMBRANE_NOISE_MOVE: 0.06,
   /** Smoothed speed (world units per frame) that counts as full speed for the noise. */
   MEMBRANE_NOISE_SPEED: 6,
   /** Wall molding: the clamp blends in over this share of the radius, so corners round off. */
   MEMBRANE_WALL_SOFT: 0.25,
   /** A pellet across the rim dents it in by up to this share of the radius. */
   MEMBRANE_PELLET_DENT: 0.04,
+  /** One rim (agar): its width as a share of the radius. It carries the health state. */
+  RIM_FRAC: 0.075,
+  /** My blob reads by a soft drop shadow (offset as a share of r, ink alpha), never a ring. */
+  ME_SHADOW_DY: 0.07,
+  ME_SHADOW_ALPHA: 0.18,
 
-  // Arena wall
-  /** BOOST preview rings fade to this share of their alpha while they touch the wall. */
-  PREVIEW_WALL_FADE: 0.5,
+  /** The dotted max-size outline shown only while BOOST is held. */
+  PREVIEW_ALPHA: 0.25,
 } as const;
