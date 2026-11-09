@@ -14,7 +14,7 @@ import { NitroFeel } from "./nitro";
 import type { Shot } from "./director";
 import { reducedMotion } from "./motion";
 import { JUICE } from "./juice";
-import { wallDistance } from "./membrane";
+import { smoothMin, wallDistance } from "./membrane";
 
 /** ~35 grid cells across the screen at start size (agar.io measured). */
 const CELL = 60;
@@ -22,6 +22,8 @@ const CELL = 60;
 const WARN_REACH = 500;
 /** World units across the LONG screen side at start size: a start blob is ~5.5% of it (agar.io). */
 const VIEW_AT_START = 2100;
+/** Grid drawn this far past the arena so the camera never shows a void. */
+const BEYOND = 3000;
 /** Points on the BOOST preview rings; even, so the dotted ring alternates dash and gap. */
 const PREVIEW_PTS = 64;
 
@@ -68,7 +70,6 @@ export class ArenaRenderer {
   private last: { x: number; y: number; h: number } | null = null;
   private view = VIEW_AT_START;
   private lastBlobT = 0;
-  private arena = { w: 0, h: 0 };
   private lastRadius = new Map<string, number>();
 
   async mount(root: HTMLElement, source: FrameSource, opts: { fps?: boolean; fit?: HTMLElement; view?: number } = {}): Promise<void> {
@@ -80,7 +81,7 @@ export class ArenaRenderer {
     ]);
     await this.app.init({
       resizeTo: opts.fit ?? window,
-      background: C.outside,
+      background: C.floor,
       antialias: true,
       autoDensity: true,
       resolution: Math.min(window.devicePixelRatio || 1, 2),
@@ -157,12 +158,11 @@ export class ArenaRenderer {
   }
 
   private draw(f: Frame, tS: number): void {
-    this.arena = f.arena;
     const meView = f.blobs.find((b) => b.id === f.me);
-    // The grid is the playable floor only; past the wall is the flat slate background.
-    this.grid.position.set(0, 0);
-    this.grid.width = f.arena.w;
-    this.grid.height = f.arena.h;
+    // agar: the wall is invisible, the same grid runs on past it; the only cue is no food out there.
+    this.grid.position.set(-BEYOND, -BEYOND);
+    this.grid.width = f.arena.w + BEYOND * 2;
+    this.grid.height = f.arena.h + BEYOND * 2;
     this.drawZone(f);
     this.syncFood(f);
     this.syncSpikes(f, meView, tS);
@@ -194,7 +194,7 @@ export class ArenaRenderer {
     if (f.match.phase !== "LIVE") this.zoneMaxR = 0;
     else this.zoneMaxR = Math.max(this.zoneMaxR, z.r);
     const shrinking = f.match.phase === "LIVE" && z.r < this.zoneMaxR - 1 && z.r < Math.hypot(f.arena.w, f.arena.h);
-    const key = `${z.cx | 0},${z.cy | 0},${z.r | 0},${shrinking},${f.arena.w},${f.arena.h},${this.zoom.toFixed(2)}`;
+    const key = `${z.cx | 0},${z.cy | 0},${z.r | 0},${shrinking},${f.arena.w},${f.arena.h}`;
     if (key === this.zoneKey) return;
     this.zoneKey = key;
     this.zone.clear();
@@ -208,15 +208,6 @@ export class ArenaRenderer {
         .circle(z.cx, z.cy, z.r)
         .stroke({ width: 4, color: C.liq, alpha: 0.7 });
     }
-    // The wall: a soft inner rim (a few fading strokes on the arena side), then a solid dark line.
-    const px = 1 / this.zoom;
-    for (let i = 0; i < JUICE.WALL_RIM_STEPS; i++) {
-      const inset = (JUICE.WALL_LINE_PX / 2 + (i + 0.5) * (JUICE.WALL_RIM_PX / JUICE.WALL_RIM_STEPS)) * px;
-      this.zone
-        .rect(inset, inset, f.arena.w - inset * 2, f.arena.h - inset * 2)
-        .stroke({ width: (JUICE.WALL_RIM_PX / JUICE.WALL_RIM_STEPS) * px, color: C.wall, alpha: JUICE.WALL_RIM_ALPHA * (1 - i / JUICE.WALL_RIM_STEPS) });
-    }
-    this.zone.rect(0, 0, f.arena.w, f.arena.h).stroke({ width: JUICE.WALL_LINE_PX * px, color: C.wall });
   }
 
   private syncFood(f: Frame): void {
@@ -291,7 +282,14 @@ export class ArenaRenderer {
       // agar: cells overlap and the bigger one draws on top (me wins a tie), so only the
       // smaller blob dents, along the edge of the one above it.
       const over = solid.filter((o) => o.id !== v.id && above(o, v, f.me) && Math.hypot(o.x - v.x, o.y - v.y) < o.radius + v.radius);
-      s.update(v, tS, isMe, this.zoom, !isMe && !live, boosting, { w: f.arena.w, h: f.arena.h, over: over.map((o) => ({ x: o.x, y: o.y, r: o.radius })), dt });
+      // Pellets sitting across the rim dent it (agar); a cheap box test before the exact one.
+      const food = v.kind === "drone" ? [] : f.food.filter((p) => Math.abs(p.x - v.x) < v.radius + p.r && Math.abs(p.y - v.y) < v.radius + p.r && Math.abs(Math.hypot(p.x - v.x, p.y - v.y) - v.radius) < p.r);
+      // On screen, using last frame's camera (a frame late at worst; the margin covers it).
+      const sx = this.world.position.x + v.x * this.zoom;
+      const sy = this.world.position.y + v.y * this.zoom;
+      const sr = (v.radius + 40) * this.zoom;
+      const visible = sx > -sr && sy > -sr && sx < this.app.screen.width + sr && sy < this.app.screen.height + sr;
+      s.update(v, tS, isMe, this.zoom, !isMe && !live, boosting, { w: f.arena.w, h: f.arena.h, over: over.map((o) => ({ x: o.x, y: o.y, r: o.radius })), food, dt, visible });
       s.zIndex = v.radius + (isMe ? 0.5 : 0);
       this.lastRadius.set(v.id, v.radius);
     }
@@ -300,7 +298,7 @@ export class ArenaRenderer {
   }
 
   /** Thin solid ring = my size after one BOOST tap; dotted ring = after every lit pip. Both
-   *  flatten on the wall like the membrane, and fade while pressed there, so a squish stays a squish. */
+   *  mold softly on the (invisible) wall like the membrane and fade there, so they never draw a straight wall line. */
   private drawPreview(f: Frame, me: Frame["blobs"][number] | undefined): void {
     this.preview.clear();
     const p = me && !boostBlocked(me, f.match) ? boostPreview(me) : null;
@@ -312,8 +310,8 @@ export class ArenaRenderer {
         const a = (i / PREVIEW_PTS) * Math.PI * 2;
         const c = Math.cos(a);
         const s = Math.sin(a);
-        const rr = Math.min(r, wallDistance(me.x, me.y, c, s, f.arena.w, f.arena.h));
-        flat ||= rr < r;
+        const rr = smoothMin(r, wallDistance(me.x, me.y, c, s, f.arena.w, f.arena.h), r * JUICE.MEMBRANE_WALL_SOFT);
+        flat ||= rr < r - 0.5;
         pts.push(me.x + c * rr, me.y + s * rr);
       }
       return { pts, flat };
@@ -357,20 +355,11 @@ export class ArenaRenderer {
     const target = base * size * (1 - JUICE.BOOST_ZOOM_OUT * this.bz);
     this.zoom += (target - this.zoom) * (1 - Math.exp(-dt / JUICE.ZOOM_TAU_S));
     this.world.scale.set(this.zoom);
-    // Camera centre in world units, then clamped so at most CAM_MAX_OUTSIDE of the view is
-    // past the wall: near a wall the player drifts off-centre instead (agar).
-    const cx = clampCam(x + (this.lead.x + this.kick.x) / this.zoom, width / 2 / this.zoom, this.arena.w);
-    const cy = clampCam(y + (this.lead.y + this.kick.y) / this.zoom, height / 2 / this.zoom, this.arena.h);
-    this.world.position.set(width / 2 - cx * this.zoom, height / 2 - cy * this.zoom);
+    // agar: the camera stays centred on the player, even at the wall.
+    const ox = this.lead.x + this.kick.x;
+    const oy = this.lead.y + this.kick.y;
+    this.world.position.set(width / 2 - ox - x * this.zoom, height / 2 - oy - y * this.zoom);
   }
-}
-
-/** Clamp a camera centre on one axis: half view hw, arena size size (world units). */
-function clampCam(c: number, hw: number, size: number): number {
-  if (!(size > 0)) return c;
-  const lo = hw * (1 - 2 * JUICE.CAM_MAX_OUTSIDE);
-  const hi = size - lo;
-  return lo > hi ? size / 2 : Math.max(lo, Math.min(hi, c));
 }
 
 /** Is blob a drawn on top of blob b? Bigger on top; my blob wins a tie. */

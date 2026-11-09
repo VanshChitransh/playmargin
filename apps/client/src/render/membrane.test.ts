@@ -1,7 +1,7 @@
 // The soft body flattens on the wall, dents only under a partly overlapping bigger blob,
 // and its springs settle on the target.
 import { describe, expect, it } from "vitest";
-import { Membrane, dentStrength, pointCount, rayEnter, wallDistance } from "./membrane";
+import { Membrane, dentStrength, pointCount, rayEnter, smoothMin, wallDistance } from "./membrane";
 
 const circle = (r: number) => (): number => r;
 // r 49 gives an even point count, so index n/2 points exactly left (angle pi).
@@ -53,5 +53,19 @@ describe("membrane", () => {
     m.target(500, 500, 40, circle(40), 1000, 1000, []);
     m.step(1 / 60, false);
     expect(m.rad[0]).toBeCloseTo(40);
+  });
+
+  it("soft min never exceeds the hard min and rounds the corner where they meet", () => {
+    expect(smoothMin(10, 50, 5)).toBe(10);
+    expect(smoothMin(40, 40, 10)).toBeLessThan(40);
+    for (const [a, b] of [[30, 33], [33, 30], [20, 20]] as const) expect(smoothMin(a, b, 10)).toBeLessThanOrEqual(Math.min(a, b));
+  });
+
+  it("a pellet across the rim dents it locally, the far side stays round", () => {
+    const m = new Membrane();
+    m.target(500, 500, 49, circle(49), 1000, 1000, [], [{ x: 549, y: 500, r: 10 }]);
+    m.settleIfNew();
+    expect(m.rad[0]).toBeCloseTo(49 * (1 - 0.04));
+    expect(left(m)).toBeCloseTo(49);
   });
 });

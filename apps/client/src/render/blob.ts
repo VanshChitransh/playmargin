@@ -18,6 +18,10 @@ export interface Surroundings {
   h: number;
   /** Blobs drawn on top of this one that may overlap it. */
   over: readonly Neighbour[];
+  /** Pellets near my rim (each dents it a little while it overlaps). */
+  food?: readonly Neighbour[];
+  /** False when the blob is off screen: geometry is not rebuilt. */
+  visible?: boolean;
   dt: number;
 }
 
@@ -36,6 +40,8 @@ export class BlobSprite extends Container {
   private fill = 0;
   private isMe = false;
   private mem = new Membrane();
+  /** Phase seed for this blob's lumps, from its id. */
+  private seed = 0;
   private ringStyle: { w: number; color: number; dashed: boolean } = { w: RING_W, color: C.ringSafe, dashed: false };
   private lastR = -1;
   private dirty = true;
@@ -54,6 +60,8 @@ export class BlobSprite extends Container {
       style: { fontFamily: ["Rubik", "system-ui", "sans-serif"], fontSize: 28, fontWeight: "700", fill: 0xffffff, stroke: { color: C.ink, width: 5, join: "round" } },
     });
     this.nameText.anchor.set(0.5);
+    for (let i = 0; i < v.id.length; i++) this.seed = (this.seed * 31 + v.id.charCodeAt(i)) % 6283;
+    this.seed /= 1000;
     this.warnSign = new Text({ text: "⚠", style: { fontSize: 18, fill: C.liq } });
     this.warnSign.anchor.set(0.5);
     this.addChild(this.shield, this.body, this.ring, this.nameText, this.warnSign);
@@ -102,25 +110,29 @@ export class BlobSprite extends Container {
   /** Shape the soft outline for this frame and redraw it when it moved. */
   private membrane(v: BlobView, tS: number, around?: Surroundings): void {
     const r = v.radius;
-    const amp = reducedMotion ? 0 : wobble(r, this.prev.speed);
+    const k = Math.min(1, this.prev.speed / JUICE.MEMBRANE_NOISE_SPEED);
+    const amp = reducedMotion ? 0 : r * (JUICE.MEMBRANE_NOISE_REST + (JUICE.MEMBRANE_NOISE_MOVE - JUICE.MEMBRANE_NOISE_REST) * k);
+    const seed = this.seed;
     const sq = performance.now() < this.squashUntil ? 1 - this.squashAmount : 1;
     const sx = 1 + this.stretch;
     const sy = 1 - this.stretch / 2;
     const h = this.heading;
-    // Free shape: stretched along the heading (BOOST), squashed (REPAY, pickups), rippling.
+    // Free shape: stretched along the heading (BOOST), squashed (REPAY, pickups), and alive:
+    // agar cells are never perfect circles, lumps drift all the time, more while moving.
     const shape = (a: number): number => {
       const c = Math.cos(a - h) / sx;
       const s = Math.sin(a - h) / sy;
-      return (r * sq) / Math.sqrt(c * c + s * s) + amp * Math.sin(a * 5 + tS * 6) * Math.sin(a * 3 - tS * 4);
+      return (r * sq) / Math.sqrt(c * c + s * s) + amp * lumps(a, tS, seed);
     };
-    // The health ring sits outside the body: keep the body back so the ring, not the body, meets the wall.
-    this.mem.target(v.x, v.y, r, shape, around?.w ?? Infinity, around?.h ?? Infinity, around?.over ?? [], RING_GAP + RING_W);
+    this.mem.target(v.x, v.y, r, shape, around?.w ?? Infinity, around?.h ?? Infinity, around?.over ?? [], around?.food ?? []);
     this.mem.settleIfNew();
     if (this.lastR > 0 && !reducedMotion && Math.abs(r - this.lastR) > 1) this.mem.kick((r - this.lastR) * JUICE.MEMBRANE_KICK);
     this.lastR = r;
     // Ask before stepping: a reduced-motion snap lands on the target in one step and would hide the change.
     const moving = this.mem.moving();
     this.mem.step(around?.dt ?? 1 / 60, !reducedMotion);
+    // Off screen: keep the springs running but skip building geometry nobody sees.
+    if (around?.visible === false) return void (this.dirty = true);
     if (!this.dirty && !moving) return;
     this.dirty = false;
     this.paint(r);
@@ -138,14 +150,15 @@ export class BlobSprite extends Container {
       smooth(b, this.mem.points()).fill(this.fill).stroke({ width: rim, color: darken(this.fill) });
     }
     // My own blob: a thin paper ring just inside the rim, so "me" reads at a glance.
-    if (this.isMe) smooth(b, this.mem.points(((this.core || r) * 0.84) / r)).stroke({ width: Math.max(4, r * 0.07), color: 0xffffff, alpha: 0.9 });
+    if (this.isMe) b.poly(this.mem.points(((this.core || r) * 0.84) / r)).stroke({ width: Math.max(4, r * 0.07), color: 0xffffff, alpha: 0.9 });
     const ring = this.ring.clear();
     const pts = this.mem.points(1, RING_GAP);
     // Ink under every ring (sticker outline): green, amber and red read on any fill and floor.
-    smooth(ring, pts).stroke({ width: this.ringStyle.w + 3, color: C.ink, alpha: 0.85 });
+    // Rings are plain polygons: the points are a few px apart, and a poly builds far cheaper than curves.
+    ring.poly(pts).stroke({ width: this.ringStyle.w + 3, color: C.ink, alpha: 0.85, join: "round" });
     if (this.ringStyle.dashed) dashed(ring, pts, this.ringStyle.color);
-    else smooth(ring, pts).stroke({ width: this.ringStyle.w, color: this.ringStyle.color });
-    smooth(this.shield.clear(), this.mem.points(1, RING_GAP + 7)).stroke({ width: 2, color: C.navy, alpha: 0.35 });
+    else ring.poly(pts).stroke({ width: this.ringStyle.w, color: this.ringStyle.color, join: "round" });
+    this.shield.clear().poly(this.mem.points(1, RING_GAP + 7)).stroke({ width: 2, color: C.navy, alpha: 0.35 });
   }
 
   /** REPAY landed: compress then spring back (presentation only). */
@@ -179,9 +192,15 @@ export class BlobSprite extends Container {
   }
 }
 
-/** Wobble amplitude in world units grows with speed, so a blob at rest is a clean circle. */
-function wobble(r: number, speed: number): number {
-  return Math.min(r * JUICE.MEMBRANE_RIPPLE, speed * 0.25);
+/** Smooth irregular lumps in [-1, 1]: four angular frequencies drifting at their own speeds,
+ *  phases from the blob's id, so no two blobs wobble alike. */
+function lumps(a: number, t: number, seed: number): number {
+  return (
+    0.45 * Math.sin(3 * a + seed + 1.3 * t) +
+    0.3 * Math.sin(5 * a + seed * 1.7 - 1.9 * t) +
+    0.17 * Math.sin(7 * a + seed * 2.3 + 2.6 * t) +
+    0.08 * Math.sin(11 * a + seed * 3.1 - 3.4 * t)
+  );
 }
 
 /** Closed smooth curve through the outline points: quadratic segments between midpoints. */

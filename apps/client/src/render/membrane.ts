@@ -1,5 +1,5 @@
 // agar-style soft body: the outline is N points around the centre, each a radius on a spring.
-// Targets flatten against the arena wall. A blob partly under a bigger one dents along the
+// Targets mold softly against the invisible arena wall (flat side, rounded corners). A blob partly under a bigger one dents along the
 // bigger one's edge (agar: cells overlap, the bigger draws on top), fading out past half
 // overlap so a covered blob never looks broken. Visual only: the rules still see circles. Springs plus neighbour averaging give the jelly
 // wobble. Pure maths, no Pixi, so it is unit tested and cheap.
@@ -22,6 +22,13 @@ export function wallDistance(cx: number, cy: number, c: number, s: number, w: nu
   const tx = c > 1e-6 ? (w - cx) / c : c < -1e-6 ? -cx / c : Infinity;
   const ty = s > 1e-6 ? (h - cy) / s : s < -1e-6 ? -cy / s : Infinity;
   return Math.max(0, Math.min(tx, ty));
+}
+
+/** Smooth minimum (polynomial): equals min(a, b) when they differ by more than k, never above it. */
+export function smoothMin(a: number, b: number, k: number): number {
+  if (k <= 0) return Math.min(a, b);
+  const h = Math.max(0, Math.min(1, 0.5 + (0.5 * (b - a)) / k));
+  return b + (a - b) * h - k * h * (1 - h);
 }
 
 /** Distance along unit ray (c, s) from my centre to where it enters circle o, or Infinity. */
@@ -53,9 +60,9 @@ export class Membrane {
   private cos = new Float32Array(0);
   private sin = new Float32Array(0);
 
-  /** Recompute targets. shape(a) is the free outline radius at angle a (stretch, squash, ripple).
-   *  pad keeps the outline that far inside the wall (room for a ring drawn outside it). */
-  target(cx: number, cy: number, r: number, shape: (a: number) => number, w: number, h: number, others: readonly Neighbour[], pad = 0): void {
+  /** Recompute targets. shape(a) is the free outline radius at angle a (stretch, squash, living
+   *  noise); food lists pellets that may touch the rim (each leaves a small local dent). */
+  target(cx: number, cy: number, r: number, shape: (a: number) => number, w: number, h: number, others: readonly Neighbour[], food: readonly Neighbour[] = []): void {
     this.resize(pointCount(r));
     const floor = r * JUICE.MEMBRANE_MIN;
     const dents: Array<{ o: Neighbour; k: number }> = [];
@@ -63,14 +70,28 @@ export class Membrane {
       const k = dentStrength(Math.hypot(o.x - cx, o.y - cy), r, o.r);
       if (k > 0) dents.push({ o, k });
     }
+    const soft = r * JUICE.MEMBRANE_WALL_SOFT;
+    // A pellet sitting across my rim pushes a small dent in, centred on it, about as wide as it.
+    const pellets: Array<{ a: number; depth: number; width: number }> = [];
+    for (const p of food) {
+      const d = Math.hypot(p.x - cx, p.y - cy);
+      if (Math.abs(d - r) >= p.r) continue;
+      pellets.push({ a: Math.atan2(p.y - cy, p.x - cx), depth: r * JUICE.MEMBRANE_PELLET_DENT * (1 - Math.abs(d - r) / p.r), width: Math.max(0.05, p.r / r) });
+    }
     for (let i = 0; i < this.n; i++) {
       const c = this.cos[i]!;
       const s = this.sin[i]!;
-      const wall = wallDistance(cx - pad, cy - pad, c, s, w - pad * 2, h - pad * 2);
-      let t = Math.min(shape((i / this.n) * Math.PI * 2), wall);
+      const a = (i / this.n) * Math.PI * 2;
+      const wall = wallDistance(cx, cy, c, s, w, h);
+      // Soft min: the side facing the wall flattens and the corners round off over soft units.
+      let t = smoothMin(shape(a), wall, soft);
       for (const { o, k } of dents) {
         const e = rayEnter(cx, cy, c, s, o);
         if (e < t) t -= (t - e) * k * JUICE.MEMBRANE_DENT_DEPTH;
+      }
+      for (const p of pellets) {
+        const da = Math.atan2(Math.sin(a - p.a), Math.cos(a - p.a));
+        t -= p.depth * Math.exp(-(da * da) / (2 * p.width * p.width));
       }
       // The floor keeps a dent from crushing the blob; the wall always wins over it.
       this.wall[i] = Math.max(JUICE.MEMBRANE_WALL_MIN, wall);

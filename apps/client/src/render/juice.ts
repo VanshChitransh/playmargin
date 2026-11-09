@@ -132,17 +132,17 @@ export const JUICE = {
   MEMBRANE_DENT_DEPTH: 0.6,
   /** A sudden size jump (an eat, a hit) kicks the rim outward this much per world unit of change. */
   MEMBRANE_KICK: 6,
-  /** Moving ripple: largest bump as a share of the radius (grows with speed up to this). */
-  MEMBRANE_RIPPLE: 0.016,
+  /** Living outline (agar): smooth irregular lumps as a share of the radius, at rest and at full speed. */
+  MEMBRANE_NOISE_REST: 0.025,
+  MEMBRANE_NOISE_MOVE: 0.045,
+  /** Smoothed speed (world units per frame) that counts as full speed for the noise. */
+  MEMBRANE_NOISE_SPEED: 6,
+  /** Wall molding: the clamp blends in over this share of the radius, so corners round off. */
+  MEMBRANE_WALL_SOFT: 0.25,
+  /** A pellet across the rim dents it in by up to this share of the radius. */
+  MEMBRANE_PELLET_DENT: 0.04,
 
   // Arena wall
-  /** The wall line in screen px, and the soft rim on the arena side (width, steps, start alpha). */
-  WALL_LINE_PX: 4,
-  WALL_RIM_PX: 14,
-  WALL_RIM_STEPS: 5,
-  WALL_RIM_ALPHA: 0.16,
-  /** Camera: at most this share of the view may show past the wall on each axis. */
-  CAM_MAX_OUTSIDE: 0.25,
   /** BOOST preview rings fade to this share of their alpha while they touch the wall. */
   PREVIEW_WALL_FADE: 0.5,
 } as const;
