@@ -95,8 +95,11 @@ export class BlobSprite extends Container {
     this.fill = vivid(v.id);
     this.membrane(r, 0, true);
     const rr = r + RING_GAP;
-    if (v.ring === "yellow") dashed(this.ring, rr, C.warn);
-    else this.ring.circle(0, 0, rr).stroke({ width: v.ring === "red" ? RING_W + 2 : RING_W, color: v.ring === "red" ? C.liq : C.safe });
+    // Ink under every ring (sticker outline): green, amber and red read on any fill and floor.
+    const w = v.ring === "red" ? RING_W + 2 : RING_W;
+    this.ring.circle(0, 0, rr).stroke({ width: w + 3, color: C.ink, alpha: 0.85 });
+    if (v.ring === "yellow") dashed(this.ring, rr, C.ringWarn);
+    else this.ring.circle(0, 0, rr).stroke({ width: w, color: v.ring === "red" ? C.liq : C.ringSafe });
     this.shield.circle(0, 0, rr + 7).stroke({ width: 2, color: C.navy, alpha: 0.35 });
   }
 }

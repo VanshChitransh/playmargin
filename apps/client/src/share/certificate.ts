@@ -10,7 +10,7 @@ export interface CertData extends Death {
   matchId: string;
 }
 
-const C = { ink: "#070A12", paper: "#EEF2FF", liq: "#FF3D5A", gold: "#F5B83D", agent: "#3BE3FF", muted: "#8391B3" };
+const C = { ink: "#070A12", paper: "#EEF2FF", liq: "#E5484D", gold: "#F5B83D", agent: "#3BE3FF", muted: "#8391B3" };
 const W = 1080;
 const H = 1350;
 

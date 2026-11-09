@@ -15,7 +15,7 @@ export default defineConfig({
         name: "MARGIN",
         short_name: "MARGIN",
         description: "Get greedy. Get liquidated. A 90-second arena where BOOST is a loan.",
-        theme_color: "#FF3D5A",
+        theme_color: "#E5484D",
         background_color: "#070A12",
         display: "fullscreen",
         orientation: "any",

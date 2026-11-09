@@ -14,7 +14,7 @@
   --color-base-200: #0d1424;
   --color-base-300: #1a2742;
   --color-base-content: #eef2ff;
-  --color-primary: #ff3d5a;
+  --color-primary: #e5484d;
   --color-primary-content: #070a12;
   --color-secondary: #3be3ff;
   --color-secondary-content: #070a12;
@@ -28,7 +28,7 @@
   --color-success-content: #070a12;
   --color-warning: #ffd84d;
   --color-warning-content: #070a12;
-  --color-error: #ff3d5a;
+  --color-error: #e5484d;
   --color-error-content: #070a12;
   --radius-selector: 1rem;
   --radius-field: 0.75rem;
@@ -48,7 +48,7 @@
   --color-muted: #8391b3;
   --color-safe: #2ef29a;
   --color-warn: #ffd84d;
-  --color-liq: #ff3d5a;
+  --color-liq: #e5484d;
   --color-gold: #f5b83d;
   --color-agent: #3be3ff;
   --font-display: "Lilita One", system-ui, sans-serif;

@@ -5,7 +5,7 @@
 import { Application, Container, Graphics, Sprite, Text, Texture, TilingSprite } from "pixi.js";
 import type { Frame } from "../game/frame";
 import { BlobSprite } from "./blob";
-import { C, vivid } from "./colors";
+import { C, pellet } from "./colors";
 import { spikeWouldRedden } from "./danger";
 import { SpikeSprite, bakeSpikeTextures } from "./spike";
 import { boostBlocked, boostPreview } from "../hud/logic";
@@ -189,7 +189,7 @@ export class ArenaRenderer {
       if (!s) {
         s = new Sprite(this.dot);
         s.anchor.set(0.5);
-        s.tint = vivid(fd.id);
+        s.tint = pellet(fd.id);
         this.foods.set(fd.id, s);
         this.foodLayer.addChild(s);
       }

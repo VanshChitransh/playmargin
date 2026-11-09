@@ -7,11 +7,11 @@ import type { ControlsEls } from "../input/controls";
 import { boostBlocked, cashoutOpen, displayName, elapsedS, interestPerS, phaseName, fuelGradient, fuelOf, ranking } from "./logic";
 import "./hud.css";
 import { isMuted, play as sfx, setMuted } from "../audio";
-import { coachMarks } from "./coach";
+import { coachMarks, type Coach } from "./coach";
 
 const LB_MS = 1000 / R.LEADERBOARD_HZ;
 const ROW_PX = 22;
-const C = { gold: "#F5B83D", liq: "#FF3D5A", dim: "#1A2742", paper: "#EEF2FF" };
+const C = { gold: "#F5B83D", liq: "#E5484D", dim: "#1A2742", paper: "#EEF2FF" };
 
 
 export class Hud {
@@ -23,7 +23,7 @@ export class Hud {
   private pipRing: HTMLElement;
   private lastBeat = 0;
 
-  private closeCoach: () => void;
+  private coach: Coach;
   private touch = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
   held = false;
 
@@ -39,7 +39,7 @@ export class Hud {
         <div data-h=banner class="mt-3 px-3 text-center font-display text-3xl tracking-wide max-sm:mt-40 max-sm:text-2xl"></div>
       </div>
       <div class="absolute right-0 top-0 p-3 pr-[max(12px,env(safe-area-inset-right))] pt-[max(12px,env(safe-area-inset-top))]">
-        <ol data-h=lb class="relative w-36 rounded-box bg-navy/70 p-2 text-xs sm:w-44 sm:text-sm" style="height:${R.LEADERBOARD_TOP * ROW_PX + 16}px"></ol>
+        <ol data-h=lb class="relative w-36 rounded-box bg-navy/70 p-2 text-xs transition-[height] duration-300 sm:w-44 sm:text-sm" style="height:${ROW_PX + 16}px"></ol>
         <div data-h=myrank class="mt-1 hidden w-36 rounded-box bg-navy/70 px-2 py-1 text-xs sm:w-44 sm:text-sm"></div>
       </div>
       <div data-h=center class="absolute inset-x-0 top-[14%] grid place-items-center text-center"></div>
@@ -63,13 +63,13 @@ export class Hud {
     this.pipRing.className = "pip-ring";
     els.boost.classList.add("relative");
     els.boost.appendChild(this.pipRing);
-    this.closeCoach = opts.coach === false ? () => {} : coachMarks(root, this.touch);
+    this.coach = opts.coach === false ? { update: () => {}, close: () => {} } : coachMarks(root, this.touch);
   }
 
   destroy(): void {
     this.el.remove();
     this.pipRing.remove();
-    this.closeCoach();
+    this.coach.close();
   }
 
   update(f: Frame, now: number): void {
@@ -81,6 +81,7 @@ export class Hud {
       this.lbAt = now;
       this.leaderboard(f);
     }
+    this.coach.update(m.phase, elapsedS(m), (me?.owe ?? 0) > 0);
     if (!me) return;
     this.fuel(me, boostBlocked(me, m));
     const ring = me.state === "alive" && m.phase === "LIVE" ? me.ring : "green";
@@ -158,9 +159,6 @@ export class Hud {
         this.flash(c, String(m.timeLeftS), "punch", C.paper, "outlined font-display text-9xl tabular-nums");
         sfx("tick");
       });
-    } else if (m.phase === "LIVE" && elapsedS(m) > 20) {
-      this.closeCoach();
-      this.set("center", "", () => (c.innerHTML = ""));
     } else if (m.phase === "LIVE" && elapsedS(m) < 1) {
       this.set("center", "GO", () => {
         this.flash(c, "GO!", "punch", C.gold, "outlined font-display text-8xl");
@@ -203,6 +201,7 @@ export class Hud {
       }
     });
     lb.querySelectorAll<HTMLElement>("li").forEach((li) => keep.has(li.dataset.id!) || li.remove());
+    lb.style.height = `${Math.max(1, top.length) * ROW_PX + 16}px`; // sized to its rows, no empty box
     const myRank = ranked.findIndex((b) => b.id === f.me);
     const mine = this.q("myrank");
     const show = myRank >= R.LEADERBOARD_TOP;
