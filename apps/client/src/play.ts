@@ -8,6 +8,7 @@ import { Receipt } from "./game/receipt";
 import { Hud } from "./hud/hud";
 import { elapsedS } from "./hud/logic";
 import { shareCertificate } from "./share/certificate";
+import { shareRoom } from "./net/room-code";
 import { Controls } from "./input/controls";
 import { MatchConnection, guestKey } from "./net/client";
 import { ArenaRenderer } from "./render/arena";
@@ -168,6 +169,7 @@ export const play: Screen = (root, params) => {
     if (left) return s.leave?.();
     src = s;
     status.textContent = s instanceof LocalMatch ? "Offline practice: real rules, local bots" : "";
+    if (params.code && !(s instanceof LocalMatch)) roomChip(root, params.code);
     receipt = new Receipt(s.me);
     s.onCommander = (r) => hud.commander(r);
     s.onAborted = (reason) => {
@@ -201,3 +203,15 @@ export const play: Screen = (root, params) => {
     if (mounted) arena.destroy();
   };
 };
+
+/** Private room: the code stays on screen with one tap to send the link to a friend. */
+function roomChip(root: HTMLElement, code: string): void {
+  const b = document.createElement("button");
+  b.className = "sticker sticker-press fixed bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-box bg-paper px-4 py-2 font-display text-lg text-ink";
+  const label = (t: string): void => void (b.innerHTML = `Room <span class="num">${code}</span> · ${t}`);
+  label("Invite a friend");
+  b.addEventListener("click", () =>
+    void shareRoom(code).then((r) => label(r === "copied" ? "Link copied" : r === "shared" ? "Sent" : "Copy failed")),
+  );
+  root.appendChild(b);
+}
