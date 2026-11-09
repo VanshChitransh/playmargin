@@ -45,7 +45,7 @@ agar.io where the mass is money. You start a 90 second match with 80 mass bought
 |---|---|---|
 | **Hold BOOST** to grow fast and move 1.5x | Borrow from the room's vault, 1x your equity per second, up to 2.5x leverage, 1% fee | `packages/core/src/economy.ts` (`boostHold`, `flushBoost`) |
 | Watch your **health ring** go green, yellow, red | Health factor = mass x 0.8 / debt. Interest drains mass every second | `economy.ts` (`hfBps`, `ring`, `accrueInterest`) |
-| **Tap REPAY** (15% of debt per tap) | Deleverage. In red, REPAY is the only way out | `economy.ts` (`repayTap`) |
+| **Hold REPAY** (15% of debt every 0.4 s held, a tap pays one chunk) | Deleverage. In red, REPAY is the only way out | `economy.ts` (`repayHold`) |
 | Get touched while red, or fall below HF 0.90 | **Liquidation**: the vault takes its loan back, the popper gets an 8% bounty | `economy.ts` (`liquidate`, `keeperCheck`) |
 | **Cash out** (45 to 80 s, a 4 s channel) or survive the bell | Close the position and keep your equity | `economy.ts` (`cashOut`) |
 
