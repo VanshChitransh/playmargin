@@ -6,11 +6,11 @@ import type { Micro, World } from "./types";
 
 /** Target size of one food piece; big amounts split into at most MAX_PIECES (fewer, heavier shards
  *  keep the map from flooding: agar.io shows 3 to 7 pellets per megapixel of screen). */
-const PIECE: Micro = 4 * MICRO;
-const MAX_PIECES = 6;
+const PIECE: Micro = R.SCATTER_PIECE_UNITS * MICRO;
+const MAX_PIECES = R.SCATTER_MAX_PIECES;
 /** Share of refilled pellets that land near an existing pellet (loose clusters), the rest anywhere. */
-const CLUSTER_SHARE = 0.6;
-const CLUSTER_R = 320;
+const CLUSTER_SHARE = R.FOOD_CLUSTER_SHARE;
+const CLUSTER_R = R.FOOD_CLUSTER_RADIUS_PX;
 
 function clampToArena(w: World, x: number, y: number): [number, number] {
   return [Math.min(w.arena.w, Math.max(0, x)), Math.min(w.arena.h, Math.max(0, y))];
