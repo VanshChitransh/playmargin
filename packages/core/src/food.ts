@@ -1,7 +1,7 @@
 // Food placement. Every Micro that leaves a blob without an owner (scatter, interest, zone,
 // spike shards) becomes food here, so mass is never created or destroyed (RULES: food from the pot).
-import { MICRO } from "./constants";
-import { rand, randRange } from "./rng";
+import { MICRO, R } from "./constants";
+import { rand } from "./rng";
 import type { Micro, World } from "./types";
 
 /** Target size of one food piece; big amounts split into at most MAX_PIECES. */
@@ -32,7 +32,8 @@ export function scatterFood(w: World, amount: Micro, x: number, y: number, sprea
 /** Drop amount as one piece at a random spot inside the zone at least minDist px from (ax, ay). */
 export function spawnFoodInZone(w: World, amount: Micro, ax: number, ay: number, minDist: number): void {
   if (amount <= 0) return;
-  const { cx, cy, r } = w.zone;
+  const { cx, cy } = w.zone;
+  const r = Math.min(w.zone.r, R.PLAY_RADIUS_PX);
   let x = cx;
   let y = cy;
   // ponytail: 8 tries then accept the last spot; fine while the zone is much bigger than minDist.
@@ -47,7 +48,23 @@ export function spawnFoodInZone(w: World, amount: Micro, ax: number, ay: number,
   w.food.push({ id: w.nextId++, x: fx, y: fy, mass: amount });
 }
 
-/** Random point in the arena, for the opening food seed. */
-export function randomPoint(w: World): [number, number] {
-  return [randRange(w, 0, w.arena.w), randRange(w, 0, w.arena.h)];
+/**
+ * Random point in the play area: the disc of PLAY_RADIUS_PX around the centre (clipped to the
+ * arena). Food and spikes live here, so a map many screens wide still keeps the action together.
+ */
+export function playPoint(w: World): [number, number] {
+  const a = rand(w) * Math.PI * 2;
+  const d = Math.sqrt(rand(w)) * Math.min(R.PLAY_RADIUS_PX, w.arena.w / 2);
+  return clampToArena(w, w.arena.w / 2 + Math.cos(a) * d, w.arena.h / 2 + Math.sin(a) * d);
+}
+
+/** Opening seed: the entry's food share as pellets of FOOD_SEED_PELLET_UNITS, so the map reads as agar.io. */
+export function seedPellets(w: World, amount: Micro): void {
+  const pellet = Math.round(R.FOOD_SEED_PELLET_UNITS * MICRO);
+  const n = Math.max(1, Math.floor(amount / pellet));
+  // Each pellet lands at its own random spot; the last one takes the rounding remainder.
+  for (let i = 0; i < n; i++) {
+    const [x, y] = playPoint(w);
+    w.food.push({ id: w.nextId++, x, y, mass: i === n - 1 ? amount - pellet * (n - 1) : pellet });
+  }
 }

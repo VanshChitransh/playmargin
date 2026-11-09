@@ -36,7 +36,7 @@ export function matchView(w: World): MatchView {
 
 /** A food piece as drawn. */
 export function foodView(f: Food): FoodView {
-  return { id: f.id, x: f.x, y: f.y, r: radius(f.mass) };
+  return { id: f.id, x: f.x, y: f.y, r: R.FOOD_RADIUS_PX };
 }
 
 /** Live spikes only; a consumed spike is invisible until it respawns. */
