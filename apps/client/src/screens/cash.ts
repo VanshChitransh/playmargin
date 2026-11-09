@@ -4,6 +4,7 @@
 import { NETWORK } from "../chain/config";
 import { STATE_WORDS, depositStatus, originTokens, quoteDeposit, type OriginToken } from "../chain/addfunds";
 import { balanceOf, deposit, testnetFaucet, walletUsdc, withdraw } from "../chain/funds";
+import { showStake } from "../stake";
 import { NeedFunds, payToPlay, type PaidStep } from "../chain/paid";
 import { EMAIL_LOGIN, createEmailAccount, onAccount, resumeEmail, signIn, signInEmail, signOut } from "../chain/wallet";
 import { setPaidSeat } from "../play";
@@ -25,16 +26,18 @@ const TONE: Record<Tone, [string, string]> = {
 };
 
 export const cash: Screen = (root) => {
+  let stake = "$1"; // replaced by the contract's real entry stake as soon as it is read
   root.innerHTML = `
   <div class="min-h-full bg-liq px-4 py-8 text-ink">
     <div class="mx-auto max-w-xl">
       <a href="#/" class="tag">← MARGIN</a>
-      <h1 class="outlined mt-3 font-display text-6xl text-paper">Play for $1</h1>
+      <h1 class="outlined mt-3 font-display text-6xl text-paper">Play for <span data-stake>$1</span></h1>
       <p class="mt-2">Humans only. Winners split the pot by equity. ${NETWORK === "testnet" ? "<b>Test money for now, nothing real at stake.</b>" : ""}</p>
       <div data-c=body class="mt-6 space-y-4"></div>
       <div data-c=msg class="mt-4" role="status" aria-live="polite"></div>
     </div>
   </div>`;
+  void showStake(root).then((l) => (stake = l)); // later renders read stake, this fills what is already drawn
   const body = root.querySelector<HTMLElement>("[data-c=body]")!;
   const msg = root.querySelector<HTMLElement>("[data-c=msg]")!;
   const say: Say = (t, tone = "info") => {
@@ -84,7 +87,7 @@ export const cash: Screen = (root) => {
           <button data-c=out class="tag shrink-0 whitespace-nowrap underline">Sign out</button></div>
         <div class="mt-2 font-display text-5xl"><span class="tabular-nums">$${usd(bal)}</span> <span class="text-2xl">balance</span></div>
         <div class="mt-4 flex flex-wrap gap-3">
-          <button data-c=play class="${btn} bg-liq text-paper">PLAY $1</button>
+          <button data-c=play class="${btn} bg-liq text-paper">PLAY <span data-stake>${stake}</span></button>
           <button data-c=add class="${btn} bg-paper">Add funds</button>
           ${bal > 0n ? `<button data-c=wd class="tag self-center underline">Withdraw</button>` : ""}
         </div>
@@ -112,9 +115,9 @@ export const cash: Screen = (root) => {
         setPaidSeat(() => ({ mode: "paid", accountId, ticketId: entry.ticketTx ?? "held", join: entry.join() }) as JoinOpts);
         location.hash = "#/play";
       } catch (e) {
-        b.textContent = "PLAY $1";
+        b.innerHTML = `PLAY <span data-stake>${stake}</span>`;
         if (e instanceof NeedFunds) {
-          say(`You have $${usd(e.balance)}. A match needs $1.00. Add funds first.`, "error");
+          say(`You have $${usd(e.balance)}. A match needs ${stake}. Add funds first.`, "error");
           await addFunds(body.querySelector<HTMLElement>("[data-c=funds]")!, acc!, say);
         } else throw e;
       }

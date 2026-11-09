@@ -1,7 +1,7 @@
 // The results screen is a money receipt (inspiration.md 1.7): line items that add up to
 // the final number, built from the same events the server broadcasts. Food is the
 // remainder, so the receipt always sums exactly even where a line is an estimate.
-import { R, type BlobView, type GameEventMsg, type RateTier } from "@margin/core";
+import { MICRO, R, START_MASS_BPS, mulBps, type BlobView, type GameEventMsg, type LogEntry, type RateTier } from "@margin/core";
 import { displayName, interestPerS } from "../hud/logic";
 
 /** S1's server-confirmed save (core PR #13); declared here so the client works before and after it lands. */
@@ -192,4 +192,76 @@ export class Receipt {
   private name(id: string): string {
     return this.labels.get(id) ?? id;
   }
+}
+
+/**
+ * The money receipt from the hash-chained match log (the same entries settle() replays), so every
+ * line is a real logged number. Food minus zone is the remainder, which makes the column add up.
+ * Units: mass (Micro / MICRO), like the rest of the results card. Null when I am not in the log.
+ */
+export function receiptFromLog(log: readonly LogEntry[], me: string): { start: number; end: number; lines: Line[] } | null {
+  const u = (x: number): number => x / MICRO;
+  const names = new Map<string, string>();
+  const sum = new Map<string, number>();
+  const add = (label: string, v: number): void => void (v && sum.set(label, (sum.get(label) ?? 0) + u(v)));
+  let start: number | null = null;
+  let paid = 0;
+  let cashouts = 0;
+  for (const e of log) {
+    switch (e.type) {
+      case "JOIN":
+        names.set(e.data.player.id, e.data.player.label);
+        break;
+      case "CHARGE":
+        if (e.data.blob === me) start = u(mulBps(e.data.entry, START_MASS_BPS)); // core world.ts startMass
+        break;
+      case "BOOST":
+        if (e.data.blob === me) (add("Borrowed (BOOST)", e.data.borrowed), add("Borrow fees", -e.data.fee));
+        break;
+      case "REPAY":
+        if (e.data.blob === me) add("Repaid the vault", -e.data.amount);
+        break;
+      case "INTEREST":
+        if (e.data.blob === me) add("Interest", -e.data.amount);
+        break;
+      case "SPIKE":
+        if (e.data.blob === me) add("Spikes", -e.data.damage);
+        break;
+      case "EAT":
+        if (e.data.by === me) add(`Ate ${names.get(e.data.victim) ?? e.data.victim}`, e.data.gained);
+        if (e.data.victim === me) {
+          add("Eaten: vault repaid", -e.data.debtRepaid);
+          add(`Eaten: to ${names.get(e.data.by) ?? e.data.by}`, -e.data.gained);
+          add("Eaten: scattered", -e.data.scattered);
+        }
+        break;
+      case "POP":
+        if (e.data.by === me) add(`Popped ${names.get(e.data.victim) ?? e.data.victim}`, e.data.bounty);
+        if (e.data.victim === me) {
+          add("Liquidated: vault repaid", -e.data.debtRepaid);
+          add(`Liquidated: bounty to ${names.get(e.data.by) ?? e.data.by}`, -e.data.bounty);
+          add("Liquidated: fee", -e.data.fee);
+          add("Liquidated: scattered", -e.data.scattered);
+        }
+        break;
+      case "KEEPER_POP":
+        if (e.data.victim === me) {
+          add("Liquidated: vault repaid", -e.data.debtRepaid);
+          add("Liquidated: keeper fee", -e.data.fee);
+          add("Liquidated: scattered", -e.data.scattered);
+        }
+        break;
+      case "CASHOUT":
+        // A second CASHOUT for me is my equal share of the food left at the bell.
+        if (e.data.blob === me) (cashouts++ && add("Leftover food share", e.data.amount), (paid += u(e.data.amount)));
+        break;
+    }
+  }
+  if (start === null) return null;
+  const known = [...sum].map(([label, amount]) => ({ label, amount }));
+  const food = paid - start - known.reduce((s, l) => s + l.amount, 0);
+  // Food eaten and the zone burn are not logged per blob (both are mass to and from food), so
+  // they share the remainder line.
+  const lines = [{ label: "Food minus zone", amount: food }, ...known].filter((l) => Math.abs(l.amount) >= 0.005);
+  return { start, end: paid, lines };
 }

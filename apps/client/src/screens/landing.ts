@@ -7,6 +7,7 @@ import type { Screen } from "../router";
 import { newRoomCode } from "../net/room-code";
 import { ENDPOINT } from "../net/client";
 import { reducedMotion } from "../render/motion";
+import { showStake } from "../stake";
 
 // Each card plays a few seconds of real play (scripts/clips.sh, offline practice on the real rules).
 const STEPS: Array<[string, string, string]> = [
@@ -41,7 +42,7 @@ export const landing: Screen = (root) => {
         <p class="mt-6 max-w-md text-lg">A 90-second arena where BOOST is a loan. Borrow to grow, hunt the ones who went red, cash out before the vault pops you.</p>
         <div class="mt-8 flex flex-wrap items-center gap-4">
           <a href="#/play" class="sticker sticker-press rounded-box bg-paper px-7 py-4 font-display text-2xl">Practice free</a>
-          <a href="#/cash" class="sticker sticker-press rounded-box bg-ink px-5 py-3 font-display text-xl text-paper">Play for $1</a>
+          <a href="#/cash" class="sticker sticker-press rounded-box bg-ink px-5 py-3 font-display text-xl text-paper">Play for <span data-stake>$1</span></a>
           <button data-challenge class="tag basis-full text-left underline">Challenge a friend: private room link</button>
           <p data-proof class="tag hidden basis-full"></p>
           <span class="text-sm">No wallet. No sign-up.<span class="pointer-coarse:hidden"><br />Mouse steers, hold <kbd class="kbd kbd-sm">Space</kbd> = BOOST</span></span>
@@ -77,6 +78,7 @@ export const landing: Screen = (root) => {
       </div>
     </section>
   </div>`;
+  void showStake(root);
 
   // A private room is just a fresh code: the first one in creates it, the friend's link joins it.
   // Proof strip: real counts from the server, a number that is still 0 is left out, never padded.

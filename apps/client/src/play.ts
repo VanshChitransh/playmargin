@@ -1,10 +1,10 @@
 // #/play: joins a live free match, or, if no server answers in 2.5 s (or ?local is set),
 // runs offline practice on the real rules with local bots. Either way the same renderer,
 // HUD, receipt and end screens run on top. Open /?fps#/play to see the frame rate.
-import type { GameEventMsg, InputCmd, JoinOpts } from "@margin/core";
+import type { GameEventMsg, InputCmd, JoinOpts, LogEntry } from "@margin/core";
 import type { Frame } from "./game/frame";
 import { LocalMatch } from "./game/local";
-import { Receipt, type ClutchSave } from "./game/receipt";
+import { Receipt, receiptFromLog, type ClutchSave } from "./game/receipt";
 import { Hud } from "./hud/hud";
 import { elapsedS } from "./hud/logic";
 import { shareCertificate, verifyUrl } from "./share/certificate";
@@ -12,7 +12,7 @@ import { shareLink } from "./share/link";
 import type { Outcome } from "./game/receipt";
 import { shareRoom } from "./net/room-code";
 import { Controls } from "./input/controls";
-import { MatchConnection, guestKey } from "./net/client";
+import { ENDPOINT, MatchConnection, guestKey } from "./net/client";
 import { refusalWords } from "./net/refusal";
 import { ArenaRenderer } from "./render/arena";
 import { rerender, type Screen } from "./router";
@@ -206,8 +206,19 @@ export const play: Screen = (root, params) => {
     ended = true;
     const o = receipt.outcome(lastFrame.blobs);
     overlay?.remove();
-    // A beat after the bell so the last pop or cash-out is seen before the receipt covers it.
-    setTimeout(() => !left && (overlay = showResults(root, o, (a) => (a === "again" ? again() : a === "verify" ? void toVerify() : a === "share" ? void shareResult(o, src!.matchId) : home()), wasPaid)), 900);
+    // A beat after the bell so the last pop or cash-out is seen before the receipt covers it. In
+    // that beat the receipt lines are rebuilt from the match log itself (falls back to the live
+    // estimate if the log is slow or missing).
+    const fromLog = matchLog(src)
+      .then((log) => (log && lastFrame ? receiptFromLog(log, lastFrame.me) : null))
+      .catch(() => null);
+    const wait = new Promise<null>((r) => setTimeout(() => r(null), 2500));
+    const beat = new Promise((r) => setTimeout(r, 900));
+    void Promise.all([Promise.race([fromLog, wait]), beat]).then(([r]) => {
+      if (left) return;
+      if (r) Object.assign(o, r);
+      overlay = showResults(root, o, (a) => (a === "again" ? again() : a === "verify" ? void toVerify() : a === "share" ? void shareResult(o, src!.matchId) : home()), wasPaid);
+    });
   };
 
   const draw = (now: number): Frame | null => {
@@ -294,6 +305,19 @@ function roomChip(root: HTMLElement, code: string): void {
 }
 
 /** Share from the results screen: the certificate after a liquidation, else a one-line brag + verify link. */
+/** The hash-chained log for this match: local practice keeps it in memory, the server serves it. */
+async function matchLog(src: unknown): Promise<LogEntry[] | null> {
+  if (src instanceof LocalMatch) return src.log();
+  const id = (src as { matchId?: string } | null)?.matchId;
+  if (!id) return null;
+  for (let i = 0; i < 3; i++) {
+    const r = await fetch(`${ENDPOINT}/api/matches/${encodeURIComponent(id)}/log`);
+    if (r.ok) return ((await r.json()) as { log: LogEntry[] }).log;
+    await new Promise((ok) => setTimeout(ok, 600)); // the room writes the log at the bell
+  }
+  return null;
+}
+
 function shareResult(o: Outcome, matchId: string): void {
   if (o.death && !o.death.eaten) return void shareCertificate({ ...o.death, matchId });
   const what = o.kind === "cashed" ? `cashed out ${o.end.toFixed(2)}` : o.kind === "survived" ? `survived with ${o.end.toFixed(2)}` : "got eaten";
