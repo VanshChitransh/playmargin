@@ -126,6 +126,36 @@ describe("step", () => {
     expect(human.state).toBe("popped");
   });
 
+  it("a BOOST tap borrows at least 0.1 s worth, bursts once, and the burst has a cooldown", () => {
+    const a = makeBlob();
+    const w = makeWorld([a]);
+    const tap = (t: number, boost: boolean) => step(w, new Map([["a", { seq: t, dirX: 1, dirY: 0, boost, repay: false, cashout: false }]]), t);
+    tap(1, true);
+    expect(a.burst).toBeGreaterThan(0);
+    for (let t = 2; t <= 10; t++) tap(t, false); // released after one tick
+    const borrowed = w.pendingLog.filter((e) => e.type === "BOOST").reduce((s, e) => s + (e.data as { borrowed: number }).borrowed, 0);
+    expect(borrowed).toBeGreaterThanOrEqual(Math.floor(0.1 * 80 * MICRO) - 10 * 6); // ~8 units, per-tick floors aside
+    tap(11, true);
+    expect(a.burstReadyAt).toBe(1 + sToTicks(0.8)); // second press inside 0.8 s: no new burst
+  });
+
+  it("REPAY pressed just before the cooldown ends is buffered, and leaving red is a clutch save", () => {
+    const red = makeBlob({ id: "r", mass: u(142.5), debt: u(120), redSince: 0 });
+    const w = makeWorld([red, makeBlob({ id: "big", mass: u(400), x: 700 })]);
+    const press = (t: number, repay: boolean) => {
+      const ev = step(w, new Map([["r", { seq: t, dirX: 0, dirY: 0, boost: false, repay, cashout: false }]]), t);
+      return ev;
+    };
+    press(1, true); // tap 1: 0.95 -> 0.98, still red
+    const t2 = 1 + sToTicks(0.4) - 5; // 83 ms early: buffered
+    press(t2, true);
+    expect(red.repayQueued).toBe(true);
+    let ev: ReturnType<typeof press> = [];
+    for (let t = t2 + 1; t <= 1 + sToTicks(0.4); t++) ev = press(t, false);
+    expect(ev.some((e) => e.type === "repay")).toBe(true);
+    expect(ev.find((e) => e.type === "clutchSave")).toEqual({ type: "clutchSave", blob: "r", clutch: true });
+  });
+
   it("a drone holding bounty mass can't BOOST, REPAY or cash out (settle would refuse it)", () => {
     const drone = makeBlob({ id: "d", kind: "drone", mass: u(30), x: 100 });
     const w = makeWorld([drone, makeBlob({ id: "p" })]);

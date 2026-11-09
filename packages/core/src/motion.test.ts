@@ -8,7 +8,7 @@ import { mulBps, mulDiv, mulDivUp, toMicro, assertMicro } from "./units";
 
 function blob(over: Partial<Blob> = {}): Blob {
   return {
-    id: "a", kind: "human", label: "a", accountId: null, x: 500, y: 500, dirX: 1, dirY: 0, vx: 0, vy: 0,
+    id: "a", kind: "human", label: "a", accountId: null, x: 500, y: 500, dirX: 1, dirY: 0, vx: 0, vy: 0, boostHeld: false, boostMinUntil: 0, burst: 0, burstReadyAt: 0, sputterUntil: 0, repayQueued: false,
     mass: 80 * MICRO, debt: 0, boostFees: 0, payout: 0, lastInputAt: -1e9, pendingBorrow: 0, boostUntil: 0, repayReadyAt: 0,
     shieldUntil: 0, spikeImmuneUntil: 0, redSince: null, lastThreatAt: -1e9, cashout: null,
     state: "alive", lastInput: null, ...over,
@@ -71,7 +71,7 @@ describe("motion", () => {
   it("eases: from rest a start blob reaches ~63% of its speed in easeS, and glides to a stop", () => {
     const b = blob({ dirX: 1, dirY: 0 });
     const t = easeS(b);
-    expect(t).toBeCloseTo(0.08 + radius(80 * MICRO) / 1000);
+    expect(t).toBeCloseTo(R.EASE_BASE_S + radius(80 * MICRO) * R.EASE_PER_RADIUS_PX_S);
     const ticks = Math.round(t * 60);
     for (let i = 0; i < ticks; i++) move(b, 1 / 60, i, { w: 1e6, h: 1e6 });
     expect(b.vx / BASE_SPEED_PX_S).toBeGreaterThan(0.6);
@@ -80,6 +80,13 @@ describe("motion", () => {
     b.dirX = 0;
     for (let i = 0; i < 60; i++) move(b, 1 / 60, 100 + i, { w: 1e6, h: 1e6 });
     expect(b.vx).toBeLessThan(1);
+  });
+  it("boost runs on equity, so holding nitro never slows you (80 -> 200 mass with 120 debt)", () => {
+    const full = blob({ mass: 200 * MICRO, debt: 120 * MICRO, boostUntil: 10 });
+    expect(blobSpeed(full, 5)).toBeCloseTo(R.BOOST_SPEED_MULT * BASE_SPEED_PX_S); // 1.5x speed(80 equity)
+    expect(blobSpeed(full, 10)).toBeCloseTo(speed(200 * MICRO)); // released: the loan weighs you down
+    expect(Math.abs(speed(200 * MICRO) - 395)).toBeLessThan(2); // agar curve, research table
+    expect(Math.abs(speed(400 * MICRO) - 340)).toBeLessThan(2);
   });
   it("burst x1.5, cash-out x0.5, dir clamped, arena clamped", () => {
     const b = blob({ boostUntil: 60 });

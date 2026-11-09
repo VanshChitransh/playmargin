@@ -26,6 +26,8 @@ export type GameEventMsg =
   | { type: "lastCall"; tick: number }
   | { type: "boost"; blob: string; amount: number }
   | { type: "repay"; blob: string; amount: number }
+  /** Left red on a REPAY (server-confirmed). clutch: a bigger blob or a drone was within 300 px. */
+  | { type: "clutchSave"; blob: string; clutch: boolean }
   | { type: "spikeHit"; blob: string; big: boolean; damage: number }
   | { type: "pop"; by: string | null; victim: string; bounty: number; keeper: boolean }
   | { type: "eat"; by: string; victim: string; gained: number }
