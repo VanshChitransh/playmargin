@@ -80,6 +80,8 @@ export class MatchRoom extends Room {
   /** Guest users holding a seat here (claimed in onAuth): one seat per guest, so a second tab or a
    *  reload during late join can't double-charge or seat the same user twice. */
   private guests = new Set<string>();
+  /** Watch-only clients (#/watch): full state and events, no blob, no charge, no DB row, no input. */
+  private spectators = new Set<string>();
   /** Paid accounts this room holds in seatedAccounts; released on leave before GO and on dispose. */
   private accounts = new Set<string>();
   /** Paid: open_match on chain, started at the 3-2-1. GO waits for it, a failure aborts the room. */
@@ -131,8 +133,17 @@ export class MatchRoom extends Room {
   }
 
   /** filterBy skips options a client leaves out, so re-check mode and code here. */
-  override async onAuth(_client: Client, opts: unknown, ctx?: { ip?: string | string[] }): Promise<string | { accountId: string }> {
+  override async onAuth(
+    _client: Client,
+    opts: unknown,
+    ctx?: { ip?: string | string[] },
+  ): Promise<string | { accountId: string } | { spectator: true }> {
     if (!joinLimit.allow(clientIp(ctx))) throw new Error("too many joins, slow down");
+    // Spectators only watch public free rooms: private codes and paid tickets stay private.
+    if ((opts as { spectate?: unknown } | null)?.spectate === true) {
+      if (this.key.mode !== "free" || this.key.roomCode || this.judge) throw new Error("only public free rooms can be watched");
+      return { spectator: true };
+    }
     const k = parseRoomKey(opts);
     if (k.mode !== this.key.mode) throw new Error(`mode mismatch: pass { mode: "${this.key.mode}" }`);
     if (this.key.roomCode && k.roomCode !== this.key.roomCode) throw new Error("wrong room code");
@@ -151,8 +162,14 @@ export class MatchRoom extends Room {
     return paid;
   }
 
-  override onJoin(client: Client, _opts: unknown, auth?: string | { accountId: string }): void {
+  override onJoin(client: Client, _opts: unknown, auth?: string | { accountId: string } | { spectator: true }): void {
     const id = client.sessionId;
+    if (typeof auth === "object" && "spectator" in auth) {
+      this.spectators.add(id);
+      client.send("commander", { rationale: this.lastRationale });
+      this.publish();
+      return;
+    }
     const accountId = typeof auth === "object" ? auth.accountId : null;
     const p: PlayerSeed = { id, kind: "human", label: accountId ?? `Player ${++this.joined}`, accountId };
     if (this.started) {
@@ -177,10 +194,20 @@ export class MatchRoom extends Room {
     const all = [...this.world.blobs.values()];
     this.state.humans = all.filter((b) => b.kind === "human").length;
     this.state.agents = all.filter((b) => b.kind === "agent").length;
+    this.publish();
   }
 
   /** Dropped mid-match: the blob stays where it is, input expires, still poppable, seat held. */
+  /** Listing metadata, read by GET /api/watch to pick the busiest public free room. */
+  private publish(): void {
+    void this.setMetadata({
+      mode: this.key.mode, public: !this.key.roomCode && !this.judge, phase: this.phase,
+      humans: this.state.humans, spectators: this.spectators.size,
+    });
+  }
+
   override onDrop(client: Client): void {
+    if (this.spectators.has(client.sessionId)) return; // watchers just rejoin, nothing to hold
     // Before GO leaving is free (onLeave runs next), except a paid 3-2-1: the ticket is being bound.
     if (!this.started && !this.paidLocked) return;
     this.inputs.close(client.sessionId);
@@ -205,6 +232,7 @@ export class MatchRoom extends Room {
 
   override onLeave(client: Client): void {
     const id = client.sessionId;
+    if (this.spectators.delete(id)) return void this.publish();
     this.inputs.close(id);
     if (this.started || this.paidLocked) return; // after GO (paid: after the 3-2-1) the blob stays
     this.guests.delete(this.users.get(id) ?? "");
@@ -353,6 +381,7 @@ export class MatchRoom extends Room {
     this.phase = phase;
     this.phaseTick = 0;
     this.state.phase = phase;
+    this.publish();
     const ev: GameEventMsg = { type: "phase", phase, tick: this.roomTick };
     if (announce) this.broadcast("ev", ev);
   }

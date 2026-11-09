@@ -60,6 +60,23 @@ rooms[0]!.onStateChange((st: Wire) => {
   if (typeof f === "number") fuelSeen = true;
   if (typeof f === "number" && f < 0.99) fuelDropped = true;
 });
+// Spectator (#/watch): once LIVE, /api/watch must hand out a seat in this locked room with no blob.
+const watch = { joined: false, sawEvents: 0, gotMe: false, blobs: 0, humans: 0 };
+const spectate = (async () => {
+  while (!phases.includes("LIVE")) await new Promise((r) => setTimeout(r, 200));
+  await new Promise((r) => setTimeout(r, 16_000 / 4)); // past the 15 s late-join lock (SIM_SPEED 4)
+  const reservation = await (await fetch(`${base}/api/watch`)).json();
+  const w = await sdk.consumeSeatReservation(reservation);
+  watch.joined = w.roomId === rooms[0]!.roomId;
+  w.onMessage("ev", () => void watch.sawEvents++);
+  w.onMessage("me", () => void (watch.gotMe = true));
+  w.onMessage("commander", () => {});
+  await new Promise((r) => setTimeout(r, 1500));
+  const st = w.state as unknown as { blobs: Map<string, unknown>; humans: number };
+  watch.blobs = st.blobs.size;
+  watch.humans = st.humans;
+  await w.leave();
+})();
 let t = 0;
 const iv = setInterval(() => {
   t++;
@@ -67,6 +84,7 @@ const iv = setInterval(() => {
 }, 50);
 await Promise.all(rooms.map((r) => new Promise<void>((res) => r.onLeave(() => res()))));
 clearInterval(iv);
+await spectate;
 
 const matchId = rooms[0]!.roomId;
 const served = (await (await fetch(`${base}/api/matches/${matchId}/log`)).json()) as { status: string; log: LogEntry[] };
@@ -85,6 +103,7 @@ const checks = {
   }),
   replayEqualsStored: seats.every((s) => (replay.payouts.find((p) => p.id === s.blob)?.amount ?? 0) === (s.payout ?? 0)),
   logEntries: served.log.length,
+  watch,
   fuelSeen,
   radii: [...radii].sort().join(" "),
   heldBoostBorrowed: fuelDropped && served.log.some((e) => e.type === "BOOST"),
@@ -96,6 +115,7 @@ if (checks.seats !== 2) fail(`expected 2 seats, got ${checks.seats}`);
 if (!checks.ledgerExact) fail("credits ledger is not exact");
 // The client draws food and spikes at exactly the core hitbox.
 if (checks.radii !== `food:${R.FOOD_RADIUS_PX} spike:${SPIKE_RADIUS}`) fail(`wire radii ${checks.radii}`);
+if (!watch.joined || watch.sawEvents === 0 || watch.gotMe || watch.humans !== 2 || watch.blobs !== 12) fail(`spectate ${JSON.stringify(watch)}`);
 if (!checks.fuelSeen) fail("BlobView.fuel never reached the client");
 if (!checks.heldBoostBorrowed) fail("holding BOOST never borrowed");
 if (!checks.replayEqualsStored) fail("settleVerified(log) differs from stored payouts");

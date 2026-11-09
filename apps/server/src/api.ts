@@ -1,6 +1,7 @@
 // Public read API: match logs and proofs for the Verify page, the verified leaderboard, and the
 // traction numbers the README quotes. Read only, CORS open; money leaves as display units.
 import type { Application } from "express";
+import { matchMaker } from "colyseus";
 import { toUnits } from "@margin/core";
 import { creditsRepo, isGuestKey, topUpDaily } from "./credits";
 import { userForGuestKey, type Db } from "./db";
@@ -13,6 +14,23 @@ import { sharedChain } from "./settlement";
 const DAY_MS = 86_400_000;
 /** Each new guestKey makes a user row, so cap credit lookups per IP. */
 const creditsLimit = new RateLimiter(30, 60_000);
+/** Each watch reserves a seat and may create a room, so cap it per IP too. */
+const watchLimit = new RateLimiter(12, 60_000);
+const PHASE_RANK: Record<string, number> = { LIVE: 3, COUNTDOWN: 2, WARMUP: 1 };
+
+interface Listing {
+  roomId: string;
+  clients: number;
+  maxClients: number;
+  metadata?: { mode?: string; public?: boolean; phase?: string; humans?: number };
+}
+
+/** The public free room worth watching: LIVE first, then the most humans. Null if none has a free slot. */
+export function pickWatchRoom<T extends Listing>(rooms: T[]): T | null {
+  const ok = rooms.filter((r) => r.metadata?.mode === "free" && r.metadata.public && PHASE_RANK[r.metadata.phase ?? ""] && r.clients < r.maxClients);
+  ok.sort((a, b) => PHASE_RANK[b.metadata!.phase!]! - PHASE_RANK[a.metadata!.phase!]! || (b.metadata!.humans ?? 0) - (a.metadata!.humans ?? 0));
+  return ok[0] ?? null;
+}
 
 interface MatchRow {
   id: string;
@@ -73,13 +91,17 @@ export function stats(db: Db) {
   const one = <T>(sql: string): T => db.prepare(sql).get() as T;
   const { users } = one<{ users: number }>("SELECT COUNT(*) AS users FROM users");
   const { players } = one<{ players: number }>("SELECT COUNT(DISTINCT user_id) AS players FROM match_players");
-  const { matches } = one<{ matches: number }>("SELECT COUNT(*) AS matches FROM matches WHERE status = 'settled'");
+  // Only matches a human played: agents-only rooms made for #/watch are not traction.
+  const { matches } = one<{ matches: number }>(
+    "SELECT COUNT(*) AS matches FROM matches m WHERE m.status = 'settled' AND EXISTS (SELECT 1 FROM match_players p WHERE p.match_id = m.id)",
+  );
   const { multi } = one<{ multi: number }>(
     `SELECT COUNT(*) AS multi FROM (SELECT p.match_id FROM match_players p JOIN matches m ON m.id = p.match_id
      WHERE m.status = 'settled' GROUP BY p.match_id HAVING COUNT(*) >= 2)`,
   );
   const { agentPops } = one<{ agentPops: number }>(
     `SELECT COUNT(*) AS agentPops FROM events WHERE json_extract(json, '$.type') = 'POP'
+     AND EXISTS (SELECT 1 FROM match_players p WHERE p.match_id = events.match_id)
      AND (json_extract(json, '$.data.by') LIKE 'agent-%' OR json_extract(json, '$.data.by') LIKE 'drone-%')`,
   );
   return { users, players, matches, multiHumanPct: matches ? Math.round((100 * multi) / matches) : 0, agentPops };
@@ -107,6 +129,17 @@ export function mountApi(app: Application, db: () => Db): void {
   app.get("/api/matches/:id/proof", (req, res) => {
     const r = matchProof(db(), req.params.id);
     return r ? void res.json(r) : void res.status(404).json({ error: "unknown match" });
+  });
+  // Spectate (#/watch): a seat reservation in the busiest public free room, even one that is LIVE and
+  // locked; with none, a fresh agents-only room. Client: sdk.consumeSeatReservation(reservation).
+  app.get("/api/watch", async (req, res) => {
+    if (!watchLimit.allow(req.get("x-real-ip") ?? req.socket.remoteAddress ?? "unknown")) return void res.status(429).json({ error: "slow down" });
+    try {
+      const room = pickWatchRoom((await matchMaker.query({ name: "match" })) as unknown as Listing[]) ?? (await matchMaker.createRoom("match", { mode: "free" }));
+      res.json(await matchMaker.reserveSeatFor(room as Parameters<typeof matchMaker.reserveSeatFor>[0], { spectate: true }));
+    } catch (err) {
+      res.status(503).json({ error: err instanceof Error ? err.message : "no room to watch" });
+    }
   });
   app.get("/api/leaderboard", (_req, res) => void res.json(leaderboard(db())));
   // Liveness for deploy.sh and uptime checks: 503 while draining so nothing new is routed here.
