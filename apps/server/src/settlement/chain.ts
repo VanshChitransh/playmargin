@@ -61,6 +61,11 @@ export class Chain {
     return this.withFallback((near) => near.view<T>(this.cfg.contractId, method, args));
   }
 
+  /** Access key permission for (account, key), or null when the key is not on the account. */
+  accessKey(accountId: string, publicKey: string) {
+    return this.withFallback((near) => near.getAccessKey(accountId, publicKey));
+  }
+
   /** Settler call on the margin contract; returns the tx hash. */
   async call(method: string, args: object): Promise<string> {
     const out = await this.withFallback((near) =>
