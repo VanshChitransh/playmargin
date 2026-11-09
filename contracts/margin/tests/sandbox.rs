@@ -242,6 +242,28 @@ async fn arena_lifecycle() -> testresult::TestResult<()> {
     e.call(&s, &m, "settle", wipe, 0, true).await?;
     assert_eq!(e.view(&m, "vault", json!({})).await?["free"], "7090000");
     assert_eq!(e.margin_balance(&a).await?, "1800000");
+
+    // A7: a registered house agent (liquidator drone) can be paid its bounty, capped at 12% of
+    // the stakes (0.24 USDC here). The fake-token account stands in for drone-1.
+    let d = e.fake.clone();
+    e.deposit(&e.usdc, &a, "1000000", &json!({"for": b}).to_string()).await?;
+    for p in [&a, &b] {
+        e.call(p, &m, "enter_arena", json!({"stake": "1000000"}), 0, true).await?;
+    }
+    e.call(&s, &m, "open_match", json!({"match_id": "m5", "players": [a, b]}), 0, true).await?;
+    let bounty = |pay_a: &str, pay_d: &str| {
+        json!({"match_id": "m5", "payouts": [[a, pay_a], [b, "100000"], [d, pay_d]], "lent": "1000000",
+               "vault_repaid": "1000000", "interest_to_vault": "50000", "fees": "20000",
+               "reserve": "30000", "seq": 5, "head": "bounty"})
+    };
+    e.call(&s, &m, "settle", bounty("1700000", "100000"), 0, false).await?; // not an agent yet
+    let reg = json!({"add": [d], "remove": []});
+    e.call(&a, &m, "set_agents", reg.clone(), 1, false).await?; // not the owner
+    e.call(&e.owner, &m, "set_agents", reg, 1, true).await?;
+    assert_eq!(e.view(&m, "is_agent", json!({"account_id": d})).await?, true);
+    e.call(&s, &m, "settle", bounty("1559999", "240001"), 0, false).await?; // over the 12% cap
+    e.call(&s, &m, "settle", bounty("1700000", "100000"), 0, true).await?;
+    assert_eq!(e.margin_balance(&d).await?, "100000");
     Ok(())
 }
 

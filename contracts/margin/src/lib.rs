@@ -23,9 +23,20 @@ pub const ENTRY_STAKE: u128 = 1_000_000;
 /// RULES.html ROOM_VAULT_BUDGET = (LEVERAGE_CAP - 1) * pot, as basis points of the stakes.
 pub const BUDGET_BPS: u128 = 15_000;
 
-/// RULES.html ROOM_SIZE 12, with headroom. Payouts only reach match players (drone bounties ride
-/// in `reserve`), so this only bounds settle gas and the args size.
+/// RULES.html ROOM_SIZE 12 players plus up to 3 drones, with headroom. Payouts reach match players
+/// and registered agents (drone bounties), so this only bounds settle gas and the args size.
 pub const MAX_PAYOUTS: usize = 16;
+
+/// Most a match may pay to registered agents (drone bounties), in bps of its stakes. The bounty is
+/// 8% of a victim's debt and debt is at most 1.5x the victim's equity, so bounties are normally well
+/// under 12%. A rare chain of victims who grew by eating can exceed it: the server must clamp the
+/// agents' total to this cap and move the excess to the reserve. It bounds what a leaked settler
+/// key could route from one match to house agents.
+pub const AGENT_PAYOUT_MAX_BPS: u128 = 1_200;
+
+/// Storage key prefix for the agent set. Raw keys, not a new state field, so adding agents
+/// needed no migration (Key prefixes are single borsh bytes 0..3, "agent:" cannot collide).
+const AGENT_PREFIX: &[u8] = b"agent:";
 
 /// Settler-supplied strings are stored forever at the contract's storage cost, so cap them.
 pub const MAX_ID_LEN: usize = 64;
@@ -160,6 +171,15 @@ pub(crate) fn check_stake(stake: u128) {
     require!(100_000_000 % stake == 0, "entry stake must divide 100000000 (e.g. 100000 or 1000000)");
 }
 
+fn agent_key(account_id: &AccountId) -> Vec<u8> {
+    [AGENT_PREFIX, account_id.as_bytes()].concat()
+}
+
+/// True if the owner registered this account as a house agent (a liquidator drone).
+pub(crate) fn agent_registered(account_id: &AccountId) -> bool {
+    env::storage_has_key(&agent_key(account_id))
+}
+
 pub(crate) fn add(a: u128, b: u128) -> u128 {
     a.checked_add(b).expect("overflow")
 }
@@ -210,6 +230,29 @@ impl Contract {
         check_stake(entry_stake.0);
         self.entry_stake = entry_stake.0;
         emit("entry_stake_changed", format!(r#"{{"entry_stake":"{}"}}"#, entry_stake.0));
+    }
+
+    /// Owner: register or remove house agents (liquidator drones, e.g. drone-1.playmargin.near).
+    /// A registered agent may receive drone bounties in settle, capped per match at
+    /// AGENT_PAYOUT_MAX_BPS of the stakes, so every bounty is a public on-chain P&L.
+    #[payable]
+    pub fn set_agents(&mut self, add: Vec<AccountId>, remove: Vec<AccountId>) {
+        assert_one_yocto();
+        require!(env::predecessor_account_id() == self.owner, "only the owner");
+        require!(add.len() + remove.len() <= MAX_PAYOUTS, "too many agents in one call");
+        for a in &add {
+            require!(*a != env::current_account_id(), "the contract cannot be an agent");
+            env::storage_write(&agent_key(a), &[1]);
+        }
+        for a in &remove {
+            env::storage_remove(&agent_key(a));
+        }
+        emit("agents_changed", format!(r#"{{"add":{},"remove":{}}}"#, j(&add), j(&remove)));
+    }
+
+    /// Is this account a registered house agent (allowed to receive drone bounties)?
+    pub fn is_agent(&self, account_id: AccountId) -> bool {
+        agent_registered(&account_id)
     }
 
     /// Idle USDC of an account, in base units (6 decimals).
