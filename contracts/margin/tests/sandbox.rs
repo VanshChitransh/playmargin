@@ -228,6 +228,20 @@ async fn arena_lifecycle() -> testresult::TestResult<()> {
     assert_eq!(e.margin_balance(&a).await?, "2800000");
     assert_eq!(e.view(&m, "vault", json!({})).await?["free"], "5140000");
     assert_eq!(e.view(&m, "vault", json!({})).await?["locked"], "0");
+
+    // Nobody survives: no payouts, the leftover pot goes to the vault (Vansh, 9 Nov).
+    // Stakes 2 + lent 1 = repaid 1 + leftover 1.9 to vault + fees 0.05 + reserve 0.05.
+    e.deposit(&e.usdc, &a, "1000000", &json!({"for": b}).to_string()).await?;
+    for p in [&a, &b] {
+        e.call(p, &m, "enter_arena", json!({"stake": "1000000"}), 0, true).await?;
+    }
+    e.call(&s, &m, "open_match", json!({"match_id": "m4", "players": [a, b]}), 0, true).await?;
+    let wipe = json!({"match_id": "m4", "payouts": [], "lent": "1000000", "vault_repaid": "1000000",
+                      "interest_to_vault": "1900000", "fees": "50000", "reserve": "50000",
+                      "seq": 4, "head": "wipe"});
+    e.call(&s, &m, "settle", wipe, 0, true).await?;
+    assert_eq!(e.view(&m, "vault", json!({})).await?["free"], "7090000");
+    assert_eq!(e.margin_balance(&a).await?, "1800000");
     Ok(())
 }
 

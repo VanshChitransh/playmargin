@@ -6,11 +6,11 @@ use crate::*;
 
 #[near]
 impl Contract {
-    /// Moves ENTRY_STAKE from the caller's balance into a ticket. Callable with a session
+    /// Moves the entry stake from the caller's balance into a ticket. Callable with a session
     /// (function-call) key: no deposit needed, and it can never move money out of the contract.
     pub fn enter_arena(&mut self, stake: U128) {
         let player = env::predecessor_account_id();
-        require!(stake.0 == ENTRY_STAKE, "stake must be exactly 1 USDC");
+        require!(stake.0 == self.entry_stake, "stake must equal the entry stake (see config)");
         require!(!self.tickets.contains_key(&player), "already holding a ticket");
         self.debit(&player, stake.0);
         let ticket = Ticket { stake, entered_at: env::block_timestamp(), match_id: None };
@@ -265,6 +265,63 @@ mod tests {
         let mut c = two_players();
         open(&mut c);
         st(&mut c, vec![("a.near", 1_800_001), ("b.near", 100_000)], [USDC, USDC, 50_000, 20_000, 30_000]);
+    }
+
+    /// Mainnet may launch at 0.10 USDC: the stake is state, checked against config.
+    #[test]
+    fn cheap_entry_stake() {
+        let mut c = setup();
+        ctx("owner.near", 1, 0);
+        c.set_entry_stake(U128(100_000));
+        assert_eq!(c.config().entry_stake.0, 100_000);
+        c.credit(&acc("a.near"), USDC);
+        ctx("a.near", 0, 0);
+        c.enter_arena(U128(100_000));
+        assert_eq!(c.balance_of(acc("a.near")).0, 900_000);
+    }
+
+    #[test]
+    #[should_panic(expected = "stake must equal the entry stake")]
+    fn old_stake_refused_after_change() {
+        let mut c = setup();
+        ctx("owner.near", 1, 0);
+        c.set_entry_stake(U128(100_000));
+        c.credit(&acc("a.near"), USDC);
+        ctx("a.near", 0, 0);
+        c.enter_arena(U128(USDC));
+    }
+
+    #[test]
+    #[should_panic(expected = "exactly 1 yoctoNEAR")]
+    fn entry_stake_change_needs_yocto() {
+        let mut c = setup();
+        ctx("owner.near", 0, 0);
+        c.set_entry_stake(U128(100_000));
+    }
+
+    /// Upgrade path: V1 state (no entry_stake) on disk, migrate keeps balances and adds the stake.
+    #[test]
+    fn migrate_from_v1() {
+        let mut c = setup();
+        c.credit(&acc("a.near"), 3 * USDC);
+        c.balances.flush();
+        let v1 = ContractV1 {
+            owner: acc("owner.near"),
+            settler: acc("settler.near"),
+            usdc: acc("usdc.near"),
+            balances: LookupMap::new(Key::Balances),
+            tickets: LookupMap::new(Key::Tickets),
+            matches: LookupMap::new(Key::Matches),
+            anchors: LookupMap::new(Key::Anchors),
+            vault: Vault { free: U128(7), locked: U128(0) },
+            reserve: 5,
+        };
+        env::state_write(&v1);
+        ctx("margin.near", 0, 0);
+        let m = Contract::migrate(Some(U128(100_000)));
+        assert_eq!(m.balance_of(acc("a.near")).0, 3 * USDC);
+        assert_eq!(m.reserve().0, 5);
+        assert_eq!(m.config().entry_stake.0, 100_000);
     }
 
     #[test]

@@ -16,7 +16,8 @@ use near_sdk::{AccountId, BorshStorageKey, PanicOnDefault, assert_one_yocto, env
 /// contract storage, so dust deposits from throwaway accounts are refunded instead.
 pub const MIN_DEPOSIT: u128 = 100_000;
 
-/// RULES.html ENTRY_PAID_USDC (1 USDC, 6 decimals). One tier keeps matchmaking by stake trivial.
+/// Default paid entry: RULES.html ENTRY_PAID_USDC (1 USDC, 6 decimals). The live value is
+/// state (`entry_stake`), set at init or by the owner, so mainnet can launch at 0.10 USDC.
 pub const ENTRY_STAKE: u128 = 1_000_000;
 
 /// RULES.html ROOM_VAULT_BUDGET = (LEVERAGE_CAP - 1) * pot, as basis points of the stakes.
@@ -102,6 +103,8 @@ pub struct Config {
     pub owner: AccountId,
     pub settler: AccountId,
     pub usdc: AccountId,
+    /// The one paid entry, USDC base units. Client and server read it from here.
+    pub entry_stake: U128,
 }
 
 #[near(contract_state)]
@@ -116,6 +119,22 @@ pub struct Contract {
     anchors: LookupMap<String, Anchor>,
     vault: Vault,
     /// House reserve (fees, rounding dust). First line of defence for vault bad debt.
+    reserve: u128,
+    /// Paid entry in USDC base units (appended last: migrate() reads the V1 layout before it).
+    entry_stake: u128,
+}
+
+/// State layout before entry_stake existed. Only migrate() reads it.
+#[near(serializers = [borsh])]
+pub struct ContractV1 {
+    owner: AccountId,
+    settler: AccountId,
+    usdc: AccountId,
+    balances: LookupMap<AccountId, u128>,
+    tickets: LookupMap<AccountId, Ticket>,
+    matches: LookupMap<String, Match>,
+    anchors: LookupMap<String, Anchor>,
+    vault: Vault,
     reserve: u128,
 }
 
@@ -143,8 +162,10 @@ pub(crate) fn sub(a: u128, b: u128) -> u128 {
 #[near]
 impl Contract {
     #[init]
-    pub fn new(owner: AccountId, settler: AccountId, usdc: AccountId) -> Self {
+    pub fn new(owner: AccountId, settler: AccountId, usdc: AccountId, entry_stake: Option<U128>) -> Self {
         require!(owner != env::current_account_id(), "owner must not be the contract account");
+        let entry_stake = entry_stake.map_or(ENTRY_STAKE, |s| s.0);
+        require!(entry_stake >= MIN_DEPOSIT, "entry stake below the minimum deposit");
         Self {
             owner,
             settler,
@@ -155,7 +176,30 @@ impl Contract {
             anchors: LookupMap::new(Key::Anchors),
             vault: Vault::default(),
             reserve: 0,
+            entry_stake,
         }
+    }
+
+    /// Upgrade path: deploy new code and call this in the same tx. Reads the V1 layout and
+    /// adds entry_stake. Every future state change gets its own ContractVn + migrate.
+    #[private]
+    #[init(ignore_state)]
+    pub fn migrate(entry_stake: Option<U128>) -> Self {
+        let v1: ContractV1 = env::state_read().expect("no V1 state");
+        let ContractV1 { owner, settler, usdc, balances, tickets, matches, anchors, vault, reserve } = v1;
+        let entry_stake = entry_stake.map_or(ENTRY_STAKE, |s| s.0);
+        Self { owner, settler, usdc, balances, tickets, matches, anchors, vault, reserve, entry_stake }
+    }
+
+    /// Owner: change the paid entry (e.g. 0.10 USDC for a cheap mainnet launch). Live tickets keep
+    /// the stake they paid, matches sum real ticket stakes, so a change mid-queue stays exact.
+    #[payable]
+    pub fn set_entry_stake(&mut self, entry_stake: U128) {
+        assert_one_yocto();
+        require!(env::predecessor_account_id() == self.owner, "only the owner");
+        require!(entry_stake.0 >= MIN_DEPOSIT, "entry stake below the minimum deposit");
+        self.entry_stake = entry_stake.0;
+        emit("entry_stake_changed", format!(r#"{{"entry_stake":"{}"}}"#, entry_stake.0));
     }
 
     /// Idle USDC of an account, in base units (6 decimals).
@@ -209,6 +253,7 @@ impl Contract {
             owner: self.owner.clone(),
             settler: self.settler.clone(),
             usdc: self.usdc.clone(),
+            entry_stake: U128(self.entry_stake),
         }
     }
 }
@@ -256,6 +301,6 @@ mod test_utils {
 
     pub fn setup() -> Contract {
         ctx("owner.near", 0, 0);
-        Contract::new(acc("owner.near"), acc("settler.near"), acc("usdc.near"))
+        Contract::new(acc("owner.near"), acc("settler.near"), acc("usdc.near"), None)
     }
 }

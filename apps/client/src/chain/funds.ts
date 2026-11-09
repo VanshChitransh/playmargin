@@ -28,6 +28,18 @@ export async function ticketOf(accountId: string): Promise<Ticket | null> {
   return (await reader.view<Ticket | null>(CONTRACT_ID, "ticket_of", { account_id: accountId })) ?? null;
 }
 
+let stake: Promise<string> | null = null;
+
+/** The paid entry in USDC base units, from the contract's config (owner may set 1 or 0.10 USDC). */
+export function entryStake(): Promise<string> {
+  stake ??= reader.view<{ entry_stake: string }>(CONTRACT_ID, "config", {}).then((c) => {
+    if (!c) throw new Error("contract config unavailable");
+    return c.entry_stake;
+  });
+  stake.catch(() => (stake = null)); // retry next call after a network blip
+  return stake;
+}
+
 const GAS = "100000000000000"; // 100 Tgas: ft_transfer_call / withdraw + their callbacks
 
 /** Moves `amount` base units from the wallet into the contract (credits the same account). */

@@ -4,7 +4,8 @@
 // tools/scripts/session-probe.ts.
 
 import { Near, generateKey, parseKey } from "near-kit";
-import { CONTRACT_ID, ENTRY_STAKE, NETWORK, RELAYER_URL } from "./config";
+import { CONTRACT_ID, NETWORK, RELAYER_URL } from "./config";
+import { entryStake } from "./funds";
 import { wallet } from "./wallet";
 
 /** Explicit allowance (the near-api-js default is 0.25 NEAR). Relaying never spends it. */
@@ -70,12 +71,12 @@ export interface RelayResult {
   error?: string;
 }
 
-/** Buys a 1 USDC ticket with the session key through the relayer. No pop-up, no gas. */
+/** Buys a ticket at the contract's entry stake with the session key via the relayer. No pop-up, no gas. */
 export async function enterArena(accountId: string, secret: Secret, relayerUrl = RELAYER_URL): Promise<RelayResult> {
   const signer = new Near({ network: NETWORK, privateKey: secret, defaultSignerId: accountId });
   const { payload } = await signer
     .transaction(accountId)
-    .functionCall(CONTRACT_ID, "enter_arena", { stake: ENTRY_STAKE }, { gas: "30 Tgas" })
+    .functionCall(CONTRACT_ID, "enter_arena", { stake: await entryStake() }, { gas: "30 Tgas" })
     .delegate({ blockHeightOffset: 100 });
   const res = await fetch(`${relayerUrl}/relay`, {
     method: "POST",

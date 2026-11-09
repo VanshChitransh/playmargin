@@ -16,14 +16,12 @@ const IDS = {
   },
 }[NETWORK];
 
-export const CONTRACT_ID = IDS.contract;
+/** VITE_CONTRACT_ID overrides it (mainnet: playmargin.near or margin.vanshverse.near). */
+export const CONTRACT_ID = env.VITE_CONTRACT_ID ?? IDS.contract;
 export const USDC_ID = IDS.usdc;
 
 /** NEP-366 relayer (services/relayer). */
 export const RELAYER_URL: string =
   env.VITE_RELAYER_URL ?? (typeof location === "undefined" ? "http://localhost:3030" : `${location.protocol}//${location.hostname}:3030`);
-
-/** 1 USDC in base units: the only paid entry (RULES ENTRY_PAID_USDC). */
-export const ENTRY_STAKE = "1000000";
 
 export const EXPLORER = NETWORK === "mainnet" ? "https://nearblocks.io" : "https://testnet.nearblocks.io";
