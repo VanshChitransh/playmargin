@@ -26,10 +26,13 @@ export class Hud {
   private coach: Coach;
   private touch = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
   held = false;
+  /** Offline practice against local bots: never word it like a real lobby. */
+  offline = false;
 
   constructor(root: HTMLElement, private els: ControlsEls, private onCashoutWindow: (open: boolean) => void, opts: { coach?: boolean } = {}) {
     this.el = document.createElement("div");
-    this.el.className = "pointer-events-none fixed inset-0 select-none font-sans text-paper";
+    // invisible until the first frame: no empty clock, leaderboard or pills while connecting
+    this.el.className = "pointer-events-none invisible fixed inset-0 select-none font-sans text-paper";
     this.el.innerHTML = `
       <div class="absolute top-0 inset-x-0 flex flex-col items-center pt-[max(10px,env(safe-area-inset-top))]">
         <div class="flex items-center gap-2 self-start rounded-box bg-navy/80 px-3 py-1 max-sm:ml-[102px] max-sm:mt-[2px] max-sm:gap-1 max-sm:px-2 sm:self-center">
@@ -44,7 +47,7 @@ export class Hud {
       </div>
       <div data-h=center class="absolute inset-x-0 top-[14%] grid place-items-center text-center"></div>
       <div data-h=frame class="call-frame"></div>
-      <p data-h=cmd class="absolute left-0 top-12 m-3 hidden max-w-[min(22rem,60vw)] rounded-field bg-navy/90 px-2 py-1 text-xs text-agent max-sm:line-clamp-3 max-sm:max-w-[calc(100vw-180px)] max-sm:text-[11px]"></p>
+      <p data-h=cmd style="display:none" class="absolute left-0 top-12 m-3 hidden max-w-[min(22rem,60vw)] rounded-field bg-navy/90 px-2 py-1 text-xs text-agent max-sm:line-clamp-3 max-sm:max-w-[calc(100vw-180px)] max-sm:text-[11px]"></p>
       <button data-h=mute class="tag pointer-events-auto absolute left-0 top-0 m-3 mt-[max(12px,env(safe-area-inset-top))] rounded-field bg-navy/80 px-2 py-1 text-muted"></button>
       <div data-h=call class="tag absolute inset-x-0 bottom-28 hidden text-center"><span class="rounded-field bg-liq px-3 py-1 text-paper">Margin call: tap REPAY to get out</span></div>
       <div data-h=money class="absolute bottom-0 right-28 flex flex-col items-end gap-1 p-4 pb-[max(20px,env(safe-area-inset-bottom))]">
@@ -73,6 +76,7 @@ export class Hud {
   }
 
   update(f: Frame, now: number): void {
+    this.el.classList.remove("invisible");
     const m = f.match;
     const me = f.blobs.find((b) => b.id === f.me);
     this.clock(f);
@@ -151,7 +155,7 @@ export class Hud {
       const n = f.blobs.filter((b) => b.kind !== "drone").length;
       this.set("center", `W${n}/${m.timeLeftS}`, () => {
         c.innerHTML = `<div><div class="outlined font-display text-7xl tabular-nums text-paper">${n}/${R.ROOM_SIZE}</div>
-          <div class="mt-1 font-medium text-ink/70">Finding players · starts in <span class="num">${m.timeLeftS}</span></div>
+          <div class="mt-1 font-medium text-ink/70">${this.offline ? "Offline practice" : "Finding players"} · starts in <span class="num">${m.timeLeftS}</span></div>
           ${this.hints()}</div>`;
       });
     } else if (m.phase === "COUNTDOWN") {
@@ -171,7 +175,8 @@ export class Hud {
 
   private leaderboard(f: Frame): void {
     const ranked = ranking(f.blobs);
-    const top = ranked.slice(0, R.LEADERBOARD_TOP);
+    const rows = innerWidth < 640 ? 3 : R.LEADERBOARD_TOP; // phones: top 3 + my rank
+    const top = ranked.slice(0, rows);
     const row = (b: BlobView, rank: number): string => {
       const mine = b.id === f.me;
       const name = esc(displayName(b));
@@ -204,7 +209,7 @@ export class Hud {
     lb.style.height = `${Math.max(1, top.length) * ROW_PX + 16}px`; // sized to its rows, no empty box
     const myRank = ranked.findIndex((b) => b.id === f.me);
     const mine = this.q("myrank");
-    const show = myRank >= R.LEADERBOARD_TOP;
+    const show = myRank >= rows;
     mine.classList.toggle("hidden", !show);
     if (show) mine.innerHTML = row(ranked[myRank]!, myRank + 1);
   }
@@ -234,6 +239,7 @@ export class Hud {
     const c = this.q("cmd");
     c.textContent = text ? `Commander: ${text}` : "";
     c.classList.toggle("hidden", !text);
+    c.style.display = text ? "" : "none"; // line-clamp sets display on phones and would beat hidden
   }
 
   /** Re-run a CSS animation on el with new text. */

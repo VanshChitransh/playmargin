@@ -81,7 +81,7 @@ export class BlobSprite extends Container {
     }
     this.body.clear().poly(pts).fill(this.fill).stroke({ width: Math.max(3, r * 0.06), color: darken(this.fill) });
     // My own blob: a thin paper ring just inside the rim, so "me" reads at a glance.
-    if (this.isMe) this.body.circle(0, 0, r * 0.86).stroke({ width: Math.max(2, r * 0.035), color: 0xffffff, alpha: 0.75 });
+    if (this.isMe) this.body.circle(0, 0, r * 0.84).stroke({ width: Math.max(4, r * 0.07), color: 0xffffff, alpha: 0.9 });
   }
 
   private redraw(v: BlobView, isMe: boolean): void {

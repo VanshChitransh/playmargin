@@ -96,7 +96,14 @@ export class Controls {
   }
 
   private joystick(zone: HTMLElement): void {
-    const stick = nipplejs.create({ zone, mode: "dynamic", color: "#EEF2FF", size: 110 });
+    // A faint base shows where to put a thumb; it goes away on the first touch (nipplejs then
+    // draws the real stick wherever the thumb lands).
+    const hint = document.createElement("div");
+    hint.className = "pointer-events-none absolute bottom-[18%] left-[18%] grid size-28 place-items-center rounded-full border-4 border-ink/25 bg-ink/5";
+    hint.innerHTML = `<div class="size-12 rounded-full border-4 border-ink/30 bg-paper/60"></div><span class="tag absolute -bottom-7 text-ink/50">Drag to steer</span>`;
+    zone.appendChild(hint);
+    zone.addEventListener("pointerdown", () => hint.remove(), { once: true });
+    const stick = nipplejs.create({ zone, mode: "dynamic", color: "#0D1424", size: 110 });
     // nipplejs y points up; screen and world y point down.
     stick.on("move", (e) => (this.dir = { x: e.data.vector.x, y: -e.data.vector.y }));
     stick.on("end", () => (this.dir = { x: 0, y: 0 }));

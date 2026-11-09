@@ -39,11 +39,12 @@ const JOIN_TIMEOUT_MS = 2500;
 let paidSeat: (() => JoinOpts) | null = null;
 export const setPaidSeat = (o: () => JoinOpts): void => void (paidSeat = o);
 
-/** Why the last join fell back offline, in game words (empty = server just did not answer). */
-let offlineWhy = "";
+/** The server refused the seat (credits, already playing, busy...): shown, never papered over. */
+class Refused extends Error {}
+/** Set by the refusal card's "Practice offline" button: the next connect goes straight to local bots. */
+let offlineOnPurpose = false;
 
 async function connect(roomCode?: string, judge = false): Promise<Source> {
-  offlineWhy = "";
   const paid = paidSeat;
   paidSeat = null;
   // Reloaded or came back mid-match: take the held seat back before anything else.
@@ -57,7 +58,9 @@ async function connect(roomCode?: string, judge = false): Promise<Source> {
     await conn.join(paid());
     return conn;
   }
-  if (!new URLSearchParams(location.search).has("local")) {
+  const wantLocal = offlineOnPurpose || new URLSearchParams(location.search).has("local");
+  offlineOnPurpose = false;
+  if (!wantLocal) {
     const conn = new MatchConnection();
     const timeout = new Promise<never>((_, no) => setTimeout(() => no(new Error("join timeout")), JOIN_TIMEOUT_MS));
     try {
@@ -65,10 +68,10 @@ async function connect(roomCode?: string, judge = false): Promise<Source> {
       return conn;
     } catch (e) {
       conn.leave();
-      console.warn("join failed, offline practice", e);
-      // The server said no (not just silence): tell the player why they are offline.
+      // The server said no (not just silence): show why, never dress practice up as a real lobby.
       const why = refusalWords((e as Error).message ?? "");
-      offlineWhy = why && `${why} Playing offline practice meanwhile.`;
+      if (why) throw new Refused(why);
+      console.warn("server unreachable, offline practice", e);
     }
   }
   return new LocalMatch({ seed: (Date.now() >>> 0) % 1e9, withMe: true, bots: 11, warmupS: 8 });
@@ -183,14 +186,16 @@ export const play: Screen = (root, params) => {
   });
 
   void connect(params.code, params.judge === "1").catch((e: Error) => {
-    status.textContent = `Could not join the paid match: ${e.message}. Your ticket stays on your account for the next one.`;
+    if (e instanceof Refused) refusedCard(root, e.message);
+    else status.textContent = `Could not join the paid match: ${e.message}. Your ticket stays on your account for the next one.`;
     return new Promise<never>(() => {});
   }).then((s) => {
     if (left) return s.leave?.();
     src = s;
+    hud.offline = s instanceof LocalMatch;
     status.textContent =
       s instanceof LocalMatch
-        ? offlineWhy || "Offline practice: real rules, local bots"
+        ? "Offline practice: real rules, local bots, nothing counts"
         : params.judge === "1"
           ? "Judge Run: a 90 s scenario. Seeded map, normal rules, Drone-1 hunts red blobs. Most first-timers get greedy. Will you?"
           : "";
@@ -248,4 +253,23 @@ function shareResult(o: Outcome, matchId: string): void {
   if (o.death && !o.death.eaten) return void shareCertificate({ ...o.death, matchId });
   const what = o.kind === "cashed" ? `cashed out ${o.end.toFixed(2)}` : o.kind === "survived" ? `survived with ${o.end.toFixed(2)}` : "got eaten";
   void shareLink(`I ${what} on MARGIN, rank #${o.rank} of ${o.of}. Get greedy. Get liquidated.`, verifyUrl(matchId));
+}
+
+/** The server said no: say why, offer offline practice as an explicit choice, or go home. */
+function refusedCard(root: HTMLElement, why: string): void {
+  const el = document.createElement("div");
+  el.className = "fixed inset-0 z-20 grid place-items-center bg-ink/80 p-4";
+  el.innerHTML = `<div class="sticker max-w-sm rounded-box bg-paper p-6 text-center text-ink">
+    <h2 class="font-display text-4xl">Can't join right now</h2>
+    <p data-why class="mt-2"></p>
+    <div class="mt-5 flex flex-wrap justify-center gap-3">
+      <button data-off class="sticker sticker-press rounded-box bg-ink px-5 py-3 font-display text-lg text-paper">Practice offline</button>
+      <a href="#/" class="sticker sticker-press rounded-box bg-paper px-5 py-3 font-display text-lg">Home</a></div>
+    <p class="mt-3 text-xs text-ink/60">Offline practice runs the real rules against local bots. Nothing counts.</p></div>`;
+  el.querySelector("[data-why]")!.textContent = why;
+  el.querySelector("[data-off]")!.addEventListener("click", () => {
+    offlineOnPurpose = true;
+    rerender();
+  });
+  root.appendChild(el);
 }
