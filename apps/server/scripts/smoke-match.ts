@@ -34,7 +34,8 @@ const garbageStart = pos(honest, garbage.sessionId);
 const honestStart = pos(honest);
 const floodStart = pos(honest, flood.sessionId);
 // Head for the farther wall so 2 s of movement never clamps at the arena edge.
-const away = (p: { x: number } | null) => (p && p.x > 1000 ? -1 : 1);
+const mid = (honest.state as { arenaW: number }).arenaW / 2;
+const away = (p: { x: number } | null) => (p && p.x > mid ? -1 : 1);
 const hDir = away(honestStart), fDir = away(floodStart);
 
 const junk: unknown[] = [null, "x", 7, { seq: 1, dirX: NaN, dirY: 0 }, { seq: 1, dirX: 50, dirY: 0, boost: false, repay: false, cashout: false }, { dirX: 1 }];
@@ -60,8 +61,8 @@ await new Promise<void>((resolve) => honest.onLeave(() => resolve()));
 timers.forEach(clearInterval);
 console.log(JSON.stringify({ phases, ...report, hostileDropped }, null, 1));
 
-// Ledger: players who were in at GO paid 100 and got their equity back (80 with the movement
-// stub); the hostile client was dropped during warm-up, so it was never charged.
+// Ledger: players in at GO paid 100 and got their settled payout back; the hostile client was
+// dropped during warm-up, so it was never charged.
 const http = url.replace(/^ws/, "http");
 const bal = async (k: number) =>
   ((await (await fetch(`${http}/api/credits?guestKey=ed25519:smoke${RUN}k${k}`)).json()) as { balance: number }).balance;
@@ -74,6 +75,7 @@ const ok =
   report.honestDx > 0 &&
   report.floodDx <= report.honestDx + 1 &&
   hostileDropped &&
-  balances.join() === "980,980,980,1000";
+  balances[3] === 1000 &&
+  balances.slice(0, 3).every((b) => Number.isFinite(b) && b >= 900 && b !== 1000);
 console.log(ok ? "SMOKE OK" : "SMOKE FAIL");
 process.exit(ok ? 0 : 1);

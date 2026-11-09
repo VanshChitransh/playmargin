@@ -2,8 +2,7 @@
 // Only display fields (protocol.ts BlobView) cross the wire; debt never does. A player's own
 // "owe" number goes to that client alone as a private "me" message.
 import { ArraySchema, MapSchema, Schema, type } from "@colyseus/schema";
-import { R, radius, toUnits, type Blob, type World } from "@margin/core";
-import { ring } from "../engine/stub";
+import { blobView, radius, type World } from "@margin/core";
 
 export class BlobState extends Schema {
   @type("string") id = "";
@@ -56,27 +55,15 @@ export class MatchState extends Schema {
   @type(["string"]) leaderboard = new ArraySchema<string>();
 }
 
-/** Copy display fields of these blobs into state.blobs; drop blobs no longer present. */
-export function syncBlobs(state: MatchState, blobs: Iterable<Blob>, tick: number): void {
-  const seen = new Set<string>();
-  for (const b of blobs) {
-    seen.add(b.id);
-    let s = state.blobs.get(b.id);
-    if (!s) {
-      s = new BlobState().assign({ id: b.id, kind: b.kind, label: b.label });
-      state.blobs.set(b.id, s);
-    }
-    s.x = b.x;
-    s.y = b.y;
-    s.radius = radius(b.mass);
-    s.ring = ring(b);
-    s.pips = b.pips;
-    s.equity = toUnits(b.mass - b.debt);
-    s.shielded = tick < b.shieldUntil;
-    s.cashingOut = b.cashout !== null;
-    s.state = b.state;
+/** Copy core's blobView (display fields only, owe stays private) into state.blobs. */
+export function syncBlobs(state: MatchState, w: World): void {
+  for (const b of w.blobs.values()) {
+    const { owe: _owe, ...v } = blobView(b, w.tick);
+    const s = state.blobs.get(b.id);
+    if (s) s.assign(v);
+    else state.blobs.set(b.id, new BlobState().assign(v));
   }
-  for (const id of [...state.blobs.keys()]) if (!seen.has(id)) state.blobs.delete(id);
+  for (const id of [...state.blobs.keys()]) if (!w.blobs.has(id)) state.blobs.delete(id);
 }
 
 /** Copy zone, food and spikes from the world (LIVE only). */
@@ -106,13 +93,4 @@ function syncById<T extends { id: number }, S extends Schema>(
     fill(s, item);
   }
   for (const key of [...map.keys()]) if (!seen.has(key)) map.delete(key);
-}
-
-/** Top LEADERBOARD_TOP alive blob ids by equity, highest first. */
-export function leaderboard(blobs: Iterable<Blob>): string[] {
-  return [...blobs]
-    .filter((b) => b.state === "alive")
-    .sort((a, b) => b.mass - b.debt - (a.mass - a.debt))
-    .slice(0, R.LEADERBOARD_TOP)
-    .map((b) => b.id);
 }

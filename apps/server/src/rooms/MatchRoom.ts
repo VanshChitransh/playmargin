@@ -1,36 +1,41 @@
-// One match: WARMUP (ghosts, nothing charged) -> COUNTDOWN 3-2-1 -> GO (seeded fair respawn)
-// -> LIVE 90 s -> ENDED -> dispose. Every timer reads this.phase, nothing else (RULES: Warm-up).
-// The engine runs only in LIVE; before GO players are ghosts that just move. Registered twice:
-// "match" (public, filtered by mode) and "private" (also by 4-letter roomCode), so a public
-// joinOrCreate can never land in a friend's room.
+// One match: WARMUP (ghosts, nothing charged) -> COUNTDOWN 3-2-1 -> GO -> LIVE 90 s -> ENDED
+// -> settle -> dispose. Every timer reads this.phase. Registered as "match" (public, by mode)
+// and "private" (also by 4-letter roomCode), so a public joinOrCreate never lands in a friend's room.
+// Rules live in @margin/core; this shell owns sockets, timers, credits and the log.
 import { randomInt } from "node:crypto";
 import { Room, type Client } from "colyseus";
 import {
   R,
   TICK_MS,
-  move,
+  addPlayer,
+  drainLog,
+  matchT,
+  matchView,
+  newWorld,
+  removePlayer,
+  settleVerified,
+  startMatch,
+  step,
   sToTicks,
   toUnits,
-  type Blob,
   type GameEventMsg,
+  type LogEntry,
   type Phase,
+  type PlayerSeed,
   type World,
 } from "@margin/core";
-// Swap to @margin/core once C3 (newWorld/step) lands on main.
-import { ARENA, makeBlob, newWorld, step } from "../engine/stub";
 import { sharedDb } from "../db";
-import { admitFree, chargeEntry, payoutFree } from "./freeMatch";
+import { admitFree, chargeEntry, payFromSettle } from "./freeMatch";
 import { InputQueue } from "./input";
 import { agentFill, parseRoomKey, warmupNext, type RoomKey } from "./lobby";
-import { MatchState, leaderboard, syncBlobs, syncWorld } from "./schema";
+import { MatchState, syncBlobs, syncWorld } from "./schema";
 
 const WARMUP_TICKS = sToTicks(R.WARMUP_S);
 const PAID_WAIT_TICKS = sToTicks(R.PAID_WAIT_S);
 const COUNTDOWN_TICKS = sToTicks(R.COUNTDOWN_S);
-const LEADERBOARD_EVERY = sToTicks(1 / R.LEADERBOARD_HZ);
+const LATE_JOIN_TICKS = sToTicks(R.LATE_JOIN_S);
 /** Results stay on screen this long before the room closes. */
 const ENDED_HOLD_TICKS = sToTicks(5);
-const DT_S = 1 / R.TICK_HZ;
 const MAX_CATCHUP_TICKS = 10;
 
 /** Set when SIGTERM arrives: no new matches start while LIVE ones finish (drain deploys). */
@@ -47,25 +52,33 @@ export class MatchRoom extends Room {
   private phaseTick = 0;
   private roomTick = 0;
   private readonly seed = randomInt(2 ** 31);
-  private ghosts = new Map<string, Blob>();
-  private world: World | null = null;
+  /** Warm-up world for ghosts; replaced at GO by one sized for the final head count. */
+  private world!: World;
+  private log: LogEntry[] = [];
+  /** Hashing is async: every drain chains on the last one so seqs never interleave. */
+  private logChain: Promise<unknown> = Promise.resolve();
+  private settled = false;
   private inputs = new InputQueue();
-  private lastOwe = new Map<string, number>();
+  private lastMe = new Map<string, string>();
   /** Blob id (= sessionId) to credits user id, humans in free rooms only. */
   private users = new Map<string, string>();
   private key: RoomKey = { mode: "free", roomCode: null };
   private startNow = false;
+  private joined = 0;
   private owedMs = 0;
+
+  private get started(): boolean {
+    return this.world.goTick >= 0;
+  }
 
   override onCreate(opts: unknown): void {
     if (drain.on) throw new Error("server is restarting, try again in a moment");
     this.key = parseRoomKey(opts);
     if (this.roomName === "private" && !this.key.roomCode) throw new Error("private room needs a 4-letter roomCode");
     if (this.roomName !== "private") this.key.roomCode = null;
+    this.world = newWorld(this.seed, this.key.mode, [], this.roomId);
     this.state.mode = this.key.mode;
-    this.state.arenaW = ARENA.w;
-    this.state.arenaH = ARENA.h;
-    this.onMessage("input", (client, msg: unknown) => this.inputs.push(client.sessionId, msg, Date.now(), this.roomTick));
+    this.onMessage("input", (client, msg: unknown) => this.inputs.push(client.sessionId, msg, Date.now()));
     this.onMessage("startNow", () => (this.startNow = true));
     // Fixed timestep: timers fire late under load, so run as many ticks as wall time owes
     // (capped, so a long stall can't freeze the loop) and a match is always 90 real seconds.
@@ -89,84 +102,83 @@ export class MatchRoom extends Room {
 
   override onJoin(client: Client, _opts: unknown, auth?: string | true): void {
     const id = client.sessionId;
+    const p: PlayerSeed = { id, kind: "human", label: `Player ${++this.joined}`, accountId: null };
+    if (this.started) {
+      // Late join (free, first 15 s): pay now, then core charges the pot and shields 10 s.
+      if (typeof auth !== "string" || !chargeEntry(sharedDb(), auth, this.roomId)) {
+        client.leave(4001, "not enough credits");
+        return;
+      }
+      addPlayer(this.world, p, this.roomTick);
+    } else {
+      addPlayer(this.world, p);
+    }
     if (typeof auth === "string") this.users.set(id, auth);
     this.inputs.open(id);
-    const p = { id, kind: "human" as const, label: `Player ${this.ghosts.size + 1}`, accountId: null };
-    this.ghosts.set(id, makeBlob(p, Math.random() * ARENA.w, Math.random() * ARENA.h, this.key.mode));
     this.countHeads();
   }
 
   /** Honest lobby counter: "5/12 · 2 humans · 3 agents". */
   private countHeads(): void {
-    const all = [...(this.world?.blobs.values() ?? this.ghosts.values())];
+    const all = [...this.world.blobs.values()];
     this.state.humans = all.filter((b) => b.kind === "human").length;
     this.state.agents = all.filter((b) => b.kind === "agent").length;
   }
 
-  /** Dropped mid-match: the blob stays where it is, input zeroed and still poppable, seat held. */
+  /** Dropped mid-match: the blob stays where it is, input expires, still poppable, seat held. */
   override onDrop(client: Client): void {
-    if (!this.world) return; // before GO leaving is free: onLeave runs next
+    if (!this.started) return; // before GO leaving is free: onLeave runs next
     this.inputs.close(client.sessionId);
-    const ticksLeft = sToTicks(R.MATCH_S) - this.world.tick + ENDED_HOLD_TICKS;
+    const ticksLeft = sToTicks(R.MATCH_S) - matchT(this.world, this.roomTick) + ENDED_HOLD_TICKS;
     this.allowReconnection(client, Math.max(1, Math.ceil(ticksLeft / R.TICK_HZ)));
   }
 
   override onReconnect(client: Client): void {
     this.inputs.open(client.sessionId);
-    this.lastOwe.delete(client.sessionId);
+    this.lastMe.delete(client.sessionId);
   }
 
   /** Drain: before GO nobody was charged, so close; LIVE rooms play out, settle and close. */
   override onBeforeShutdown(): void {
-    if (!this.world) void this.disconnect();
+    if (!this.started) void this.disconnect();
   }
 
   override onLeave(client: Client): void {
     const id = client.sessionId;
     this.inputs.close(id);
-    if (!this.world) this.users.delete(id);
-    // Before GO leaving is free; after GO the blob stays and stays poppable (S4 adds reconnection).
-    this.ghosts.delete(id);
+    if (this.started) return; // after GO the blob stays in the arena
+    this.users.delete(id);
+    removePlayer(this.world, id);
     this.countHeads();
   }
 
   private tick(): void {
     this.roomTick++;
     this.phaseTick++;
-    const inputs = this.inputs.take(this.roomTick);
+    const w = this.world;
+    const events = step(w, this.inputs.take(), this.roomTick);
+    for (const ev of events) this.broadcast("ev", ev);
     switch (this.phase) {
-      case "WARMUP":
-      case "COUNTDOWN":
-        for (const g of this.ghosts.values()) {
-          const cmd = inputs.get(g.id);
-          g.dirX = cmd?.dirX ?? 0;
-          g.dirY = cmd?.dirY ?? 0;
-          move(g, DT_S, 0, ARENA);
-        }
-        if (this.phase === "WARMUP") {
-          const next = warmupNext({ mode: this.key.mode, humans: this.ghosts.size, phaseTick: this.phaseTick, startNow: this.startNow });
-          if (next === "close") void this.disconnect();
-          if (next === "countdown") this.countdown();
-        } else if (this.phase === "COUNTDOWN" && this.phaseTick >= COUNTDOWN_TICKS) {
-          this.go();
-        }
-        break;
-      case "LIVE": {
-        const w = this.world!;
-        for (const ev of step(w, inputs, w.tick + 1)) this.broadcast("ev", ev);
-        if (this.roomTick % LEADERBOARD_EVERY === 0) {
-          this.state.leaderboard.clear();
-          this.state.leaderboard.push(...leaderboard(w.blobs.values()));
-        }
-        if (w.phase === "ENDED") {
-          if (this.key.mode === "free") payoutFree(sharedDb(), this.users, w, this.roomId);
-          this.enter("ENDED");
-        }
+      case "WARMUP": {
+        const humans = this.state.humans;
+        const next = warmupNext({ mode: this.key.mode, humans, phaseTick: this.phaseTick, startNow: this.startNow });
+        if (next === "close") void this.disconnect();
+        if (next === "countdown") this.countdown();
         break;
       }
+      case "COUNTDOWN":
+        if (this.phaseTick >= COUNTDOWN_TICKS) this.go();
+        break;
+      case "LIVE":
+        this.drainLog();
+        if (this.key.mode === "free" && this.phaseTick === LATE_JOIN_TICKS) void this.lock();
+        if (w.phase === "ENDED") {
+          this.enter("ENDED", false); // core already sent the ENDED phase event
+          void this.settle();
+        }
+        break;
       case "ENDED":
-        // Settlement (S5) slots in here; until then the room just closes after the results hold.
-        if (this.phaseTick >= ENDED_HOLD_TICKS) void this.disconnect();
+        if (this.phaseTick >= ENDED_HOLD_TICKS && this.settled) void this.disconnect();
         break;
     }
   }
@@ -174,63 +186,89 @@ export class MatchRoom extends Room {
   /** Lock the room; free rooms fill the empty seats with labelled agents who appear for the 3-2-1. */
   private countdown(): void {
     void this.lock();
-    if (this.key.mode === "free") {
-      for (const p of agentFill(this.ghosts.size)) {
-        this.ghosts.set(p.id, makeBlob(p, Math.random() * ARENA.w, Math.random() * ARENA.h, "free"));
-      }
-      this.countHeads();
-    }
+    if (this.key.mode === "free") for (const p of agentFill(this.state.humans)) addPlayer(this.world, p);
+    this.world.phase = "COUNTDOWN";
+    this.countHeads();
     this.enter("COUNTDOWN");
   }
 
-  /** GO: seeded fair respawn of everyone still here; from now on the room must not vanish. */
+  /** GO: charge, build the real world for this head count, seeded fair respawn. No vanishing after this. */
   private go(): void {
     // Entry is charged here and nowhere else; anyone who can no longer pay is sent home uncharged.
     for (const [id, userId] of this.users) {
       if (chargeEntry(sharedDb(), userId, this.roomId)) continue;
       this.users.delete(id);
-      this.ghosts.delete(id);
+      removePlayer(this.world, id);
       this.clients.getById(id)?.leave(4001, "not enough credits");
     }
-    const players = [...this.ghosts.values()].map(({ id, kind, label, accountId }) => ({ id, kind, label, accountId }));
-    this.world = newWorld(this.seed, this.key.mode, players);
-    this.ghosts.clear();
+    const players = [...this.world.blobs.values()].map(({ id, kind, label, accountId }) => ({ id, kind, label, accountId }));
+    this.world = newWorld(this.seed, this.key.mode, players, this.roomId);
+    startMatch(this.world, this.roomTick);
+    this.state.arenaW = this.world.arena.w;
+    this.state.arenaH = this.world.arena.h;
     this.autoDispose = false;
+    if (this.key.mode === "free") void this.unlock(); // late joins for 15 s
+    this.drainLog();
     this.enter("LIVE");
   }
 
-  private enter(phase: Phase): void {
+  private drainLog(): void {
+    const w = this.world;
+    this.logChain = this.logChain.then(() => drainLog(w, this.log));
+  }
+
+  /** Replay the hash-chained log, check it against the live world, then pay out. */
+  private async settle(): Promise<void> {
+    try {
+      await this.logChain;
+      const result = await settleVerified(this.log);
+      for (const p of result.payouts) {
+        const live = this.world.blobs.get(p.id)?.payout;
+        if (live !== p.amount) throw new Error(`settle != live for ${p.id}: ${p.amount} vs ${live}`);
+      }
+      if (this.key.mode === "free") payFromSettle(sharedDb(), this.users, result, this.roomId);
+    } catch (err) {
+      // Never pay from numbers that disagree with the log; the match stays unpaid and loud.
+      console.error(`[settle] ${this.roomId} refused:`, err);
+    } finally {
+      this.settled = true;
+    }
+  }
+
+  private enter(phase: Phase, announce = true): void {
     this.phase = phase;
     this.phaseTick = 0;
     this.state.phase = phase;
-    const ev: GameEventMsg = { type: "phase", phase, tick: this.world?.tick ?? 0 };
-    this.broadcast("ev", ev);
+    const ev: GameEventMsg = { type: "phase", phase, tick: this.roomTick };
+    if (announce) this.broadcast("ev", ev);
   }
 
   override onBeforePatch(): void {
-    const left = {
-      WARMUP: (this.key.mode === "paid" ? PAID_WAIT_TICKS : WARMUP_TICKS) - this.phaseTick,
-      COUNTDOWN: COUNTDOWN_TICKS - this.phaseTick,
-      LIVE: sToTicks(R.MATCH_S) - (this.world?.tick ?? 0),
-      ENDED: 0,
-    }[this.phase];
-    this.state.timeLeftS = Math.max(0, Math.ceil(left / R.TICK_HZ));
-    this.state.tick = this.roomTick;
     const w = this.world;
-    if (!w) {
-      syncBlobs(this.state, this.ghosts.values(), 0);
-      return;
+    const left =
+      this.phase === "WARMUP" ? (this.key.mode === "paid" ? PAID_WAIT_TICKS : WARMUP_TICKS) - this.phaseTick
+      : this.phase === "COUNTDOWN" ? COUNTDOWN_TICKS - this.phaseTick
+      : 0;
+    const view = matchView(w);
+    this.state.timeLeftS = Math.max(0, Math.ceil(this.started ? view.timeLeftS : left / R.TICK_HZ));
+    this.state.tick = this.roomTick;
+    this.state.rateTier = view.rateTier;
+    this.state.arenaW = w.arena.w;
+    this.state.arenaH = w.arena.h;
+    if (this.state.leaderboard.join() !== view.leaderboard.join()) {
+      this.state.leaderboard.clear();
+      this.state.leaderboard.push(...view.leaderboard);
     }
-    syncBlobs(this.state, w.blobs.values(), w.tick);
+    syncBlobs(this.state, w);
     syncWorld(this.state, w);
     for (const c of this.clients) {
       const b = w.blobs.get(c.sessionId);
       if (!b) continue;
-      const owe = toUnits(b.debt);
-      if (this.lastOwe.get(c.sessionId) !== owe) {
-        this.lastOwe.set(c.sessionId, owe);
-        c.send("me", { owe });
-      }
+      const me = { owe: toUnits(b.debt), ratePerMinBps: w.ratePerMinBps };
+      const key = `${me.owe}|${me.ratePerMinBps}`;
+      if (this.lastMe.get(c.sessionId) === key) continue;
+      this.lastMe.set(c.sessionId, key);
+      c.send("me", me);
     }
   }
 }

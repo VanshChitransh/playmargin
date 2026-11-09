@@ -1,6 +1,6 @@
 // Credits side of a free match: admit at join, charge the entry at GO (never earlier, so
 // leaving during warm-up is free), pay out at the end. Agents never touch the ledger.
-import { ENTRY_FREE_MICRO, type Micro, type World } from "@margin/core";
+import { ENTRY_FREE_MICRO, type Micro, type SettleResult } from "@margin/core";
 import { creditsRepo, isGuestKey, topUpDaily } from "../credits";
 import { userForGuestKey, type Db } from "../db";
 
@@ -22,18 +22,15 @@ export function chargeEntry(db: Db, userId: string, matchId: string): boolean {
   return true;
 }
 
-/**
- * Credit each human's final equity (popped = 0). Returns the total paid.
- * ponytail: equity read from the live world; S5 swaps in core.settle(log) and asserts they match.
- */
-export function payoutFree(db: Db, users: Map<string, string>, w: World, matchId: string): Micro {
+/** Credit each human's settled payout (from settle(log), never from live state). Returns the total. */
+export function payFromSettle(db: Db, users: Map<string, string>, result: SettleResult, matchId: string): Micro {
   const repo = creditsRepo(db);
   let total = 0;
-  for (const [blobId, userId] of users) {
-    const b = w.blobs.get(blobId);
-    const amount = b && b.state !== "popped" ? Math.max(0, b.mass - b.debt) : 0;
-    if (amount > 0) repo.append({ userId, delta: amount, reason: "payout", matchId });
-    total += amount;
+  for (const p of result.payouts) {
+    const userId = users.get(p.id);
+    if (!userId || p.amount <= 0) continue;
+    repo.append({ userId, delta: p.amount, reason: "payout", matchId });
+    total += p.amount;
   }
   return total;
 }

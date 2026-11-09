@@ -1,6 +1,6 @@
 // Trust boundary for client input. Anything malformed is dropped (never thrown), and each
 // client gets at most INPUT_MAX_PER_S commands per second so a flood can't speed anyone up.
-import { R, sToTicks, type InputCmd } from "@margin/core";
+import type { InputCmd } from "@margin/core";
 
 export const INPUT_MAX_PER_S = 30;
 
@@ -30,17 +30,17 @@ export class RateLimit {
   }
 }
 
-const INPUT_EXPIRE_TICKS = sToTicks(R.INPUT_EXPIRE_MS / 1000);
-
 interface Pending {
   cmd: InputCmd;
-  at: number;
   boost: boolean;
   repay: boolean;
   cashout: boolean;
 }
 
-/** Latest command per connected player, rate-limited, turned into one InputCmd per tick. */
+/**
+ * Commands that arrived since the last tick, one per player, rate-limited. Core's step() keeps
+ * the last direction and expires it after INPUT_EXPIRE_MS, so a dropped player stops by itself.
+ */
 export class InputQueue {
   private pending = new Map<string, Pending>();
   private limits = new Map<string, RateLimit>();
@@ -49,13 +49,13 @@ export class InputQueue {
     this.limits.set(id, new RateLimit());
   }
 
-  /** Forget the player's input (zeroes their direction) and stop accepting more. */
+  /** Stop accepting input from this player and forget anything not yet applied. */
   close(id: string): void {
     this.limits.delete(id);
     this.pending.delete(id);
   }
 
-  push(id: string, msg: unknown, nowMs: number, tick: number): void {
+  push(id: string, msg: unknown, nowMs: number): void {
     if (!this.limits.get(id)?.allow(nowMs)) return;
     const cmd = parseInput(msg);
     if (!cmd) return;
@@ -63,28 +63,17 @@ export class InputQueue {
     // Taps are edge-triggered: OR them until a tick consumes them, so none is lost between ticks.
     this.pending.set(id, {
       cmd,
-      at: tick,
       boost: cmd.boost || (prev?.boost ?? false),
       repay: cmd.repay || (prev?.repay ?? false),
       cashout: cmd.cashout || (prev?.cashout ?? false),
     });
   }
 
-  /** This tick's commands: direction expires after INPUT_EXPIRE_MS, taps fire once. */
-  take(tick: number): Map<string, InputCmd> {
+  /** Everything that arrived since the last call, taps merged; the queue is then empty. */
+  take(): Map<string, InputCmd> {
     const out = new Map<string, InputCmd>();
-    for (const [id, p] of this.pending) {
-      const fresh = tick - p.at <= INPUT_EXPIRE_TICKS;
-      out.set(id, {
-        seq: p.cmd.seq,
-        dirX: fresh ? p.cmd.dirX : 0,
-        dirY: fresh ? p.cmd.dirY : 0,
-        boost: p.boost,
-        repay: p.repay,
-        cashout: p.cashout,
-      });
-      p.boost = p.repay = p.cashout = false;
-    }
+    for (const [id, p] of this.pending) out.set(id, { ...p.cmd, boost: p.boost, repay: p.repay, cashout: p.cashout });
+    this.pending.clear();
     return out;
   }
 }
