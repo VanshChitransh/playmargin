@@ -1,6 +1,6 @@
 // Read API numbers must be exactly what the tables say.
 import { describe, expect, it } from "vitest";
-import { leaderboard, matchProof, stats } from "./api";
+import { leaderboard, matchLog, matchProof, stats } from "./api";
 import { openDb, userForAccount, userForGuestKey } from "./db";
 import { addMatchPlayer, createMatch, finishMatch, saveEvents } from "./matches";
 import type { LogEntry } from "@margin/core";
@@ -31,5 +31,9 @@ describe("read api", () => {
     expect(matchProof(db, "m1")).toMatchObject({ mode: "paid", settleTx: "tx1" });
     expect(matchProof(db, "m2")).toMatchObject({ mode: "free", anchor: null });
     expect(matchProof(db, "nope")).toBeNull();
+    // Verify page shape: paid head is vouched for by its settle tx, free head only once anchored.
+    expect(matchLog(db, "m1", "testnet")).toMatchObject({ anchorHead: "h1", tx: "tx1", network: "testnet" });
+    expect(matchLog(db, "m2", "testnet")).toMatchObject({ log: expect.any(Array), anchorHead: null, tx: null });
+    expect(matchLog(db, "nope")).toBeNull();
   });
 });

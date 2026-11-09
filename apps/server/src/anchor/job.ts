@@ -4,7 +4,7 @@
 // roots and proofs are still stored and the tx waits for a box that has one.
 import type { Db } from "../db";
 import type { Chain } from "../settlement/chain";
-import { merkle } from "./merkle";
+import { merkle } from "@margin/core";
 
 export const HOUR_MS = 3_600_000;
 export const ANCHOR_ROOM = "free";

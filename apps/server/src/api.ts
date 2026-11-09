@@ -18,10 +18,15 @@ interface MatchRow {
   proof: string | null;
 }
 
-/** Match summary plus its full hash-chained log, or null if unknown. */
-export function matchLog(db: Db, id: string) {
-  const m = db.prepare("SELECT id, mode, status, head, tx_hash FROM matches WHERE id = ?").get(id) as MatchRow | undefined;
-  return m ? { match: m, log: loadLog(db, id) } : null;
+/**
+ * The Verify page's input: the full hash-chained log, the head NEAR vouches for (null until the
+ * settle tx or the hourly anchor lands) and that tx. Null if the match is unknown.
+ */
+export function matchLog(db: Db, id: string, network = process.env.NETWORK === "mainnet" ? "mainnet" : "testnet") {
+  const p = matchProof(db, id);
+  if (!p) return null;
+  const tx = p.mode === "paid" ? p.settleTx : (p.anchor?.tx ?? null);
+  return { log: loadLog(db, id), anchorHead: tx ? p.head : null, tx, network, status: p.status };
 }
 
 /** How to prove this match: paid = its settle tx, free = Merkle proof to the hourly anchor tx. */
@@ -88,11 +93,11 @@ export function mountApi(app: Application, db: () => Db): void {
     const toppedUp = topUpDaily(db(), userId);
     res.json({ balance: toUnits(creditsRepo(db()).balance(userId)), toppedUp: toUnits(toppedUp) });
   });
-  app.get("/api/match/:id/log", (req, res) => {
+  app.get("/api/matches/:id/log", (req, res) => {
     const r = matchLog(db(), req.params.id);
     return r ? void res.json(r) : void res.status(404).json({ error: "unknown match" });
   });
-  app.get("/api/match/:id/proof", (req, res) => {
+  app.get("/api/matches/:id/proof", (req, res) => {
     const r = matchProof(db(), req.params.id);
     return r ? void res.json(r) : void res.status(404).json({ error: "unknown match" });
   });

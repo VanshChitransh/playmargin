@@ -1,10 +1,9 @@
 // Roots per finished hour, proofs stored per match, the current hour left alone.
-import { sha256Hex } from "@margin/core";
+import { rootFromProof, sha256Hex, type ProofStep } from "@margin/core";
 import { describe, expect, it } from "vitest";
 import { openDb } from "../db";
 import { createMatch, finishMatch } from "../matches";
 import { HOUR_MS, anchorPending } from "./job";
-import { rootFromProof, type ProofStep } from "./merkle";
 
 describe("anchorPending", () => {
   it("anchors finished hours only and every proof leads to its root", async () => {
