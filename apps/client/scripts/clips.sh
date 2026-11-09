@@ -2,7 +2,7 @@
 # The three "How it works" loops on the landing page, filmed from real play in offline practice
 # (core rules, labelled bots). Nothing is staged or edited beyond trimming:
 #   nitro:      hold BOOST after GO, the blob grows, the fuel ring drains
-#   repay:      borrow to the cap, steer into spikes until the ring turns red, REPAY at once
+#   repay:      borrow to the cap, steer into spikes until the rim turns red, hold REPAY to PAID OFF
 #   liquidated: same, but no REPAY: stay red until a bot or the vault pops the blob
 # Each is trimmed to a few seconds, scaled to 480 px and encoded as a small muted mp4.
 #   npm run clips -w @margin/client -- [nitro|repay|liquidated ...]   (default: all three)
@@ -57,7 +57,9 @@ for CLIP in "${@:-nitro repay liquidated}"; do for C in $CLIP; do
     ab record start "$TMP/r.webm" "$URL" >/dev/null
     T0=$(date +%s); until_live; sleep 5.5
     RED=$(go_red "$T0")
-    for _ in 1 2 3 4; do ab press r >/dev/null; sleep 0.3; done; sleep 1.5
+    sleep 0.8; press keydown KeyR
+    for _ in $(seq 1 30); do [ "$(ab eval '(__frame.blobs.find(b=>b.id===__frame.me)?.owe ?? 0) < 0.5')" = "true" ] && break; sleep 0.1; done
+    sleep 0.4; press keyup KeyR; sleep 1.8
     ab record stop >/dev/null
     if [ -n "$RED" ]; then encode "$TMP/r.webm" "$((RED - 2))" 5 repay.mp4; else echo "repay: never went red, rerun" >&2; fi ;;
   liquidated)
@@ -65,9 +67,10 @@ for CLIP in "${@:-nitro repay liquidated}"; do for C in $CLIP; do
     T0=$(date +%s); until_live; sleep 5.5
     RED=$(go_red "$T0"); HIT=""
     ab mouse move 320 320 >/dev/null
-    for _ in $(seq 1 60); do [ "$(ab eval '!!document.querySelector(".stamp")')" = "true" ] && { HIT=$(since "$T0"); break; }; sleep 0.5; done
+    for _ in $(seq 1 60); do case "$(ab eval 'document.querySelector(".stamp")?.textContent ?? ""')" in *LIQUIDATED*) HIT=$(since "$T0"); break ;; *EATEN*) break ;; esac; sleep 0.5; done
     sleep 2
     ab record stop >/dev/null
-    if [ -n "$HIT" ]; then encode "$TMP/l.webm" "$((HIT - 4))" 6 liquidated.mp4; else echo "liquidated: no pop, rerun" >&2; fi ;;
+    # Only a pop counts (the card says "Stay red, get popped"); an EATEN death is a rerun.
+    if [ -n "$HIT" ]; then encode "$TMP/l.webm" "$((HIT - 4))" 6 liquidated.mp4; else echo "liquidated: no pop (eaten or none), rerun" >&2; fi ;;
   esac
 done; done
