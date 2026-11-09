@@ -5,7 +5,10 @@ import { Commander, nearAiCall } from "../../apps/server/src/agents/index";
 import { runMatch } from "./match";
 
 const key = process.env.NEAR_AI_API_KEY;
-if (!key) throw new Error("set NEAR_AI_API_KEY (see .env.example)");
+if (!key) {
+  console.error("npm run commander needs a NEAR AI Cloud key: put NEAR_AI_API_KEY=... in .env (see .env.example). Everything else runs without keys.");
+  process.exit(1);
+}
 const c = new Commander(nearAiCall(key));
 let last: unknown = null;
 let plans = 0;

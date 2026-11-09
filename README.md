@@ -19,12 +19,12 @@ npm run demo
 ```
 
 `npm run demo` plays one full paid match headless with the real engine and the real bots
-(6 bot-driven players + 2 liquidator drones), narrates it, then proves it (seed 82, about 10 s). Expected tail:
+(6 bot-driven players + 2 liquidator drones), narrates it, then proves it (seed 68, about 10 s). The last three lines are the proof (exact numbers change only if the rules change):
 
 ```
-vault: lent 552.5, repaid 552.5, interest 4.4, fees 4.1 · reserve 7.2
-hash chain: 437 events, head a91f6e2c3ffd8ed8...
-5880 ticks · 0 micro-units created or destroyed · settle == live ✓ · 10.6 s
+vault: lent 783.9, repaid 783.9, interest 6.4, fees 5.9 · reserve 8.5
+hash chain: 483 events, head d9b15a280500a49d...
+5880 ticks · 0 micro-units created or destroyed · settle == live ✓ · 10.5 s
 ```
 
 To play in a browser:
@@ -33,26 +33,32 @@ To play in a browser:
 npm run dev          # game server on :2567, client on :1234
 ```
 
-Open http://localhost:1234 and press Play. Free rooms need no wallet: you get guest credits and
+Open http://localhost:1234 and press **Practice free**.
+
+Ports busy? `PORT=3567 npm run dev -w @margin/server` moves the game server, and
+`VITE_SERVER_URL=http://localhost:3567 npm run dev -w @margin/client -- --port 3234` moves the client and points it there.
+
+Free rooms need no wallet: you get guest credits and
 the room fills with labelled AI agents (🤖).
 
 ### 2. Do X, see Y
 
 | # | Do | See |
 |---|---|---|
-| 1 | `npm run demo` | A narrated paid match: BOOSTs (loans), a player going red and escaping with REPAY, two players popped by liquidator drones (one at 89 s), payouts, then `0 micro-units created or destroyed` and `settle == live` |
+| 1 | `npm run demo` | A narrated paid match: BOOSTs (loans), a player going red and escaping, two players popped by liquidator drones (at 59 s and 86 s), payouts, then `0 micro-units created or destroyed` and `settle == live` |
+| 1b | `npm run e2e:local` | The strongest end-to-end proof: boots the real game server with a fresh database, two network clients play a full free match, then it checks the match settled, the credit ledger is exact for both players, and replaying the served log gives exactly the stored payouts. Ends with `E2E OK` (about 35 s) |
 | 2 | `npm run sim -- --matches 500` | 500 full matches (2.94M ticks) with the conservation check every tick, every hash chain verified, `settle == live in 500/500` (1 to 3 minutes) |
 | 3 | `npm test` | The whole TypeScript suite (engine, settle, bots, server, client logic) passes |
 | 4 | `cd contracts/margin && cargo test` | Contract unit tests + near-sandbox integration tests pass |
-| 5 | `npm run dev`, open http://localhost:1234, press Play | A 90 s match: steer with the mouse, hold Space = BOOST (borrow, like nitro: the fuel ring empties as you borrow), R = REPAY, E = cash out. Watch your ring go green, yellow, red |
+| 5 | `npm run dev`, open http://localhost:1234, press **Practice free** | A 90 s match: steer with the mouse, hold Space = BOOST (borrow, like nitro: the fuel ring empties as you borrow), R = REPAY, E = cash out. Watch your ring go green, yellow, red |
 | 6 | Hold BOOST until the fuel ring is empty, then run into a big spike | Your ring turns red. Within a moment a blob or a drone touches you: "LIQUIDATED", and your receipt shows what the vault took back |
 | 7 | After any match, open the receipt's Verify link (`/#/verify/<id>`) | The browser replays the log with the same code as the server, checks every hash, and shows settle == what you were paid. Press "Tamper" and the exact broken event turns red |
 | 8 | Open `/#/judge` | Judge Run: a published seed (20261114), normal rules, Drone-1 hunting red blobs. Most first-timers get greedy |
 | 9 | `npm run sweep -- 300` | The balance table behind the rules: liquidations per match and how often a greedy player (holding BOOST to the cap) is popped, for each candidate setting |
 | 9b | `npx tsx tools/sim/human.ts 60` | Can a newcomer win? An average-human bot against 11 agents: median rank and survival (measured: rank 4 of 12, survives 63%) |
 | 9c | `npx tsx tools/sim/contacts.ts 40` | Do players meet on the big map? Contacts per minute, first contact time, liquidations per match (measured: 21 per minute, about 7 s, about 1) |
-| 10 | `npm run soak -- --rooms 50` | 50 rooms on the real server: CPU per room tick (measured 0.128 ms, budget 4 ms) |
-| 11 | Put `NEAR_AI_API_KEY` in `.env`, then `npm run commander` | One live match with the AI commander on NEAR AI Cloud. Each new plan prints with its one-line rationale |
+| 10 | `npm run soak -- --rooms 50` | 50 rooms of 12 on the real server for one full match: CPU per room tick and match length under load (measured 0.17 ms per room tick, budget 4 ms, about half of one core, every match 90 s) |
+| 11 | Put `NEAR_AI_API_KEY` in `.env`, then `npm run commander` (without a key it says so and exits) | One live match with the AI commander on NEAR AI Cloud. Each new plan prints with its one-line rationale |
 
 ### 3. What needs keys
 

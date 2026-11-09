@@ -25,9 +25,20 @@ const server = spawn(process.execPath, ["--import", "tsx", "src/index.ts"], {
   env: { ...process.env, PORT: String(PORT), JOIN_LIMIT_PER_MIN: "100000", DB_PATH: join(mkdtempSync(join(tmpdir(), "margin-soak-")), "soak.sqlite") },
   stdio: ["ignore", "pipe", "inherit"],
 });
+// The server logs one JSON object per line; it is ready at {"event":"up"}. Give up after 60 s.
 await new Promise<void>((ok, fail) => {
-  server.stdout!.on("data", (d: Buffer) => d.toString().includes("server up") && ok());
+  const timer = setTimeout(() => fail(new Error("server did not log its \"up\" event within 60 s")), 60_000);
+  server.stdout!.on("data", (d: Buffer) => {
+    if (/"event":"up"|server up/.test(d.toString())) {
+      clearTimeout(timer);
+      ok();
+    }
+  });
   server.on("exit", (c) => fail(new Error(`server exited (${c}) before it was up`)));
+}).catch((e: unknown) => {
+  console.error(`soak FAILED: ${e instanceof Error ? e.message : String(e)}`);
+  server.kill();
+  process.exit(1);
 });
 
 /** Fail loudly, never hang: stop the server we spawned and exit 1. */
