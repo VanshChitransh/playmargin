@@ -1,0 +1,57 @@
+# NEAR in MARGIN
+
+Every NEAR feature MARGIN uses, why it is there, where the code is, and a real testnet transaction
+that proves it runs. Contract: [`playmargin.testnet`](https://testnet.nearblocks.io/address/playmargin.testnet).
+All links are testnet (mainnet launches 12 or 13 Nov, see `tools/scripts/MAINNET-RUNBOOK.md`).
+
+Re-run the proofs yourself: `tools/scripts/e2e.ts` (deposit, ticket, settle, withdraw),
+`tools/scripts/n8-paid.ts` (two players, two real matches, stolen key), `tools/scripts/session-probe.ts`.
+
+## Money on chain
+
+| Feature | Why MARGIN needs it | Code | Proof |
+|---|---|---|---|
+| **NEP-141 deposit (`ft_transfer_call` into `ft_on_transfer`)** | Player USDC sits in the contract, not with us. Only the configured USDC is accepted, a bad msg or dust is refunded, `{"for": acc}` credits someone else (used by 1-Click) | `contracts/margin/src/deposit.rs:24`, client `apps/client/src/chain/funds.ts:46` | [deposit](https://testnet.nearblocks.io/txns/4c7WhC12tjNXRmo2U3B7hgpGdf7kYifxdkQgNpuiAQKE), [deposit for another account](https://testnet.nearblocks.io/txns/4QEHL1yGjEfidAmSPWW5CL3ZPk4WtU8xkKYsKzhtLZzg) |
+| **Ticket model** (`enter_arena`, `open_match`) | A paid entry locks the stake in a per-account ticket before the match, and `open_match` reserves the vault budget, so BOOST loans never wait for the chain | `contracts/margin/src/arena.rs:11`, `:23` | [open_match](https://testnet.nearblocks.io/txns/7eyphQU4y4j4yJM1ZR73RK3bFxyMqKViEPUKBsieNYiw) |
+| **One exact settle per match, with the log head** | The game server is the only settler, but it cannot create money: payouts + vault repaid + interest + fees + reserve must equal stakes + lent exactly. It can only pay the match's own players, bad debt is capped at 10% of the budget, and the match's hash-chain head is stored on chain for `/verify` | `contracts/margin/src/arena.rs:62` (checks at `:83`, `:99`), server `apps/server/src/settlement/near.ts:31` | real match [settle](https://testnet.nearblocks.io/txns/3Nw3RqiAfPmFYJ5LKxxXioEfppLhdEswXyTHhyZQABwA) (lent 2.87 against a 3.0 budget, all repaid, no survivor so the leftover went to the vault), [second match](https://testnet.nearblocks.io/txns/5EjnTupgYw8iqVshq4ng6sKJPCDFF61YGYthQSjBfCre) |
+| **Withdraw with 1 yoctoNEAR + `#[private]` callback** | 1 yocto forces a full-access key, so a session key can never move money out. The balance is debited before the transfer, and `on_withdraw` (callable only by the contract itself) re-credits it if the transfer fails | `contracts/margin/src/withdraw.rs:21`, callback `:54` | [withdraw](https://testnet.nearblocks.io/txns/H7t24bbuy6KQsbydw2RaURyPYfuUiutpAWtzs4ufuCew), [failed transfer re-credited](https://testnet.nearblocks.io/txns/9QGkseAp4qo8wx3pxXTEYpEPqs9g7LFqgURzdJWMwhuE) (`withdraw_failed` event, balance unchanged) |
+| **Reclaim (no server needed)** | If the server dies, a player takes the stake back 15 min after entering (or after the match opened). Nobody can block it | `contracts/margin/src/arena.rs:121` | [enter](https://testnet.nearblocks.io/txns/BUMextV78FK7nH7PP8m4VaUp9eL25mkwUD43Y8c3xyLa), [reclaim after 15 min](https://testnet.nearblocks.io/txns/7ZrF2rVJGq3VybmxuTaojzjebGiAAGha3M4DH4Yj1Etk) |
+| **NEP-297 events** | The server reads `enter`, `settle`, `refund`, `withdraw_failed` from the tx outcome, so no indexer is needed | `contracts/margin/src/lib.rs:143` | the `EVENT_JSON` logs in any tx above |
+| **Anchors** | Free matches never touch the chain one by one: their heads go into an hourly Merkle root, one tx an hour. A seq that must grow means nothing can be rolled back | contract `contracts/margin/src/arena.rs:149`, server `apps/server/src/anchor/job.ts:28`, `:50` | [hourly root](https://testnet.nearblocks.io/txns/B87qTFs8NSDUuAkhD1TUyCnBuKR7Z9abR8j1CVjcgNeY) |
+| **Upgrade with `#[init(ignore_state)]` migrate** | New code without losing balances: the entry stake became contract state through a migration | `contracts/margin/src/lib.rs:185` | [deploy + migrate](https://testnet.nearblocks.io/txns/97nmCiQ46o2S8hkHQt6e56Uj2Jt4iq69h36w4hLp8y2w) |
+
+## Keys, signatures and gas
+
+| Feature | Why MARGIN needs it | Code | Proof |
+|---|---|---|---|
+| **Function-call access key (session key)** | "Quick play": one wallet approval adds a key that can ONLY call `enter_arena` on our contract. After that, PLAY needs no pop-up | `apps/client/src/chain/session.ts:46` | [AddKey](https://testnet.nearblocks.io/txns/F3GzT78QTH1RkLCwpM89JjFsgdfZAGt9hNqbC365Cug8) |
+| **NEP-366 meta-transactions + our relayer** | The player signs a delegate with the session key, our relayer pays the gas. The relayer only wraps a zero-deposit, gas-capped `enter_arena` to our contract | client `apps/client/src/chain/session.ts:75`, relayer `services/relayer/server.ts:60`, allow-list `services/relayer/validate.ts:17` | relayed tickets: [player 1](https://testnet.nearblocks.io/txns/6ZSeFrGuuHC6Y6G6swxtpLodk9gjZUJk6cqhmdR2Tn4P), [player 2](https://testnet.nearblocks.io/txns/9jAz6gordC9Unr4rgaKzjhirYUsj4ET87QNzsXyFcK1g) |
+| **Session key signs NEP-366 without spending its allowance** | We tested it first (N7): the 0.05 NEAR allowance is unchanged after relaying, so a session key never runs dry | `tools/scripts/session-probe.ts` | [probe](https://testnet.nearblocks.io/txns/4LHK1ghPTjAh4csB7aioQAErTJAKaHuu46KPHMM4UYb7) |
+| **NEP-413 signed join** | A paid room seat must belong to the account that owns the ticket. The session key signs `margin-join:paid:<account>` (recipient = contract, one-use 60 s nonce). The server verifies the signature and that the key is on that account and scoped to our contract | client `apps/client/src/chain/join.ts:28`, server `apps/server/src/rooms/paidMatch.ts:45`, key scope `:53` | off-chain by design (no tx). Exercised in every [n8 run](../tools/scripts/n8-paid.ts) |
+| **Named sub-accounts** | Each role is its own account with its own key and nonce: `settler.`, `relayer.`, `usdc.`, `owner.playmargin.testnet`, test players. The settler and relayer never collide on nonces | `tools/scripts/keys.ts` | [sub-account created](https://testnet.nearblocks.io/txns/FPim5FK6GosZ8ftPPFTMWKycdkTUibnAZZiQdJT1RhLK) |
+
+### Stolen session key cannot withdraw
+
+`tools/scripts/n8-paid.ts` takes a real player's session key and tries to drain the account:
+
+| Attempt | Result |
+|---|---|
+| `withdraw` with 1 yocto attached | refused by the protocol: `InvalidAccessKeyError: DepositWithFunctionCall` (a function-call key cannot attach any deposit) |
+| `withdraw` without a deposit | refused by the protocol: `InvalidAccessKeyError: MethodNameMismatch` (the key only allows `enter_arena`) |
+| `withdraw` wrapped as a NEP-366 delegate to our relayer | relayer answers HTTP 400 (allow-list) |
+| balance afterwards | unchanged |
+
+The worst a stolen session key can do is buy a ticket for its owner, which the owner can reclaim.
+
+## Intents and AI
+
+| Feature | Why MARGIN needs it | Code | Proof |
+|---|---|---|---|
+| **NEAR Intents 1-Click (Add funds)** | Players top up from any chain (USDC on Base, ETH, SOL, BTC...). The quote lands as native USDC on NEAR straight into the contract with `customRecipientMsg {"for": player}`, so it is credited to the player in the same flow. Our partner JWT stays on the relayer | relayer `services/relayer/oneclick.ts:71`, `:78`, client `apps/client/src/chain/addfunds.ts:34` | dry quotes only until mainnet (Intents has no testnet): 2 USDC on Base quotes 1.995 USDC out, at least 1.975, about 35 s |
+| **NEAR AI Cloud commander** | One LLM call retunes all agents in a free room (greed, caution, drone focus). It never touches money or positions: its output is parsed and clamped | `apps/server/src/agents/commander.ts:11`, `:89`, room `apps/server/src/rooms/MatchRoom.ts:75` | `apps/server/scripts/smoke-commander.ts` (off-chain inference, no tx) |
+| **NEAR Auth (email login)** | Players without a wallet log in with email. The account key is an MPC key, the relayer creates the account and pays the MPC `sign` calls, and only for txs to our contract, USDC or the account itself | `apps/client/src/chain/email.ts`, relayer `services/relayer/fastauth.ts:45`, `services/relayer/server.ts:120`, `:138` | behind `VITE_NEAR_AUTH=1`, waiting on NEAR's mainnet approval of our Auth0 app |
+
+## Planned, not built yet
+
+- **Agent accounts.** Agents are labelled in game (`Agent-3 🤖`) but have no NEAR account yet (`accountId: null`). The plan is `agent-N.playmargin.near` sub-accounts with public P&L, so anyone can audit what the house's agents earn.
+- **Mainnet.** Same contract and scripts, deployed by following the runbook. Every mainnet transaction is approved by hand.

@@ -90,7 +90,7 @@ LIVE matches finish and settle first, and systemd waits up to 120 s.
 | Mode | Where value lives | In | Out |
 |---|---|---|---|
 | Free | `credits_ledger` in SQLite (append-only, enforced by triggers) | daily top-up to 1,000 credits | entry 100 at GO, payout at settle |
-| Paid | the contract (USDC base units) | deposit (USDC or 1-Click) becomes the idle balance, then `enter_arena` turns it into a 1 USDC ticket | `settle` pays the match's players, repays the vault and adds the reserve share |
+| Paid | the contract (USDC base units) | deposit (USDC or 1-Click) becomes the idle balance, then `enter_arena` turns it into a ticket of `entry_stake` (contract config: 1 USDC, or 0.10 USDC on a lean launch) | `settle` pays the match's players, repays the vault and adds the reserve share |
 
 - **Units.** All game money is integer Micro: 1 unit is 1,000,000 Micro, and 1 USDC is 100 units.
   Percentages are basis points.
@@ -114,6 +114,10 @@ LIVE matches finish and settle first, and systemd waits up to 120 s.
 | Relayer | pay gas for allow-listed calls, fund new email-login accounts (daily cap) | sign for players. It only wraps a gas-capped, zero-deposit `enter_arena` signed by the player (`services/relayer/validate.ts`) |
 | NEAR AI Commander | retune agent personalities (greed, caution, drone focus) | move a blob or touch money: it gets only ids and numbers, and its output is parsed and clamped (`apps/server/src/agents/commander.ts`) |
 | Operator | run the droplet, withdraw from the vault and reserve as owner | block refunds: players `reclaim()` their stake 15 min after a match opens if it never settles |
+| Owner key (`vanshverse.near`) | withdraw vault and reserve, rotate settler, change owner or entry stake | act from a dApp login key: every owner method needs 1 yoctoNEAR, which a function-call key cannot attach. Drain the reserve under open matches: `reserve_withdraw` keeps 10% of locked budget |
+| Contract account key | upgrade the code (`UPGRADE=1`, or `MIGRATE=1` with `migrate()`) | lose balances on upgrade: state is kept, layout changes go through a versioned `migrate` |
+| Email login (NEAR Auth) | sign as the player through Auth0 + MPC | make the relayer pay for arbitrary txs: `/fastauth/sign` only relays txs to our contract, USDC or the player's own account (borsh check in `services/relayer/fastauth.ts`), with per-IP and daily limits |
+| Anyone | call views, deposit USDC for themselves or another account | call any settler or owner method, or push dust: deposits under 0.1 USDC are refunded |
 
 Server abuse limits:
 - 12 joins a minute per IP.
@@ -144,4 +148,68 @@ _To be written by S1: tick order, economy, hash-chained log, settle, agents and 
 _To be written by S3: rendering, prediction and interpolation, screens, Verify page._
 
 ## Contract, relayer and Intents (S4)
-_To be written by S4: contract state and methods, ticket model, relayer policy, 1-Click flow._
+
+Every NEAR feature with a testnet transaction proving it: [`docs/NEAR.md`](NEAR.md).
+
+### Contract state (`contracts/margin`, near-sdk 5.30.1, about 199 KB)
+
+| Field | Holds |
+|---|---|
+| `balances` | idle USDC per account (base units, 6 decimals). Empty rows are deleted |
+| `tickets` | one live ticket per account: stake, `entered_at`, `match_id` once assigned |
+| `matches` | players, stakes, reserved budget, status (Open, Settled, Cancelled), `opened_at`, seq and log head. Settled and cancelled matches keep no player list |
+| `vault` | `free` (backs new matches) and `locked` (budgets of open matches) |
+| `reserve` | house money (fees, dust). Pays bad debt first |
+| `anchors` | the single `"free"` key: hourly Merkle root of free matches |
+| `owner`, `settler`, `usdc`, `entry_stake` | config, readable with `config()` |
+
+Invariant: USDC held by the contract = sum of balances + sum of tickets + vault.free +
+vault.locked + reserve (+ withdrawals in flight). Every method keeps it, and money math is checked
+(overflow panics).
+
+### Ticket model
+
+```mermaid
+sequenceDiagram
+  participant P as Player (session key)
+  participant R as Relayer
+  participant C as Contract
+  participant S as Game server (settler)
+  P->>R: signed delegate enter_arena(entry_stake)
+  R->>C: relayed tx, relayer pays gas
+  C-->>S: EVENT enter (read from the tx outcome)
+  P->>S: join paid room with NEP-413 proof
+  S->>C: open_match(id, players): reserve 1.5 x stakes from vault.free
+  Note over S: 90 s match, BOOST loans come from the reserved budget
+  S->>C: settle(id, payouts, lent, vault_repaid, interest, fees, reserve, seq, head)
+  C-->>P: payout credited to idle balance
+```
+
+- `settle` runs once and needs exact equality: sum(payouts) + vault_repaid + interest_to_vault +
+  fees + reserve == stakes + lent. Outstanding debt (lent minus repaid) must fit the budget, so the
+  budget revolves within a match. Bad debt is at most 10% of the budget and comes from the reserve.
+  The vault always gets its full budget back plus interest and fees. With no survivor, the leftover
+  pot rides in `interest_to_vault`.
+- Escape hatch: `reclaim()` returns the stake 15 min after entering (or after `open_match`), and
+  cancels a match the server never settled. `refund_ticket` lets the server refund no-shows early.
+
+### Relayer policy (`services/relayer`)
+
+| Route | Pays for | Refuses |
+|---|---|---|
+| `POST /relay` | a player's NEP-366 delegate | anything but one zero-deposit `enter_arena` to our contract, ed25519, gas at most 30 Tgas, more than one relay per account per 2 s |
+| `POST /fastauth/create` | creating an email player's account, funded with 0.01 NEAR | names outside `<name>.testnet` or `<name>.near`, more than 1 per IP per minute or 200 a day |
+| `POST /fastauth/sign` | the MPC `sign` call for an email player's tx | txs to anything but our contract, USDC or the player's own account |
+| `GET /tokens`, `POST /quote`, `GET /status` | nothing (1-Click proxy) | quotes without a valid account, known token, amount and refund address. 1 quote per second per account |
+| `GET /health` | | reports the relayer's NEAR and raises `alarm` when it runs low |
+
+### Add funds with 1-Click (NEAR Intents)
+
+1. The client lists origin tokens (`GET /tokens`: USDC, USDT, ETH, SOL, NEAR, BTC on their chains).
+2. `POST /quote` asks 1-Click for EXACT_INPUT into native USDC on NEAR, recipient = the contract,
+   `customRecipientMsg = {"for": player}`, 1% slippage (the UI shows "at least" minAmountOut),
+   refund to the player's origin address. The partner JWT never reaches the browser.
+3. Live mode only (`ONECLICK_LIVE=1`, mainnet): the player sends to the quote's deposit address,
+   the client polls `GET /status` (waiting, processing, done, refunded, failed). The solver's
+   `ft_transfer_call` lands in `ft_on_transfer`, which credits the player from the msg.
+4. Until mainnet, quotes are dry (real prices, no deposit address). Intents has no testnet.
