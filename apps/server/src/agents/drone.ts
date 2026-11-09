@@ -3,14 +3,14 @@
 // steering (Fray, Game AI Pro 2 ch. 18; idea from Apostolique aposbot, MIT, rewritten) with
 // interest toward red blobs, a vulture drift toward the most leveraged blob, and a pincer
 // offset when another drone is already closer to the same target.
-import { hfBps, R, rand, ring, seedRng, type AgentView, type Blob, type Brain, type InputCmd } from "@margin/core";
+import { hfBps, R, radius, rand, ring, seedRng, type AgentView, type Blob, type Brain, type InputCmd } from "@margin/core";
 
 const SLOTS = 32;
 const DIRS = Array.from({ length: SLOTS }, (_, i) => ({ x: Math.cos((i / SLOTS) * 2 * Math.PI), y: Math.sin((i / SLOTS) * 2 * Math.PI) }));
 const REACT_MIN_T = Math.round(0.2 * R.TICK_HZ);
 const REACT_MAX_T = Math.round(0.4 * R.TICK_HZ);
-/** Stand-off from a yellow blob: close enough to strike when it turns red, not in its face. */
-const VULTURE_GAP = 220;
+/** Stand-off past a leveraged blob's edge: close enough to strike when it turns red. */
+const VULTURE_GAP = 70;
 const PINCER_OFFSET = 160;
 
 const dist = (a: { x: number; y: number }, b: { x: number; y: number }): number => Math.hypot(a.x - b.x, a.y - b.y);
@@ -57,7 +57,8 @@ export class Drone implements Brain {
     this.target = weak?.id ?? null;
     if (!weak) return { x: v.zone.cx, y: v.zone.cy };
     const d = dist(me, weak) || 1;
-    return { x: weak.x + ((me.x - weak.x) / d) * VULTURE_GAP, y: weak.y + ((me.y - weak.y) / d) * VULTURE_GAP };
+    const gap = radius(weak.mass) + VULTURE_GAP;
+    return { x: weak.x + ((me.x - weak.x) / d) * gap, y: weak.y + ((me.y - weak.y) / d) * gap };
   }
 
   private steer(v: AgentView): { x: number; y: number } {

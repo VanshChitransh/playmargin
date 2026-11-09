@@ -14,6 +14,8 @@ const SLOW_BASE = 4.5;
 const START_UNITS = R.ENTRY_FREE * R.START_MASS_RATIO;
 const START_LOG = Math.log(START_UNITS) / Math.log(SLOW_BASE);
 const CASHOUT_SPEED_MULT = 0.5;
+/** Liquidator drones must out-run a red blob in its few hundred ms of red, at any bounty mass. */
+export const DRONE_SPEED_MULT = 1.6;
 
 /** Radius in px for a mass in Micro (agar.io-clone: 4 + sqrt(m) * 6). */
 export function radius(mass: Micro): number {
@@ -29,6 +31,7 @@ export function speed(mass: Micro): number {
 
 /** Effective px/s for this blob right now (BOOST burst x1.5, cash-out channel x0.5). */
 export function blobSpeed(b: Blob, tick: number): number {
+  if (b.kind === "drone") return BASE_SPEED_PX_S * DRONE_SPEED_MULT;
   let s = speed(b.mass);
   if (tick < b.boostUntil) s *= R.BOOST_SPEED_MULT;
   if (b.cashout) s *= CASHOUT_SPEED_MULT;
