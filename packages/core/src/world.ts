@@ -31,15 +31,21 @@ function newBlob(p: PlayerSeed, x: number, y: number, mass: Micro): Blob {
   };
 }
 
-/** Fresh world in WARMUP: ghosts with display mass, nothing charged, pot 0. */
-export function newWorld(seed: number, mode: Mode, players: PlayerSeed[], matchId = `m${seed}`): World {
+/** 1 USDC in base units: the paid stake when the server does not pass the contract's entry_stake. */
+export const DEFAULT_STAKE_BASE = 1_000_000;
+
+/** Fresh world. Paid rooms pass the contract's config().entry_stake (USDC base units) as stakeBase. */
+export function newWorld(seed: number, mode: Mode, players: PlayerSeed[], matchId = `m${seed}`, stakeBase = DEFAULT_STAKE_BASE): World {
+  if (mode === "paid" && (!Number.isSafeInteger(stakeBase) || stakeBase <= 0 || C.ENTRY_PAID_MICRO % stakeBase !== 0)) {
+    throw new Error(`stake ${stakeBase} base units must divide ${C.ENTRY_PAID_MICRO} Micro exactly`);
+  }
   // Drones hold no stake and pass through blobs, so only players size the map (2 humans = Duel).
   const side = arenaSide(players.filter((p) => p.kind !== "drone").length);
   const w: World = {
     matchId, seed, rngState: seedRng(seed), tick: 0, phase: "WARMUP", goTick: -1, mode,
     arena: { w: side, h: side }, pot: 0,
     vault: { budget: 0, lent: 0, repaid: 0, interest: 0, badDebt: 0 },
-    reserve: 0, fees: 0, cashedOut: 0, ratePerMinBps: C.RATE_BASE_BPS,
+    reserve: 0, fees: 0, cashedOut: 0, ratePerMinBps: C.RATE_BASE_BPS, stakeBase,
     blobs: new Map(), food: [], spikes: [],
     zone: { cx: side / 2, cy: side / 2, r: Math.hypot(side, side) / 2, targetR: (side / 2) * C.R.ZONE_FINAL_RADIUS },
     foodPool: 0, nextId: 1, pendingLog: [],
@@ -120,7 +126,7 @@ export function startMatch(w: World, tick: number, ratePerMinBps: number = C.RAT
   w.goTick = tick;
   w.tick = tick;
   w.ratePerMinBps = ratePerMinBps;
-  w.pendingLog.push({ type: "MATCH_START", tick, data: { matchId: w.matchId, seed: w.seed, mode: w.mode, ratePerMinBps } });
+  w.pendingLog.push({ type: "MATCH_START", tick, data: { matchId: w.matchId, seed: w.seed, mode: w.mode, ratePerMinBps, stakeBase: w.stakeBase } });
   const blobs = [...w.blobs.values()];
   // Seeded shuffle so nobody picks a spawn slot by joining order.
   for (let i = blobs.length - 1; i > 0; i--) {

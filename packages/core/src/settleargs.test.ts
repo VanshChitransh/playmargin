@@ -5,16 +5,16 @@ import { appendLog } from "./log";
 import type { InputCmd } from "./protocol";
 import { rand, seedRng } from "./rng";
 import { settle } from "./settle";
-import { toSettleArgs } from "./settleargs";
+import { microPerBase, toSettleArgs } from "./settleargs";
 import { step } from "./step";
 import type { PlayerSeed } from "./types";
 import { newWorld, startMatch } from "./world";
 
-async function paidMatch(seed: number) {
+async function paidMatch(seed: number, stakeBase: number) {
   const players: PlayerSeed[] = Array.from({ length: 4 }, (_, i) => ({
     id: `p${i}`, kind: i < 3 ? "human" : "drone", label: `P${i}`, accountId: `p${i}.testnet`,
   }));
-  const w = newWorld(seed, "paid", players);
+  const w = newWorld(seed, "paid", players, `m${seed}`, stakeBase);
   startMatch(w, 1);
   const r = { rngState: seedRng(seed) };
   for (let t = 2; w.phase !== "ENDED"; t++) {
@@ -31,12 +31,14 @@ async function paidMatch(seed: number) {
 }
 
 describe("toSettleArgs", () => {
-  it("passes the contract's checks (arena.rs settle) on 10 paid matches", async () => {
+  // 1 USDC (the default) and 0.10 USDC (deploy-day rehearsal): the game is identical, only the rate differs.
+  it.each([[1_000_000], [100_000]])("passes the contract's checks (arena.rs settle) on 10 paid matches at stake %i", async (stakeBase) => {
     let revolving = 0;
     for (let seed = 1; seed <= 10; seed++) {
-      const { w, result } = await paidMatch(seed);
+      const { w, result } = await paidMatch(seed, stakeBase);
+      expect(result.stakeBase).toBe(stakeBase);
       const a = toSettleArgs(result);
-      const stakes = 3n * 1_000_000n;
+      const stakes = 3n * BigInt(stakeBase);
       const budget = (stakes * 15_000n) / 10_000n;
       const out = a.payouts.reduce((s, [, v]) => s + BigInt(v), 0n) + BigInt(a.vault_repaid) + BigInt(a.interest_to_vault) + BigInt(a.fees) + BigInt(a.reserve);
       expect(out).toBe(stakes + BigInt(a.lent));
@@ -45,10 +47,16 @@ describe("toSettleArgs", () => {
       if (BigInt(a.lent) > budget) revolving++;
       expect(BigInt(a.vault_repaid) <= BigInt(a.lent)).toBe(true);
       expect(a.payouts.every(([acct]) => acct.endsWith(".testnet"))).toBe(true);
-      expect(w.vault.budget).toBe(Number(budget) * 100);
+      expect(w.vault.budget).toBe(Number(budget) * microPerBase(stakeBase));
     }
     // At least one real match lends more than its budget in total: the contract must allow it.
     expect(revolving).toBeGreaterThan(0);
+  });
+
+  it("refuses a stake that does not divide one entry exactly", () => {
+    expect(() => microPerBase(300_001)).toThrow(/bad stake/);
+    expect(microPerBase(100_000)).toBe(1000);
+    expect(microPerBase(1_000_000)).toBe(100);
   });
 
   it("refuses a payout with no account", () => {

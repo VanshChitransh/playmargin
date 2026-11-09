@@ -25,7 +25,7 @@ export function makeWorld(blobs: Blob[], over: Partial<World> = {}): World {
     vault: { budget: Math.floor(pot * 1.5) + lent, lent, repaid: 0, interest: 0, badDebt: 0 },
     reserve: 0, fees: 0, cashedOut: 0, ratePerMinBps: 600,
     blobs: new Map(blobs.map((b) => [b.id, b])), food: [], spikes: [],
-    zone: { cx: 1000, cy: 1000, r: 1400, targetR: 1400 }, foodPool: 0, nextId: 1, pendingLog: [],
+    zone: { cx: 1000, cy: 1000, r: 1400, targetR: 1400 }, foodPool: 0, stakeBase: 1_000_000, nextId: 1, pendingLog: [],
     ...over,
   };
 }

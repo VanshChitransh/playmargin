@@ -33,6 +33,7 @@ export function settle(log: LogEntry[]): SettleResult {
   let vaultRepaid: Micro = 0;
   let badDebt: Micro = 0;
   let goTick = 0;
+  let stakeBase = 1_000_000;
   let interestToVault: Micro = 0;
   let reserve: Micro = 0;
   let fees: Micro = 0;
@@ -63,6 +64,7 @@ export function settle(log: LogEntry[]): SettleResult {
         if (matchId) fail(s, "second MATCH_START");
         matchId = e.data.matchId;
         goTick = e.tick;
+        stakeBase = e.data.stakeBase ?? 1_000_000;
         break;
       case "JOIN": {
         const p = e.data.player;
@@ -193,7 +195,7 @@ export function settle(log: LogEntry[]): SettleResult {
   // Exact equality, no plug: every Micro that came in (entries + loans) has exactly one home.
   const out = totalPaid + vaultRepaid + interestToVault + reserve + fees;
   if (out !== pot + lent) fail(last.seq, `books off by ${out - (pot + lent)} Micro`);
-  return { matchId, payouts, lent, vaultRepaid, interestToVault, reserve, fees, head: last.hash, seq: last.seq };
+  return { matchId, payouts, lent, vaultRepaid, interestToVault, reserve, fees, head: last.hash, seq: last.seq, stakeBase };
 }
 
 /** verifyChain then settle: the only entry point the server, contract call and Verify page should use. */
