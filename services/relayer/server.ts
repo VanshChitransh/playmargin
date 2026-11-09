@@ -1,13 +1,15 @@
 // NEP-366 relayer: POST /relay {payload} wraps a player's signed enter_arena in a tx we pay gas
 // for, and returns the contract's EVENT_JSON logs so the game server sees the "enter" event
 // without an indexer. Pattern from near-api-examples meta-tx/server.ts, rewritten on near-kit.
-// Also proxies 1-Click Add funds (/tokens, /quote, /status) so the partner JWT stays server side.
+// Also proxies 1-Click Add funds (/tokens, /quote, /status) so the partner JWT stays server side,
+// and pays for NEAR Auth email accounts (/fastauth/create, /fastauth/sign, see fastauth.ts).
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { Near, decodeSignedDelegateAction } from "near-kit";
 import { FileKeyStore } from "near-kit/keys/file";
+import { createError, signError } from "./fastauth.ts";
 import * as oneclick from "./oneclick.ts";
 import { RateLimit, refuseReason, type Policy } from "./validate.ts";
 
@@ -102,6 +104,52 @@ async function quote(req: IncomingMessage, res: ServerResponse): Promise<void> {
   reply(res, r.status, r.body as object);
 }
 
+const REGISTRAR = NETWORK === "mainnet" ? "near" : "testnet";
+const FAST_AUTH = NETWORK === "mainnet" ? "fast-auth.near" : "fast-auth.testnet";
+const GUARD = `jwt#https://${NETWORK === "mainnet" ? "login.auth.near.org" : "login.testnet.fast-auth.com"}/`;
+const USDC = process.env.USDC_ID ?? (NETWORK === "mainnet" ? oneclick.USDC_NEAR.slice(7) : "usdc.playmargin.testnet");
+/** NEAR each new email account gets for its own few full-key txs (session key, deposit, withdraw). */
+const FUND = `${Number(process.env.FASTAUTH_FUND ?? 0.01)} NEAR` as const;
+// ponytail: per-IP limits + a daily cap; verify the Auth0 JWT here (JWKS) if bots farm accounts.
+const createLimiter = new RateLimit(60_000);
+const signLimiter = new RateLimit(3_000);
+const daily = { day: "", n: 0, cap: Number(process.env.FASTAUTH_DAILY_CAP ?? 200) };
+const ip = (req: IncomingMessage) => String(req.headers["x-forwarded-for"] ?? req.socket.remoteAddress ?? "?").split(",")[0] ?? "?";
+
+/** POST /fastauth/create {accountId, publicKey}: registrar create_account, funded with FUND. */
+async function fastauthCreate(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const b = await readJson(req);
+  const why = createError(b, REGISTRAR);
+  if (why) return reply(res, 400, { error: why });
+  const today = new Date().toISOString().slice(0, 10);
+  if (daily.day !== today) Object.assign(daily, { day: today, n: 0 });
+  if (daily.n >= daily.cap || !createLimiter.allow(ip(req), Date.now())) return reply(res, 429, { error: "slow down" });
+  daily.n++;
+  const args = { new_account_id: b.accountId, new_public_key: b.publicKey };
+  const r = (await near
+    .transaction(RELAYER_ID)
+    .functionCall(REGISTRAR, "create_account", args, { gas: "50 Tgas", attachedDeposit: FUND })
+    .send({ waitUntil: "FINAL" })) as unknown as Outcome;
+  const failed = JSON.stringify(r.receipts_outcome).includes("Failure");
+  reply(res, failed ? 422 : 200, { ok: !failed, hash: r.transaction.hash });
+}
+
+/** POST /fastauth/sign {guardId, verifyPayload, signPayload}: MPC signs after the JWT checks out. */
+async function fastauthSign(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  const b = await readJson(req);
+  const why = signError(b, GUARD, [policy.contractId, USDC]);
+  if (why) return reply(res, 400, { error: why });
+  if (!signLimiter.allow(ip(req), Date.now())) return reply(res, 429, { error: "slow down" });
+  const args = { guard_id: b.guardId, verify_payload: b.verifyPayload, sign_payload: b.signPayload, algorithm: "eddsa" };
+  const r = (await near
+    .transaction(RELAYER_ID)
+    .functionCall(FAST_AUTH, "sign", args, { gas: "300 Tgas", attachedDeposit: "1 yocto" })
+    .send({ waitUntil: "FINAL" })) as unknown as Outcome & { status: { SuccessValue?: string } };
+  const signature = r.status.SuccessValue;
+  if (!signature) return reply(res, 422, { error: "MPC did not sign", hash: r.transaction.hash });
+  reply(res, 200, { signature, hash: r.transaction.hash });
+}
+
 async function health(res: ServerResponse): Promise<void> {
   const balance = Number(await near.getBalance(RELAYER_ID));
   reply(res, 200, { relayer: RELAYER_ID, contract: policy.contractId, balance, alarm: balance < LOW_BALANCE });
@@ -110,6 +158,9 @@ async function health(res: ServerResponse): Promise<void> {
 createServer((req, res) => {
   if (req.method === "OPTIONS") return reply(res, 204, {});
   if (req.method === "POST" && req.url === "/relay") return void relay(req, res);
+  const err = (e: unknown) => reply(res, 502, { error: e instanceof Error ? e.message : String(e) });
+  if (req.method === "POST" && req.url === "/fastauth/create") return void fastauthCreate(req, res).catch(err);
+  if (req.method === "POST" && req.url === "/fastauth/sign") return void fastauthSign(req, res).catch(err);
   if (req.method === "GET" && req.url === "/health") return void health(res).catch(() => reply(res, 502, {}));
   const fail = () => reply(res, 502, { error: "1-Click unavailable" });
   if (req.method === "GET" && req.url === "/tokens") return void oneclick.tokens().then((t) => reply(res, 200, t), fail);

@@ -1,0 +1,16 @@
+<!doctype html>
+<!-- Dev-only check for N6b email login (not in the build). Testnet Auth0 only returns to
+     http://localhost:3000, so serve this folder as the root: VITE_NEAR_AUTH=1 npx vite apps/client/src/chain/dev --port 3000 -->
+<html>
+  <head><meta charset="utf-8" /><title>Email login check</title></head>
+  <body style="font: 16px system-ui; background: #070a12; color: #eef2ff; padding: 24px">
+    <h1>Email login check</h1>
+    <p id="status">loading...</p>
+    <button id="login">Log in with email</button>
+    <input id="name" placeholder="pick a name" /> <button id="create">Create account</button>
+    <button id="quick">Enable quick play (1 popup)</button>
+    <button id="logout">Log out</button>
+    <pre id="log"></pre>
+    <script type="module" src="./email-check.ts"></script>
+  </body>
+</html>
