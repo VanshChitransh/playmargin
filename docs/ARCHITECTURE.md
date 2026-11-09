@@ -211,7 +211,63 @@ sees only what is near it (`AgentView`) and gets no rule a human does not have.
 | Commander (`commander.ts`), NEAR AI Cloud | Every 15 s, one LLM call retunes the agents' greed, caution and drone focus. Its one-line rationale is shown to spectators | Move a blob or touch money. It sees only ids and numbers (no usernames, so no prompt injection through names). Its JSON is parsed and clamped, unknown ids are dropped, and a failed call keeps the last plan |
 
 ## Client (S3)
-_To be written by S3: rendering, prediction and interpolation, screens, Verify page._
+Vite, vanilla TypeScript, PixiJS 8 for the arena, Tailwind 4 and daisyUI for HTML screens and the
+HUD. The client only draws what the server sends and sends intent; it holds no money and decides no
+rule.
+
+### Rendering (`apps/client/src/render/`)
+- [`arena.ts`](../apps/client/src/render/arena.ts): one Pixi stage with the light agar grid, food,
+  spikes, blobs and effects. The camera follows my blob and zooms out as it grows. The wall is
+  invisible (agar): the grid runs on past the edge and the only cue is that no food lies past it.
+- [`membrane.ts`](../apps/client/src/render/membrane.ts): the soft body. The outline is 40 to 100
+  points, each a radius on a spring with neighbour averaging. Targets come from the free shape (BOOST
+  stretch, squash, living lumps), a soft minimum against the wall (flat side, rounded corners), a
+  dent under a bigger overlapping blob, and small dents from pellets on the rim. Unit tested.
+- [`blob.ts`](../apps/client/src/render/blob.ts): flat fill plus one darker rim. Health lives in the
+  rim: the fill's darker hue when green, amber dashes when yellow, brand red with a pulsing glow and a
+  warning sign when red, so red never relies on colour alone. A gold shell around a smaller core
+  shows the loan. Reduced motion turns off the wobble and keeps the molding.
+- Every feel number is a named constant in [`juice.ts`](../apps/client/src/render/juice.ts).
+
+### Input (`apps/client/src/input/controls.ts`)
+Commands, never positions: a steer direction plus BOOST and REPAY as held state (true in every
+message while Space, R or the button is down) and cash-out as a tap, at most 30 per second. The
+server expires a held input after 250 ms. A window blur or a hidden tab sends an
+all-zero command at once, so nothing stays held.
+
+### Netcode (`apps/client/src/net/`)
+- [`client.ts`](../apps/client/src/net/client.ts): the Colyseus connection. A dropped socket keeps
+  the seat (non-consented leave); a reload resumes it with the reconnection token. A watchdog ends the
+  view with a Retry card if no state arrives for 5 seconds.
+- [`interp.ts`](../apps/client/src/net/interp.ts): snapshot interpolation, drawn 100 ms in the past
+  between the two snapshots around that time. There is no client prediction: what you see is the
+  server's world, slightly delayed.
+- [`room-code.ts`](../apps/client/src/net/room-code.ts): private room codes, validated as exactly four
+  capital letters before they touch the page.
+
+### Screens
+- Landing ([`screens/landing.ts`](../apps/client/src/screens/landing.ts)): live proof strip and three
+  "How it works" loops filmed from real play (`apps/client/scripts/clips.sh`).
+- Play ([`play.ts`](../apps/client/src/play.ts)): warm-up, match, death screen, results. Offline
+  practice runs the same core in the browser ([`game/local.ts`](../apps/client/src/game/local.ts)).
+- Results receipt ([`game/receipt.ts`](../apps/client/src/game/receipt.ts)): itemised from the match
+  log (borrowed, fees, interest, spikes, eats, pops, leftover share), so the lines add up to the final
+  number.
+- Verify ([`screens/verify.ts`](../apps/client/src/screens/verify.ts),
+  [`verify/checks.ts`](../apps/client/src/verify/checks.ts)): re-runs the hash chain, the money replay
+  and the chain anchor in the visitor's browser with the same core code the server runs. A Tamper
+  button edits one number so the check turns red at that event.
+- Cash ([`screens/cash.ts`](../apps/client/src/screens/cash.ts)): balance, paid seats, and Add funds
+  through 1-Click quotes ([`chain/addfunds.ts`](../apps/client/src/chain/addfunds.ts), S4), dry until
+  a real deposit is confirmed.
+
+### What the client never trusts or owns
+- It never decides an outcome: eats, pops, interest, payouts and the receipt total all come from the
+  server state or the signed log.
+- Money lives in the server's ledger and the NEAR contract, never in the client. A modified client can
+  only send worse steering.
+- Text from other players is never trusted as HTML: names are escaped or set with `textContent`, and
+  a room code from a link must match `^[A-Z]{4}$` before it is shown.
 
 ## Contract, relayer and Intents (S4)
 
