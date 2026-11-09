@@ -4,10 +4,11 @@ import { describe, expect, it } from "vitest";
 import { MATCH_TICKS, MICRO, sToTicks } from "./constants";
 import type { InputCmd } from "./protocol";
 import { rand, seedRng } from "./rng";
+import { radius } from "./motion";
 import { step } from "./step";
 import { leak, makeBlob, makeWorld } from "./testkit";
 import type { PlayerSeed, World } from "./types";
-import { addPlayer, newWorld, startMatch } from "./world";
+import { addPlayer, newWorld, spikeRadius, startMatch } from "./world";
 
 const u = (x: number) => Math.round(x * MICRO);
 const seeds = (n: number): PlayerSeed[] =>
@@ -66,6 +67,18 @@ describe("step", () => {
     for (let i = 0; i < 50; i++) {
       const b = addPlayer(free, { id: `late${i}`, kind: "human", label: "L", accountId: null }, 2);
       expect(edge(free, b.x, b.y)).toBeGreaterThanOrEqual(300);
+    }
+  });
+
+  it("nobody spawns near a spike: blob + spike radius + 120 px at GO and on late join, 40 seeds", () => {
+    const clear = (w: World, b: { x: number; y: number; mass: number }) =>
+      w.spikes.every((k) => k.respawnAt !== null || Math.hypot(k.x - b.x, k.y - b.y) >= radius(b.mass) + spikeRadius(k) + 120);
+    for (let seed = 1; seed <= 40; seed++) {
+      const w = newWorld(seed, "free", seeds(12));
+      startMatch(w, 1);
+      for (const b of w.blobs.values()) expect(clear(w, b)).toBe(true);
+      const late = addPlayer(w, { id: `late${seed}`, kind: "human", label: "L", accountId: null }, 2);
+      expect(clear(w, late)).toBe(true);
     }
   });
 
