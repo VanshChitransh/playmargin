@@ -1,7 +1,7 @@
 // /auth/callback: NEAR Auth redirects here (whitelisted exactly as
 // https://playmargin.fun/auth/callback). The path is served by the SPA fallback; S4's
-// chain/auth.ts finishes the sign-in. import.meta.glob keeps this compiling before it lands.
-const handlers = import.meta.glob<{ handleAuthCallback: (url: URL) => Promise<void> }>("./chain/auth.ts");
+// resumeEmail finishes the sign-in, then #/cash shows the balance or asks a new player for a name.
+import { resumeEmail } from "./chain/wallet";
 
 /** True if this page load is the auth redirect (then the caller skips the normal router). */
 export function isAuthCallback(): boolean {
@@ -15,10 +15,8 @@ export async function runAuthCallback(root: HTMLElement): Promise<void> {
     <p data-msg class="mt-4 font-display text-3xl">Signing you in</p></div></main>`;
   const msg = root.querySelector<HTMLElement>("[data-msg]")!;
   try {
-    const load = handlers["./chain/auth.ts"];
-    if (!load) throw new Error("sign-in is not wired up yet");
-    await (await load()).handleAuthCallback(new URL(location.href));
-    location.replace("/#/");
+    if ((await resumeEmail()) === "out") throw new Error("not logged in after the redirect");
+    location.replace("/#/cash");
   } catch (e) {
     msg.textContent = "Sign-in failed. Try again from the home page.";
     console.error(e);

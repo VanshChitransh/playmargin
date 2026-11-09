@@ -5,7 +5,7 @@ import { EXPLORER, NETWORK } from "../chain/config";
 import { originTokens, quoteDeposit, type OriginToken } from "../chain/addfunds";
 import { balanceOf, deposit, testnetFaucet, walletUsdc } from "../chain/funds";
 import { NeedFunds, payToPlay, type PaidStep } from "../chain/paid";
-import { onAccount, signIn, signOut } from "../chain/wallet";
+import { EMAIL_LOGIN, createEmailAccount, onAccount, resumeEmail, signIn, signInEmail, signOut } from "../chain/wallet";
 import { setPaidSeat } from "../play";
 import type { Screen } from "../router";
 import type { JoinOpts } from "@margin/core";
@@ -31,14 +31,37 @@ export const cash: Screen = (root) => {
   const say = (t: string): void => void (msg.textContent = t);
   let acc: string | null = null;
 
+  let needsName = false;
+
   const draw = async (): Promise<void> => {
+    if (!acc && needsName) {
+      body.innerHTML = `<form class="sticker rounded-box bg-paper p-5">
+        <h2 class="font-display text-3xl">Pick your name</h2>
+        <p class="mt-1">It is your account name and shows on the leaderboard. Lowercase letters, numbers, - and _.</p>
+        <input name=n required minlength=2 maxlength=40 pattern="[a-z0-9_\\-]+" autocomplete=off class="mt-3 w-full rounded-field border-4 border-ink bg-paper px-3 py-2 num" />
+        <button class="${btn} mt-3 bg-liq text-paper">Create my account</button></form>`;
+      const f = body.querySelector("form")!;
+      f.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const b = f.querySelector("button")!;
+        b.disabled = true;
+        say("");
+        createEmailAccount(String(new FormData(f).get("n")))
+          .then(() => (needsName = false))
+          .catch((err: Error) => say(err.message))
+          .finally(() => (b.disabled = false));
+      });
+      return;
+    }
     if (!acc) {
       body.innerHTML = `<article class="sticker rounded-box bg-paper p-5">
         <h2 class="font-display text-3xl">Sign in to play for money</h2>
         <p class="mt-1">Your winnings go to your own NEAR account. Practice stays free with no sign-in.</p>
-        <div class="mt-4 flex flex-wrap gap-3"><button data-c=signin class="${btn} bg-liq text-paper">Sign in</button>
+        <div class="mt-4 flex flex-wrap gap-3">${EMAIL_LOGIN ? `<button data-c=email class="${btn} bg-liq text-paper">Log in with email</button>` : ""}
+        <button data-c=signin class="${btn} ${EMAIL_LOGIN ? "bg-paper" : "bg-liq text-paper"}">${EMAIL_LOGIN ? "Use a wallet" : "Sign in"}</button>
         <a href="#/play" class="${btn} bg-paper">Practice free</a></div></article>`;
       body.querySelector("[data-c=signin]")!.addEventListener("click", () => signIn().catch((e: Error) => say(e.message)));
+      body.querySelector("[data-c=email]")?.addEventListener("click", () => signInEmail().catch((e: Error) => say(e.message)));
       return;
     }
     const [bal, inWallet] = await Promise.all([balanceOf(acc), walletUsdc(acc).catch(() => 0n)]);
@@ -98,6 +121,14 @@ export const cash: Screen = (root) => {
     acc = a ?? as;
     void draw().catch((e: Error) => say(`Could not read your balance: ${e.message}`));
   });
+  // Email players come back from Auth0 logged in: restore them, or ask a new one for a name.
+  void resumeEmail()
+    .then((r) => {
+      if (r !== "needs-name") return;
+      needsName = true;
+      return draw();
+    })
+    .catch((e: Error) => say(`Email login: ${e.message}`));
   return off;
 };
 
