@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" fill="#FF3D5A"/>
+  <rect width="512" height="512" fill="#E5484D"/>
   <defs>
     <path id="body" d="M 22 560 C 12 400 72 212 256 206 C 440 212 506 400 496 560 Z"/>
     <clipPath id="bc"><use href="#body"/></clipPath>

@@ -22,6 +22,7 @@ export class BlobSprite extends Container {
   private prev = { x: 0, y: 0, speed: 0 };
   private fill = 0;
   private calm = false;
+  private isMe = false;
 
   constructor(v: BlobView, isMe: boolean) {
     super();
@@ -62,7 +63,7 @@ export class BlobSprite extends Container {
     const hz = reducedMotion ? 0 : v.ring === "red" ? 4 : v.ring === "yellow" ? 1 : 0;
     const p = hz ? 0.5 + 0.5 * Math.sin(tS * hz * Math.PI * 2) : 1;
     this.ring.alpha = hz ? 0.55 + 0.45 * p : 1;
-    this.ring.scale.set(v.ring === "red" ? 1 + 0.05 * p : 1);
+    this.ring.scale.set(v.ring === "red" ? 1 + 0.08 * p : 1);
     this.warnSign.alpha = 0.6 + 0.4 * p;
   }
 
@@ -79,6 +80,8 @@ export class BlobSprite extends Container {
       pts.push(Math.cos(a) * rr, Math.sin(a) * rr);
     }
     this.body.clear().poly(pts).fill(this.fill).stroke({ width: Math.max(3, r * 0.06), color: darken(this.fill) });
+    // My own blob: a thin paper ring just inside the rim, so "me" reads at a glance.
+    if (this.isMe) this.body.circle(0, 0, r * 0.86).stroke({ width: Math.max(2, r * 0.035), color: 0xffffff, alpha: 0.75 });
   }
 
   private redraw(v: BlobView, isMe: boolean): void {
@@ -93,10 +96,11 @@ export class BlobSprite extends Container {
       return;
     }
     this.fill = vivid(v.id);
+    this.isMe = isMe;
     this.membrane(r, 0, true);
     const rr = r + RING_GAP;
     // Ink under every ring (sticker outline): green, amber and red read on any fill and floor.
-    const w = v.ring === "red" ? RING_W + 2 : RING_W;
+    const w = v.ring === "red" ? RING_W * 2 : RING_W;
     this.ring.circle(0, 0, rr).stroke({ width: w + 3, color: C.ink, alpha: 0.85 });
     if (v.ring === "yellow") dashed(this.ring, rr, C.ringWarn);
     else this.ring.circle(0, 0, rr).stroke({ width: w, color: v.ring === "red" ? C.liq : C.ringSafe });

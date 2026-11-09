@@ -54,7 +54,11 @@ export function boostPreview(me: BlobView): { next: number; max: number } | null
 
 /** All non-popped, non-drone blobs (cashed ones keep their payout) ranked by equity, highest first (same order as the final ranking). */
 export function ranking(blobs: BlobView[]): BlobView[] {
-  return blobs.filter((b) => b.state !== "popped" && b.kind !== "drone").sort((a, b) => b.equity - a.equity);
+  // Sort on the rounded number the row shows, ties by id: near-equal blobs no longer swap
+  // places every refresh, and the rank always matches the visible order.
+  return blobs
+    .filter((b) => b.state !== "popped" && b.kind !== "drone")
+    .sort((a, b) => Math.round(b.equity) - Math.round(a.equity) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
 /** conic-gradient for the pip ring: each pip is a 120 degree arc filled 0..1. */

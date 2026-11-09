@@ -81,7 +81,7 @@ export class Hud {
       this.lbAt = now;
       this.leaderboard(f);
     }
-    this.coach.update(m.phase, elapsedS(m), (me?.owe ?? 0) > 0);
+    this.coach.update(m.phase, elapsedS(m), (me?.owe ?? 0) > 0, !!me && me.ring !== "green");
     if (!me) return;
     this.fuel(me, boostBlocked(me, m));
     const ring = me.state === "alive" && m.phase === "LIVE" ? me.ring : "green";

@@ -51,4 +51,8 @@ describe("hud logic", () => {
     expect(displayName({ kind: "agent", label: "Agent-2" })).toBe("\u{1F916} Agent-2");
     expect(displayName({ kind: "human", label: "riya" })).toBe("riya");
   });
+  it("keeps a stable order for equal shown equity, so ranks match rows", () => {
+    const r = ranking([me({ id: "c", equity: 95.2 }), me({ id: "a", equity: 94.8 }), me({ id: "b", equity: 95.4 }), me({ id: "d", equity: 120 })]);
+    expect(r.map((b) => b.id)).toEqual(["d", "a", "b", "c"]);
+  });
 });

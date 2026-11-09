@@ -35,6 +35,7 @@ try {
   const send = (method, params = {}) => new Promise((ok) => (pending.set(++id, ok), ws.send(JSON.stringify({ id, method, params }))));
 
   await send("Page.enable");
+  await send("Emulation.setFocusEmulationEnabled", { enabled: true }); // keep rAF running when the window is hidden
   await send("Page.navigate", { url });
   await sleep(14000); // warm-up and GO, so the arena is full
   await send("Emulation.setCPUThrottlingRate", { rate: Number(rate) });
