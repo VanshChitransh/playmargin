@@ -34,16 +34,18 @@ export class ArenaRenderer {
   private zoom = 1;
   private fps?: Text;
   private zoneKey = "";
+  private view = VIEW_AT_START;
 
-  async mount(root: HTMLElement, source: FrameSource, opts: { fps?: boolean } = {}): Promise<void> {
+  async mount(root: HTMLElement, source: FrameSource, opts: { fps?: boolean; fit?: HTMLElement; view?: number } = {}): Promise<void> {
     await this.app.init({
-      resizeTo: window,
+      resizeTo: opts.fit ?? window,
       background: C.ink,
       antialias: true,
       autoDensity: true,
       resolution: Math.min(window.devicePixelRatio || 1, 2),
     });
     root.appendChild(this.app.canvas);
+    this.view = opts.view ?? VIEW_AT_START;
     this.bake();
     this.world.addChild(this.grid, this.zone, this.foodLayer, this.spikeLayer, this.blobLayer, this.preview);
     this.app.stage.addChild(this.world);
@@ -187,7 +189,7 @@ export class ArenaRenderer {
 
   private follow(x: number, y: number, r: number): void {
     const { width, height } = this.app.screen;
-    const base = Math.min(width, height) / VIEW_AT_START;
+    const base = Math.min(width, height) / this.view;
     // Zoom out as I grow so a boosted blob still sees its threats (agar.io feel).
     const target = base * Math.min(1.2, Math.max(0.45, Math.pow(57 / Math.max(r, 1), 0.45)));
     this.zoom += (target - this.zoom) * 0.08;

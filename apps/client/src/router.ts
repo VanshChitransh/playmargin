@@ -6,10 +6,15 @@ export type Params = Record<string, string>;
 export type Cleanup = () => void;
 export type Screen = (root: HTMLElement, params: Params) => Cleanup | void;
 
+let render: () => void = () => {};
+
+/** Re-run the current route (Play again on the same #/play hash fires no hashchange). */
+export const rerender = (): void => render();
+
 /** Route patterns like "/verify/:id"; the first match wins, "*" is the fallback. */
 export function startRouter(root: HTMLElement, routes: Record<string, Screen>): void {
   let cleanup: Cleanup | void;
-  const render = (): void => {
+  render = (): void => {
     cleanup?.();
     root.replaceChildren();
     const path = location.hash.replace(/^#/, "") || "/";

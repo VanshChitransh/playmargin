@@ -42,6 +42,14 @@ export class MatchConnection {
     this.room.onMessage("ev", (e: GameEventMsg) => this.listeners.forEach((l) => l(e)));
   }
 
+  get me(): string {
+    return this.room?.sessionId ?? "";
+  }
+
+  frameAt(nowMs: number): Frame | null {
+    return this.buffer.frameAt(nowMs);
+  }
+
   onEvent(cb: (e: GameEventMsg) => void): () => void {
     this.listeners.add(cb);
     return () => this.listeners.delete(cb);

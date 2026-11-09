@@ -45,9 +45,9 @@ export function boostPreview(me: BlobView): { next: number; max: number } | null
   return { next: r(mass + charge), max: r(mass + charge * me.pips) };
 }
 
-/** All alive non-drone blobs ranked by equity, highest first (same order as the final ranking). */
+/** All non-popped, non-drone blobs (cashed ones keep their payout) ranked by equity, highest first (same order as the final ranking). */
 export function ranking(blobs: BlobView[]): BlobView[] {
-  return blobs.filter((b) => b.state === "alive" && b.kind !== "drone").sort((a, b) => b.equity - a.equity);
+  return blobs.filter((b) => b.state !== "popped" && b.kind !== "drone").sort((a, b) => b.equity - a.equity);
 }
 
 /** conic-gradient for the pip ring: each pip is a 120 degree arc filled 0..1. */

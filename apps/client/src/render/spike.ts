@@ -9,7 +9,7 @@ const POINTS = 12;
 
 /** Bake the grey and red spike textures once per renderer. */
 export function bakeSpikeTextures(renderer: Renderer): { grey: Texture; red: Texture } {
-  const make = (color: number, glow: boolean): Texture => {
+  const make = (color: number, thick: boolean): Texture => {
     const g = new Graphics();
     const pts: number[] = [];
     for (let i = 0; i < POINTS * 2; i++) {
@@ -17,8 +17,8 @@ export function bakeSpikeTextures(renderer: Renderer): { grey: Texture; red: Tex
       const r = i % 2 ? 0.55 : 1;
       pts.push(Math.cos(a) * r * 32, Math.sin(a) * r * 32);
     }
-    if (glow) g.circle(0, 0, 40).fill({ color, alpha: 0.18 });
-    g.poly(pts).fill({ color, alpha: 0.9 });
+    // Brand rule: no glows. Danger reads as colour plus a thick ink outline and the warning sign.
+    g.poly(pts).fill({ color }).stroke({ width: thick ? 6 : 3, color: 0x070a12, join: "round" });
     return renderer.generateTexture({ target: g, resolution: 2 });
   };
   return { grey: make(C.muted, false), red: make(C.liq, true) };
