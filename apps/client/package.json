@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p .",
-    "record": "bash scripts/record.sh"
+    "record": "bash scripts/record.sh",
+    "clips": "bash scripts/clips.sh",
+    "perf": "node scripts/perf.mjs"
   },
   "dependencies": {
     "@colyseus/sdk": "~0.17.0",

@@ -6,12 +6,16 @@ import { ArenaRenderer } from "../render/arena";
 import type { Screen } from "../router";
 import { newRoomCode } from "../net/room-code";
 import { ENDPOINT } from "../net/client";
+import { reducedMotion } from "../render/motion";
 
-const STEPS: Array<[string, string]> = [
-  ["BOOST = borrow", "Hold BOOST to borrow from the vault: bigger and faster while it burns. The ring is your fuel."],
-  ["Red ring = poppable", "Losses eat your margin. Go red and any blob that touches you pops you and takes a bounty."],
-  ["Cash out to keep it", "Between 0:45 and 1:20, hold still for 4 s and walk away with your equity."],
+// Each card plays a few seconds of real play (scripts/clips.sh, offline practice on the real rules).
+const STEPS: Array<[string, string, string]> = [
+  ["BOOST = borrow", "Hold BOOST to borrow from the vault: bigger and faster while it burns. The ring is your fuel.", "nitro"],
+  ["Red? REPAY", "Losses eat your margin. Go red and you cannot eat. Tap REPAY to pay the loan back and get out.", "repay"],
+  ["Stay red, get popped", "Any blob that touches a red blob pops it and takes a bounty. Cash out from 0:45 to keep your winnings.", "liquidated"],
 ];
+// Autoplay only for players who did not ask for less motion; the rest get a tap-to-play video.
+const play = reducedMotion ? "controls" : "autoplay loop";
 
 export const landing: Screen = (root) => {
   root.innerHTML = `
@@ -22,7 +26,7 @@ export const landing: Screen = (root) => {
         <span class="outlined font-display text-3xl text-paper">MARGIN</span>
       </a>
       <nav class="tag flex items-center gap-5">
-        <a href="#how" class="hidden sm:block">How it works</a>
+        <button data-how class="hidden sm:block">How it works</button>
         <a href="#/judge" class="rounded-field border-2 border-ink px-2 py-1" title="A seeded 90 s match on normal rules">Judge Run</a>
       </nav>
     </header>
@@ -55,7 +59,9 @@ export const landing: Screen = (root) => {
       <h2 class="outlined mx-auto max-w-6xl font-display text-5xl">How it works</h2>
       <div class="mx-auto mt-8 grid max-w-6xl gap-6 md:grid-cols-3">
         ${STEPS.map(
-          ([t, d], i) => `<article class="sticker rounded-box bg-paper p-5 text-ink" style="box-shadow:6px 6px 0 var(--color-liq)">
+          ([t, d, clip], i) => `<article class="sticker rounded-box bg-paper p-5 text-ink" style="box-shadow:6px 6px 0 var(--color-liq)">
+            <video src="/clips/${clip}.mp4" ${play} muted playsinline preload="metadata" aria-label="${t}: real gameplay"
+              class="mb-4 aspect-square w-full rounded-field border-4 border-ink bg-ink object-cover"></video>
             <span class="tag text-liq">0${i + 1}</span>
             <h3 class="mt-1 font-display text-3xl">${t}</h3>
             <p class="mt-2">${d}</p></article>`,
@@ -89,6 +95,8 @@ export const landing: Screen = (root) => {
       el.classList.remove("hidden");
     })
     .catch(() => {});
+  // An in-page jump: "#how" would be read by the hash router as a route and 404.
+  root.querySelector("[data-how]")?.addEventListener("click", () => root.querySelector("#how")?.scrollIntoView({ behavior: "smooth" }));
   root.querySelector("[data-challenge]")!.addEventListener("click", () => (location.hash = `#/r/${newRoomCode()}`));
   const box = root.querySelector<HTMLElement>("[data-hero]")!;
   const arena = new ArenaRenderer();
