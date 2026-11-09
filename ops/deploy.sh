@@ -19,6 +19,10 @@ ssh "$HOST" bash -s -- "$DIR" <<'REMOTE'
 set -euo pipefail
 DIR="$1"
 cd "$DIR"
+# Public numbers must be real users only: a local test database must never ship.
+if find "$DIR" -name '*.sqlite*' -not -path '*/node_modules/*' | grep -q .; then
+  echo "refusing: a sqlite file reached the release dir; the droplet keeps its own DB in /var/lib/margin"; exit 1
+fi
 npm ci --no-audit --no-fund
 npm test
 chown -R margin:margin "$DIR"

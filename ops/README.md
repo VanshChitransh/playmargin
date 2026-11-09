@@ -29,7 +29,7 @@ droplet vCPU is slower, but a 16.7 ms tick budget leaves a wide margin. Add your
 | A | `api` | droplet IPv4 | **DNS only** (grey cloud), so Caddy can get its Let's Encrypt cert and WebSockets pass |
 | CNAME | `@` / `www` | Cloudflare Pages project (client) | proxied |
 
-Check before step 6: `dig +short api.playmargin.fun` returns the droplet IP.
+Check before step 7: `dig +short api.playmargin.fun` returns the droplet IP.
 
 ### 3. Bootstrap
 ```
@@ -60,26 +60,38 @@ then fix the line to read `SETTLER_PRIVATE_KEY=ed25519:...`.
 
 `NEAR_AI_API_KEY` (server) turns on the agent commander, `MAX_ROOMS` caps live rooms (default 100).
 
-### 5. Ship
+### 5. Fresh database (real users only)
+The landing page and README quote `/api/stats`, so the public server starts with an EMPTY database.
+`deploy.sh` never copies a `.sqlite` file (rsync excludes it and the release is checked). The server
+creates `DB_PATH=/var/lib/margin/margin.sqlite` on first boot. If a rehearsal ran on the droplet, move
+its DB aside before launch:
+```
+systemctl stop margin-server && mv /var/lib/margin/margin.sqlite* /root/ && systemctl start margin-server
+curl -s localhost:2567/api/stats   # users 0, matches 0
+```
+Stats also skip test traffic by design: guest keys starting `ed25519:` or `qa-` (all our scripts) and
+Judge Runs (`JUDGE_SEED`). Real browsers use random UUID guest keys.
+
+### 6. Ship
 ```
 DEPLOY_HOST=root@<ip> ./ops/deploy.sh
 ```
 It prints `/health` of both services. The server must say `"network":"mainnet"` (or `testnet`) and the
 contract you expect. `"network":"off"` means the settler key is missing: free rooms work, paid rooms refuse.
 
-### 6. TLS + routes
+### 7. TLS + routes
 ```
 scp ops/Caddyfile root@<ip>:/etc/caddy/Caddyfile && ssh root@<ip> 'caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy'
 curl https://api.playmargin.fun/health
 curl https://api.playmargin.fun/relay/health
 ```
 
-### 7. Client (Cloudflare Pages)
+### 8. Client (Cloudflare Pages)
 Build `npm run build`, output `apps/client/dist`, env:
 `VITE_SERVER_URL=wss://api.playmargin.fun`, `VITE_RELAYER_URL=https://api.playmargin.fun/relay`,
 `VITE_NETWORK` and `VITE_CONTRACT_ID` as in the table above.
 
-### 8. Smoke
+### 9. Smoke
 Play one free match from a phone on 4G (S9 gate), then one paid match per the runbook.
 
 ## Day to day

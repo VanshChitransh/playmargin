@@ -2,7 +2,7 @@
 // traction numbers the README quotes. Read only, CORS open; money leaves as display units.
 import type { Application } from "express";
 import { matchMaker } from "colyseus";
-import { toUnits } from "@margin/core";
+import { JUDGE_SEED, toUnits } from "@margin/core";
 import { creditsRepo, isGuestKey, topUpDaily } from "./credits";
 import { userForGuestKey, type Db } from "./db";
 import { loadLog } from "./matches";
@@ -86,22 +86,31 @@ export function leaderboard(db: Db, nowMs = Date.now(), limit = 20) {
   return rows.map((r) => ({ account: r.account, net: toUnits(r.net), matches: r.matches }));
 }
 
-/** Traction numbers for the README: real counts straight from the tables, nothing estimated. */
+/**
+ * Who counts as a real user: a NEAR account, or a guest key from the real client (a random UUID).
+ * Every test script and harness uses an "ed25519:" or "qa-" guest key, so local test traffic never
+ * reaches the public numbers. Judge Runs (published JUDGE_SEED) are a scenario, not traction.
+ */
+const REAL_USER = `(u.account_id IS NOT NULL OR (u.guest_key NOT LIKE 'ed25519:%' AND u.guest_key NOT LIKE 'qa-%'))`;
+const REAL_SEATS = `SELECT p.match_id, p.user_id FROM match_players p JOIN users u ON u.id = p.user_id
+  JOIN matches m ON m.id = p.match_id WHERE ${REAL_USER} AND m.seed != ${JUDGE_SEED}`;
+
+/** Traction numbers for the README and landing: real users only, straight from the tables, nothing estimated. */
 export function stats(db: Db) {
   const one = <T>(sql: string): T => db.prepare(sql).get() as T;
-  const { users } = one<{ users: number }>("SELECT COUNT(*) AS users FROM users");
-  const { players } = one<{ players: number }>("SELECT COUNT(DISTINCT user_id) AS players FROM match_players");
-  // Only matches a human played: agents-only rooms made for #/watch are not traction.
+  const { users } = one<{ users: number }>(`SELECT COUNT(*) AS users FROM users u WHERE ${REAL_USER}`);
+  const { players } = one<{ players: number }>(`SELECT COUNT(DISTINCT user_id) AS players FROM (${REAL_SEATS})`);
+  // Only matches a real human played: agents-only #/watch rooms, test runs and Judge Runs are not traction.
   const { matches } = one<{ matches: number }>(
-    "SELECT COUNT(*) AS matches FROM matches m WHERE m.status = 'settled' AND EXISTS (SELECT 1 FROM match_players p WHERE p.match_id = m.id)",
+    `SELECT COUNT(*) AS matches FROM matches m WHERE m.status = 'settled' AND m.id IN (SELECT match_id FROM (${REAL_SEATS}))`,
   );
   const { multi } = one<{ multi: number }>(
-    `SELECT COUNT(*) AS multi FROM (SELECT p.match_id FROM match_players p JOIN matches m ON m.id = p.match_id
-     WHERE m.status = 'settled' GROUP BY p.match_id HAVING COUNT(*) >= 2)`,
+    `SELECT COUNT(*) AS multi FROM (SELECT r.match_id FROM (${REAL_SEATS}) r JOIN matches m ON m.id = r.match_id
+     WHERE m.status = 'settled' GROUP BY r.match_id HAVING COUNT(*) >= 2)`,
   );
   const { agentPops } = one<{ agentPops: number }>(
     `SELECT COUNT(*) AS agentPops FROM events WHERE json_extract(json, '$.type') = 'POP'
-     AND EXISTS (SELECT 1 FROM match_players p WHERE p.match_id = events.match_id)
+     AND events.match_id IN (SELECT match_id FROM (${REAL_SEATS}))
      AND (json_extract(json, '$.data.by') LIKE 'agent-%' OR json_extract(json, '$.data.by') LIKE 'drone-%')`,
   );
   return { users, players, matches, multiHumanPct: matches ? Math.round((100 * multi) / matches) : 0, agentPops };

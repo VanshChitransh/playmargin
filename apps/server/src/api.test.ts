@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { leaderboard, matchLog, matchProof, pickWatchRoom, stats } from "./api";
 import { openDb, userForAccount, userForGuestKey } from "./db";
 import { addMatchPlayer, createMatch, finishMatch, saveEvents } from "./matches";
-import type { LogEntry } from "@margin/core";
+import { JUDGE_SEED, type LogEntry } from "@margin/core";
 
 const U = 1_000_000;
 
@@ -12,7 +12,7 @@ describe("read api", () => {
     const db = openDb(":memory:");
     const alice = userForAccount(db, "alice.testnet");
     const bob = userForAccount(db, "bob.testnet");
-    const guest = userForGuestKey(db, "ed25519:guestguestguest1");
+    const guest = userForGuestKey(db, "3f2b8c1e-5d4a-4f7b-9c2e-1a6d8e0f4b7c"); // real client keys are UUIDs
     createMatch(db, { id: "m1", mode: "paid", seed: 1, pot: 200 * U });
     addMatchPlayer(db, { matchId: "m1", userId: alice, blobId: "a", entry: 100 * U });
     addMatchPlayer(db, { matchId: "m1", userId: bob, blobId: "b", entry: 100 * U });
@@ -22,12 +22,24 @@ describe("read api", () => {
     finishMatch(db, "m2", { status: "settled", head: "h2", payouts: new Map([["g", 500 * U]]) });
     const pop = (by: string, seq: number) => ({ seq, tick: 1, type: "POP", data: { by }, prevHash: "", hash: `x${seq}` }) as unknown as LogEntry;
     saveEvents(db, "m2", [pop("agent-3", 0), pop("drone-1", 1), pop("someone", 2)]);
+    // Test traffic (ed25519: and qa- guest keys) and Judge Runs (JUDGE_SEED) never count.
+    const tester = userForGuestKey(db, "ed25519:smokekey000001");
+    const judgeGuest = userForGuestKey(db, "9a1c3e5f-7b2d-4c6e-8f0a-2b4d6f8a0c1e");
+    createMatch(db, { id: "t", mode: "free", seed: 4, pot: 1200 * U });
+    addMatchPlayer(db, { matchId: "t", userId: tester, blobId: "x", entry: 100 * U });
+    finishMatch(db, "t", { status: "settled", head: "h4", payouts: new Map() });
+    saveEvents(db, "t", [pop("agent-2", 0)]);
+    createMatch(db, { id: "j", mode: "free", seed: JUDGE_SEED, pot: 1200 * U });
+    addMatchPlayer(db, { matchId: "j", userId: judgeGuest, blobId: "y", entry: 100 * U });
+    finishMatch(db, "j", { status: "settled", head: "h5", payouts: new Map() });
+    saveEvents(db, "j", [pop("drone-1", 0)]);
     // An agents-only room (#/watch with nobody playing) is not traction: no match, no pops.
     createMatch(db, { id: "bots", mode: "free", seed: 3, pot: 1200 * U });
     finishMatch(db, "bots", { status: "settled", head: "h3", payouts: new Map() });
     saveEvents(db, "bots", [pop("agent-1", 0)]);
 
-    expect(stats(db)).toEqual({ users: 3, players: 3, matches: 2, multiHumanPct: 50, agentPops: 2 });
+    // users 4: alice, bob, guest and the judge-run guest (a real person); the tester never counts.
+    expect(stats(db)).toEqual({ users: 4, players: 3, matches: 2, multiHumanPct: 50, agentPops: 2 });
     expect(leaderboard(db)).toEqual([
       { account: "alice.testnet", net: 50, matches: 1 },
       { account: "bob.testnet", net: -80, matches: 1 },
