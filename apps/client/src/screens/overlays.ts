@@ -3,7 +3,7 @@
 // primary button each (Play again); Watch keeps spectating, so the room stays alive.
 import type { Outcome } from "../game/receipt";
 
-const fmt = (n: number): string => (n >= 0 ? "+" : "−") + Math.abs(n).toFixed(Math.abs(n) < 10 ? 2 : 0);
+const fmt = (n: number): string => (n >= 0 ? "+" : "−") + Math.abs(n).toFixed(2); // one format, so the column lines up
 const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 function shell(root: HTMLElement, inner: string): HTMLElement {
@@ -61,10 +61,10 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
       </div>
       <div class="mt-3 flex items-baseline justify-between">
         <span class="tag">You keep</span>
-        <span class="num font-display text-5xl ${o.end > o.start ? "" : "text-liq"}">${o.end.toFixed(2)}</span>
+        <span class="font-display text-5xl tabular-nums ${o.end > o.start ? "" : "text-liq"}">${o.end.toFixed(2)}</span>
       </div>
       <p class="mt-1 text-xs text-ink/60">${paid ? "Real dollars, paid to your balance when the match settles." : "Practice credits. Never cash, never bought."}</p>
-      <div class="mt-5 flex flex-wrap gap-3">${btn("again", "Play again", true).replace("bg-paper", "bg-liq")}${btn("verify", "Verify", false)}${btn("home", "Home", false)}</div>
+      <div class="mt-5 grid grid-cols-[1.4fr_1fr_1fr] gap-3">${[btn("again", "Play again", true).replace("bg-paper", "bg-liq"), btn("verify", "Verify", false), btn("home", "Home", false)].map((b) => b.replace("px-5", "px-2").replace("text-xl", "text-lg")).join("")}</div>
       ${o.death ? `<button data-act="share" class="tag mt-4 underline">Get your Liquidation Certificate</button>` : ""}
     </div>`,
   );

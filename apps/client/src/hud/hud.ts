@@ -28,15 +28,15 @@ export class Hud {
     this.el.className = "pointer-events-none fixed inset-0 select-none font-sans text-paper";
     this.el.innerHTML = `
       <div class="absolute top-0 inset-x-0 flex flex-col items-center pt-[max(10px,env(safe-area-inset-top))]">
-        <div class="flex items-center gap-2 rounded-box bg-navy/80 px-3 py-1">
+        <div class="flex items-center gap-2 self-start rounded-box bg-navy/80 px-3 py-1 max-sm:ml-[104px] max-sm:mt-[2px] sm:self-center">
           <span data-h=phase class="text-xs font-medium tracking-widest text-muted"></span>
           <span data-h=clock class="num text-xl font-bold"></span>
         </div>
-        <div data-h=banner class="mt-3 font-display text-3xl tracking-wide drop-shadow"></div>
+        <div data-h=banner class="mt-3 px-3 text-center font-display text-3xl tracking-wide max-sm:mt-40 max-sm:text-2xl"></div>
       </div>
       <div class="absolute right-0 top-0 p-3 pr-[max(12px,env(safe-area-inset-right))] pt-[max(12px,env(safe-area-inset-top))]">
-        <ol data-h=lb class="relative w-44 rounded-box bg-navy/70 p-2 text-sm" style="height:${R.LEADERBOARD_TOP * ROW_PX + 16}px"></ol>
-        <div data-h=myrank class="mt-1 hidden w-44 rounded-box bg-navy/70 px-2 py-1 text-sm"></div>
+        <ol data-h=lb class="relative w-36 rounded-box bg-navy/70 p-2 text-xs sm:w-44 sm:text-sm" style="height:${R.LEADERBOARD_TOP * ROW_PX + 16}px"></ol>
+        <div data-h=myrank class="mt-1 hidden w-36 rounded-box bg-navy/70 px-2 py-1 text-xs sm:w-44 sm:text-sm"></div>
       </div>
       <div data-h=center class="absolute inset-x-0 top-[14%] grid place-items-center text-center"></div>
       <div data-h=frame class="call-frame"></div>

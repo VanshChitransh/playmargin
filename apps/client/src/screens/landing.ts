@@ -34,7 +34,7 @@ export const landing: Screen = (root) => {
         <div class="mt-8 flex flex-wrap items-center gap-4">
           <a href="#/play" class="sticker sticker-press rounded-box bg-paper px-7 py-4 font-display text-2xl">Practice free</a>
           <a href="#/cash" class="sticker sticker-press rounded-box bg-ink px-5 py-3 font-display text-xl text-paper">Play for $1</a>
-          <button data-challenge class="sticker sticker-press rounded-box bg-paper px-5 py-3 font-display text-xl">Challenge a friend</button>
+          <button data-challenge class="tag basis-full text-left underline">Challenge a friend: private room link</button>
           <span class="text-sm">No wallet. No sign-up.<span class="pointer-coarse:hidden"><br />Mouse steers, <kbd class="kbd kbd-sm">Space</kbd> = BOOST</span></span>
         </div>
       </section>
@@ -43,7 +43,7 @@ export const landing: Screen = (root) => {
         <div class="sticker absolute -bottom-5 left-4 rounded-field bg-paper px-3 py-2 text-sm">
           <b>Live:</b> bots playing on the real rules
         </div>
-        <img src="/brand/margin-cat-cutout.svg" alt="" class="pointer-events-none absolute -bottom-10 -right-4 w-28 rotate-6 sm:w-36" />
+        <img src="/brand/margin-cat-cutout.svg" alt="" class="pointer-events-none absolute -bottom-12 -right-2 w-20 rotate-6 sm:-bottom-10 sm:-right-4 sm:w-36" />
       </section>
     </main>
     <section id="how" class="bg-ink px-4 py-16 text-paper">

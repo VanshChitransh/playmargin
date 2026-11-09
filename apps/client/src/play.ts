@@ -73,7 +73,7 @@ export const play: Screen = (root, params) => {
   const controls = new Controls(root, (cmd) => src?.send(cmd));
   const hud = new Hud(root, controls.els, (open) => controls.setCashoutVisible(open));
   const status = document.createElement("div");
-  status.className = "tag pointer-events-none fixed bottom-3 left-3 text-muted";
+  status.className = "tag pointer-events-none fixed bottom-3 left-3 max-w-[55vw] text-muted";
   status.textContent = "Connecting";
   root.appendChild(status);
 
