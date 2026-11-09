@@ -10,7 +10,7 @@ import { mountApi } from "./api";
 import { sharedDb } from "./db";
 import { anchorPending } from "./anchor/job";
 import { sharedChain } from "./settlement";
-import { log } from "./obs";
+import { SETTLER_LOW_NEAR, log, settler } from "./obs";
 
 const server = defineServer({
   rooms: {
@@ -37,6 +37,22 @@ server.onBeforeShutdown(() => {
 // drain exit never waits on it.
 const anchor = () => anchorPending(sharedDb(), sharedChain()).catch((err: unknown) => log.error("anchor_failed", { err }));
 setInterval(anchor, 5 * 60_000).unref();
+
+// Settler balance alarm: every 5 min, cached for /health so it never waits on an RPC.
+const checkSettler = async () => {
+  const chain = sharedChain();
+  if (!chain) return;
+  try {
+    settler.near = await chain.settlerNear();
+    settler.low = settler.near < SETTLER_LOW_NEAR;
+    settler.checkedAt = Date.now();
+    if (settler.low) log.warn("settler_low", { account: chain.cfg.settlerId, near: settler.near, min: SETTLER_LOW_NEAR });
+  } catch (err) {
+    log.error("settler_balance_failed", { err });
+  }
+};
+setInterval(checkSettler, 5 * 60_000).unref();
+void checkSettler();
 void anchor();
 
 listen(server).then(() =>

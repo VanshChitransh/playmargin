@@ -15,6 +15,10 @@ export const log = {
   error: (event: string, fields?: Fields) => console.error(line("error", event, fields)),
 };
 
+/** Settler gas money: a 100 Tgas call needs ~0.101 NEAR free, so warn under 0.12. Null until checked. */
+export const SETTLER_LOW_NEAR = 0.12;
+export const settler = { near: null as number | null, low: false, checkedAt: 0 };
+
 /** Tick durations in ms since boot: count, mean, max and p99 from 0.1 ms buckets up to 100 ms. */
 export const ticks = {
   count: 0,

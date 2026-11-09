@@ -66,6 +66,11 @@ export class Chain {
     return this.withFallback((near) => near.getAccessKey(accountId, publicKey));
   }
 
+  /** Spendable NEAR of the settler account (near-kit: balance minus storage stake). */
+  async settlerNear(): Promise<number> {
+    return Number(await this.withFallback((near) => near.getBalance(this.cfg.settlerId)));
+  }
+
   /** Settler call on the margin contract; returns the tx hash. */
   async call(method: string, args: object): Promise<string> {
     const out = await this.withFallback((near) =>
