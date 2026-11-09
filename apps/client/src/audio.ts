@@ -74,6 +74,36 @@ export function play(s: Sfx): void {
   }
 }
 
+let engineNodes: { o: OscillatorNode; g: GainNode } | null = null;
+
+/** The nitro engine: a sawtooth that climbs in pitch while BOOST is held, fading out on release. */
+export function engine(on: boolean): void {
+  if (!ctx || ctx.state !== "running") return;
+  const t = ctx.currentTime;
+  if (on && !muted && !engineNodes) {
+    const o = ctx.createOscillator();
+    const f = ctx.createBiquadFilter();
+    const g = ctx.createGain();
+    o.type = "sawtooth";
+    o.frequency.setValueAtTime(90, t);
+    o.frequency.exponentialRampToValueAtTime(260, t + 1.6);
+    f.type = "lowpass";
+    f.frequency.value = 900;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.06, t + 0.08);
+    o.connect(f).connect(g).connect(ctx.destination);
+    o.start(t);
+    engineNodes = { o, g };
+  } else if (!on && engineNodes) {
+    const { o, g } = engineNodes;
+    g.gain.cancelScheduledValues(t);
+    g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+    o.stop(t + 0.2);
+    engineNodes = null;
+  }
+}
+
 function env(t: number, dur: number, peak: number): GainNode {
   const g = ctx!.createGain();
   g.gain.setValueAtTime(0.0001, t);

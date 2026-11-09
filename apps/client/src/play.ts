@@ -18,7 +18,7 @@ import { rerender, type Screen } from "./router";
 import { showAborted, showDeath, showResults } from "./screens/overlays";
 import { setLocalLog } from "./screens/verify";
 import { C } from "./render/colors";
-import { play as sfx } from "./audio";
+import { engine, play as sfx } from "./audio";
 
 interface Source {
   readonly me: string;
@@ -85,6 +85,11 @@ export const play: Screen = (root, params) => {
 
   const controls = new Controls(root, (cmd) => src?.send(cmd));
   const hud = new Hud(root, controls.els, (open) => controls.setCashoutVisible(open));
+  controls.onHold = (on) => {
+    arena.held = on;
+    hud.held = on;
+    engine(on);
+  };
   const status = document.createElement("div");
   status.className = "tag pointer-events-none fixed bottom-3 left-3 max-w-[55vw] text-muted";
   status.textContent = "Connecting";
@@ -99,11 +104,11 @@ export const play: Screen = (root, params) => {
     const z = arena.zoomLevel;
     const num = (n: number): string => (n >= 10 ? Math.round(n).toString() : n.toFixed(1));
     switch (e.type) {
-      case "boost":
+      // BOOST feel (engine sound, trail, ticking +N) comes from the held state, not this event.
       case "repay": {
         const p = e.blob === me ? at(me) : undefined;
-        if (p) sfx(e.type);
-        if (p) arena.fx.floatText(p.x, p.y - p.r, `${e.type === "boost" ? "+" : "\u2212"}${num(e.amount)}`, e.type === "boost" ? C.gold : C.paper, z);
+        if (p) sfx("repay");
+        if (p) arena.fx.floatText(p.x, p.y - p.r, `\u2212${num(e.amount)}`, C.paper, z);
         break;
       }
       case "spikeHit": {
@@ -215,6 +220,7 @@ export const play: Screen = (root, params) => {
   return () => {
     left = true;
     src?.leave?.();
+    engine(false);
     controls.destroy();
     hud.destroy();
     overlay?.remove();

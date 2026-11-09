@@ -23,6 +23,8 @@ export class Controls {
   private dir = { x: 0, y: 0 };
   private taps = { repay: false, cashout: false };
   private boostHeld = false;
+  /** Fired when BOOST starts or stops being held (sound, nitro feel). */
+  onHold?: (on: boolean) => void;
   private seq = 0;
   private lastSent = 0;
   private timer: number;
@@ -106,6 +108,7 @@ export class Controls {
     if (this.boostHeld === on) return;
     this.boostHeld = on;
     this.els.boost.classList.toggle("holding", on);
+    this.onHold?.(on);
     this.lastSent = 0;
     this.flush(false);
   }
@@ -121,6 +124,7 @@ export class Controls {
   private release(): void {
     this.dir = { x: 0, y: 0 };
     this.taps = { repay: false, cashout: false };
+    if (this.boostHeld) this.onHold?.(false);
     this.boostHeld = false;
     this.els.boost.classList.remove("holding");
     this.lastSent = 0;

@@ -7,6 +7,7 @@ import type { ControlsEls } from "../input/controls";
 import { boostBlocked, cashoutOpen, displayName, elapsedS, interestPerS, phaseName, fuelGradient, fuelOf, ranking } from "./logic";
 import "./hud.css";
 import { isMuted, play as sfx, setMuted } from "../audio";
+import { coachMarks } from "./coach";
 
 const LB_MS = 1000 / R.LEADERBOARD_HZ;
 const ROW_PX = 22;
@@ -21,6 +22,10 @@ export class Hud {
   private bannerKey = "";
   private pipRing: HTMLElement;
   private lastBeat = 0;
+
+  private closeCoach: () => void;
+  private touch = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
+  held = false;
 
   constructor(root: HTMLElement, private els: ControlsEls, private onCashoutWindow: (open: boolean) => void) {
     this.el = document.createElement("div");
@@ -58,11 +63,13 @@ export class Hud {
     this.pipRing.className = "pip-ring";
     els.boost.classList.add("relative");
     els.boost.appendChild(this.pipRing);
+    this.closeCoach = coachMarks(root, this.touch);
   }
 
   destroy(): void {
     this.el.remove();
     this.pipRing.remove();
+    this.closeCoach();
   }
 
   update(f: Frame, now: number): void {
@@ -79,7 +86,9 @@ export class Hud {
     const ring = me.state === "alive" && m.phase === "LIVE" ? me.ring : "green";
     this.set("ring", ring, () => {
       // Android buzz on the way into red (iOS has no vibrate; the frame and label still show).
-      if (ring === "red" && this.last.get("ringPrev") !== "red") navigator.vibrate?.([70, 50, 70]);
+      const prev = this.last.get("ringPrev");
+      if (ring === "red" && prev !== "red") navigator.vibrate?.([70, 50, 70]);
+      else if (ring === "yellow" && prev === "green") navigator.vibrate?.(25); // a tick: margin is getting thin
       this.last.set("ringPrev", ring);
       this.q("frame").dataset.ring = ring;
       this.q("call").classList.toggle("hidden", ring !== "red");
@@ -142,13 +151,16 @@ export class Hud {
       this.set("center", `W${n}/${m.timeLeftS}`, () => {
         c.innerHTML = `<div><div class="outlined font-display text-7xl tabular-nums text-paper">${n}/${R.ROOM_SIZE}</div>
           <div class="mt-1 font-medium text-ink/70">Finding players · starts in <span class="num">${m.timeLeftS}</span></div>
-          <div class="mt-2 text-sm text-ink/60">Warm up: steer around. BOOST unlocks at GO.</div></div>`;
+          ${this.hints()}</div>`;
       });
     } else if (m.phase === "COUNTDOWN") {
       this.set("center", `C${m.timeLeftS}`, () => {
         this.flash(c, String(m.timeLeftS), "punch", C.paper, "outlined font-display text-9xl tabular-nums");
         sfx("tick");
       });
+    } else if (m.phase === "LIVE" && elapsedS(m) > 20) {
+      this.closeCoach();
+      this.set("center", "", () => (c.innerHTML = ""));
     } else if (m.phase === "LIVE" && elapsedS(m) < 1) {
       this.set("center", "GO", () => {
         this.flash(c, "GO!", "punch", C.gold, "outlined font-display text-8xl");
@@ -200,10 +212,23 @@ export class Hud {
 
   /** The fuel ring around BOOST: drains while held, refills as REPAY or eating raise equity. */
   private fuel(me: BlobView, blocked: boolean): void {
-    this.pipRing.style.background = fuelGradient(fuelOf(me), blocked ? "#8391B3" : C.gold, C.dim);
+    const fuel = fuelOf(me);
+    this.pipRing.style.background = fuelGradient(fuel, blocked ? "#8391B3" : C.gold, C.dim);
+    // Holding with an empty tank: the ring flashes so the player sees why nothing happens.
+    this.pipRing.classList.toggle("empty", this.held && fuel <= 0.01);
     this.els.boost.classList.toggle("blocked", blocked);
   }
 
+
+  /** Warm-up teaching, no numbers: one line per rule, worded for the player's controls. */
+  private hints(): string {
+    const lines = this.touch
+      ? ["Hold BOOST to grow (you borrow)", "Red? You can't eat. Tap REPAY", "Cash out from 0:45"]
+      : ["Hold SPACE to boost (you borrow)", "Red? You can't eat. Hit R to repay", "Cash out from 0:45"];
+    return `<ul class="mx-auto mt-3 flex max-w-sm flex-col items-center gap-1.5 text-sm">${lines
+      .map((l) => `<li class="rounded-field bg-navy/85 px-3 py-1 text-paper">${l}</li>`)
+      .join("")}<li class="text-xs text-ink/60">Try BOOST now: it is free practice until GO.</li></ul>`;
+  }
 
   /** The agents' commander plan, shown so spectators see what the AI is up to. Null hides it. */
   commander(text: string | null): void {

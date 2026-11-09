@@ -29,6 +29,14 @@ export class FxLayer extends Container {
     this.items.push({ node: t, life: 0, ttl: 0.9, vx: 0, vy: -90 / zoom, spin: 0 });
   }
 
+  /** A fading ring left behind a blob burning nitro (the trail). */
+  ghost(x: number, y: number, r: number, color: number): void {
+    const g = new Graphics().circle(0, 0, r).stroke({ width: Math.max(3, r * 0.08), color, alpha: 0.55 });
+    g.position.set(x, y);
+    this.addChildAt(g, 0);
+    this.items.push({ node: g, life: 0, ttl: 0.35, vx: 0, vy: 0, spin: 0 });
+  }
+
   /** n hard-edged shards flying out of (x, y); more shards for a bigger hit. */
   shards(x: number, y: number, n: number, color: number, r: number): void {
     for (let i = 0; i < n; i++) {

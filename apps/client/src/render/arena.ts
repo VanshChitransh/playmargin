@@ -10,6 +10,7 @@ import { spikeWouldRedden } from "./danger";
 import { SPIKE_R, SpikeSprite, bakeSpikeTextures } from "./spike";
 import { boostBlocked, boostPreview } from "../hud/logic";
 import { FxLayer } from "./fx";
+import { NitroFeel } from "./nitro";
 
 /** ~35 grid cells across the screen at start size (agar.io measured). */
 const CELL = 60;
@@ -44,6 +45,10 @@ export class ArenaRenderer {
   private fps?: Text;
   private zoneKey = "";
   private zoneMaxR = 0;
+  /** BOOST held right now (set by the play screen): drives the nitro feel. */
+  held = false;
+  private nitro = new NitroFeel();
+  private lastDraw = 0;
   private view = VIEW_AT_START;
 
   async mount(root: HTMLElement, source: FrameSource, opts: { fps?: boolean; fit?: HTMLElement; view?: number } = {}): Promise<void> {
@@ -120,6 +125,9 @@ export class ArenaRenderer {
     this.syncSpikes(f, meView, tS);
     this.syncBlobs(f, tS);
     this.drawPreview(f, meView);
+    const dt = Math.min(0.1, tS - this.lastDraw);
+    this.lastDraw = tS;
+    this.nitro.update(meView, meView && this.blobs.get(meView.id), f.match.phase, this.held, this.fx, this.zoom, dt);
     if (meView) this.follow(meView.x, meView.y, meView.radius);
   }
 

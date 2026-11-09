@@ -35,3 +35,7 @@
 /* Red: REPAY is the only way out, so the button itself throbs and grows (shape + motion). */
 @keyframes urgent { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 var(--color-liq); } 50% { transform: scale(1.18); box-shadow: 0 0 0 8px var(--color-liq); } }
 .urgent { animation: urgent 0.45s ease-in-out infinite; }
+
+/* Empty fuel while BOOST is held: the ring blinks liq red, the player sees the tank is dry. */
+@keyframes empty { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+.pip-ring.empty { background: var(--color-liq) !important; animation: empty 0.3s steps(2) infinite; }
