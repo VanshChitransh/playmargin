@@ -17,7 +17,16 @@ export interface Outcome {
   rank: number;
   of: number;
   /** Death details for the LIQUIDATED screen. */
-  death?: { by: string; keeper: boolean; leverage: number; redS: number };
+  death?: {
+    by: string;
+    keeper: boolean;
+    leverage: number;
+    redS: number;
+    /** Highest leverage this match (mass / equity), for the greed score. */
+    peakLeverage: number;
+    /** Match second when the ring last left green before the pop: the moment to REPAY. */
+    warnAtS: number | null;
+  };
 }
 
 export class Receipt {
@@ -28,18 +37,23 @@ export class Receipt {
   private lastMe?: BlobView;
   private redSince: number | null = null;
   private redS = 0;
+  private peakLev = 1;
+  private warnAt: number | null = null;
   private death?: Outcome["death"];
   private labels = new Map<string, string>();
 
   constructor(private me: string, private start: number = R.ENTRY_FREE * R.START_MASS_RATIO) {}
 
   /** Feed every frame: remembers my last alive state and how long I have been red. */
-  frame(blobs: BlobView[], tier: RateTier, nowMs: number, dtS: number, rateBps?: number): void {
+  frame(blobs: BlobView[], tier: RateTier, nowMs: number, dtS: number, rateBps?: number, elapsedS?: number): void {
     for (const b of blobs) this.labels.set(b.id, displayName(b));
     const me = blobs.find((b) => b.id === this.me);
     if (!me || me.state !== "alive") return;
     this.lastMe = me;
     this.interest += interestPerS(me.owe, tier, rateBps) * dtS;
+    if (me.equity > 0) this.peakLev = Math.max(this.peakLev, (me.equity + me.owe) / me.equity);
+    if (me.ring === "green") this.warnAt = null;
+    else if (elapsedS !== undefined) this.warnAt ??= elapsedS;
     if (me.ring === "red") this.redSince ??= nowMs;
     else this.redSince = null;
     this.redS = this.redSince === null ? 0 : (nowMs - this.redSince) / 1000;
@@ -66,6 +80,8 @@ export class Receipt {
             keeper: e.keeper,
             leverage: m && m.equity > 0 ? (m.equity + m.owe) / m.equity : 0,
             redS: this.redS,
+            peakLeverage: this.peakLev,
+            warnAtS: this.warnAt,
           };
         }
         break;

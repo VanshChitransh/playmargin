@@ -21,7 +21,7 @@ const btn = (act: string, text: string, primary: boolean): string =>
 const onDark = (html: string): string => html.replace("<button", '<button style="box-shadow:6px 6px 0 var(--color-liq);border-color:var(--color-paper)"');
 
 /** The pop moment. Returns the element so the caller can remove it when Watch is pressed. */
-export function showDeath(root: HTMLElement, d: NonNullable<Outcome["death"]>, act: (a: "watch" | "again") => void): HTMLElement {
+export function showDeath(root: HTMLElement, d: NonNullable<Outcome["death"]>, act: (a: "watch" | "again" | "share") => void): HTMLElement {
   const why = d.keeper ? "VAULT CLOSED YOUR LOAN" : `popped by ${esc(d.by)}`;
   const greed =
     d.leverage >= 1.05
@@ -35,6 +35,7 @@ export function showDeath(root: HTMLElement, d: NonNullable<Outcome["death"]>, a
       <p class="mt-2 text-lg text-paper">${greed}</p>
       <p class="mt-1 text-sm text-muted">Tap REPAY earlier, or run before you go red.</p>
       <div class="mt-6 flex justify-center gap-4">${onDark(btn("again", "Play again", true))}${onDark(btn("watch", "Watch", false))}</div>
+      <button data-act="share" class="tag mt-5 text-paper underline">Get your Liquidation Certificate</button>
     </div>`,
   );
   wire(el, act);
@@ -42,7 +43,7 @@ export function showDeath(root: HTMLElement, d: NonNullable<Outcome["death"]>, a
 }
 
 /** The bell: a receipt whose lines add up to the final number. */
-export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "home" | "verify") => void): HTMLElement {
+export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "home" | "verify" | "share") => void): HTMLElement {
   const title = o.kind === "cashed" ? "CASHED OUT" : o.kind === "survived" ? "SURVIVED" : "LIQUIDATED";
   const rows = o.lines
     .map((l) => `<div class="flex justify-between gap-6"><span>${esc(l.label)}</span><span class="num ${l.amount < 0 ? "text-liq" : ""}">${fmt(l.amount)}</span></div>`)
@@ -64,6 +65,7 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
       </div>
       <p class="mt-1 text-xs text-ink/60">Practice credits. Never cash, never bought.</p>
       <div class="mt-5 flex flex-wrap gap-3">${btn("again", "Play again", true).replace("bg-paper", "bg-liq")}${btn("verify", "Verify", false)}${btn("home", "Home", false)}</div>
+      ${o.death ? `<button data-act="share" class="tag mt-4 underline">Get your Liquidation Certificate</button>` : ""}
     </div>`,
   );
   wire(el, act);

@@ -6,6 +6,8 @@ import type { Frame } from "./game/frame";
 import { LocalMatch } from "./game/local";
 import { Receipt } from "./game/receipt";
 import { Hud } from "./hud/hud";
+import { elapsedS } from "./hud/logic";
+import { shareCertificate } from "./share/certificate";
 import { Controls } from "./input/controls";
 import { MatchConnection, guestKey } from "./net/client";
 import { ArenaRenderer } from "./render/arena";
@@ -137,7 +139,7 @@ export const play: Screen = (root, params) => {
     const o = receipt.outcome(lastFrame.blobs);
     overlay?.remove();
     // A beat after the bell so the last pop or cash-out is seen before the receipt covers it.
-    setTimeout(() => !left && (overlay = showResults(root, o, (a) => (a === "again" ? again() : a === "verify" ? void toVerify() : home()))), 900);
+    setTimeout(() => !left && (overlay = showResults(root, o, (a) => (a === "again" ? again() : a === "verify" ? void toVerify() : a === "share" ? void shareCertificate({ ...o.death!, matchId: src!.matchId }) : home()))), 900);
   };
 
   const draw = (now: number): Frame | null => {
@@ -147,7 +149,7 @@ export const play: Screen = (root, params) => {
     if (!f) return null;
     lastFrame = f;
     hud.update(f, now);
-    receipt?.frame(f.blobs, f.match.rateTier, now, dt, f.rateBps);
+    receipt?.frame(f.blobs, f.match.rateTier, now, dt, f.rateBps, f.match.phase === "LIVE" ? elapsedS(f.match) : undefined);
     if (f.match.phase === "ENDED") finish();
     // Dev-only hook so tests and agent-browser can read the drawn frame (stripped from builds).
     if (import.meta.env.DEV) (window as unknown as { __frame?: unknown }).__frame = f;
@@ -177,8 +179,10 @@ export const play: Screen = (root, params) => {
       receipt?.event(e);
       juice(e, s.me);
       if (e.type === "pop" && e.victim === s.me && !ended) {
-        overlay = showDeath(root, receipt!.outcome(lastFrame?.blobs ?? []).death!, (a) => {
+        const death = receipt!.outcome(lastFrame?.blobs ?? []).death!;
+        overlay = showDeath(root, death, (a) => {
           if (a === "again") return again();
+          if (a === "share") return void shareCertificate({ ...death, matchId: s.matchId });
           overlay?.remove();
           overlay = null;
         });
