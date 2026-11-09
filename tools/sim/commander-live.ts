@@ -7,7 +7,7 @@ import { runMatch } from "./match";
 const key = process.env.NEAR_AI_API_KEY;
 if (!key) {
   console.error("npm run commander needs a NEAR AI Cloud key: put NEAR_AI_API_KEY=... in .env (see .env.example). Everything else runs without keys.");
-  process.exit(1);
+  process.exit(0); // an optional feature without its key is not a failure
 }
 const c = new Commander(nearAiCall(key));
 let last: unknown = null;

@@ -11,7 +11,7 @@ const flag = (name: string): string | undefined => {
 };
 const fast = args.includes("--fast");
 // A seed where the drones get to work: chosen by scanning seeds for at least one drone pop.
-const seed = Number(flag("seed") ?? 68);
+const seed = Number(flag("seed") ?? 108);
 
 const n = (m: number): string => toUnits(m).toFixed(1);
 const label = (w: World, id: string): string => w.blobs.get(id)?.label ?? id;
@@ -45,6 +45,7 @@ function narrate(w: World, e: LogEntry): void {
   }
 }
 
+console.log(`MARGIN demo: one paid match, seed ${seed}, 6 bot-driven players + 2 liquidator drones (labelled)\n`);
 const t0 = performance.now();
 const { w, log, ticks } = await runMatch({
   seed, mode: "paid", players: 6, drones: 2,
@@ -63,7 +64,9 @@ const { w, log, ticks } = await runMatch({
 
 console.log("\nResults");
 for (const b of [...w.blobs.values()].sort((a, z) => z.payout - a.payout)) {
-  console.log(`  ${b.label.padEnd(10)} ${b.state.padEnd(7)} ${n(b.payout).padStart(7)}`);
+  // Drones hold no stake: what they leave with is the liquidation bounties they earned.
+  const what = b.kind === "drone" ? "bounties" : b.state;
+  console.log(`  ${b.label.padEnd(10)} ${what.padEnd(8)} ${n(b.payout).padStart(7)}`);
 }
 const r = await settleVerified(log);
 const live = r.payouts.every((p) => w.blobs.get(p.id)?.payout === p.amount) &&

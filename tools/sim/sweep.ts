@@ -13,11 +13,9 @@ type Cfg = {
   src?: Record<string, [string, string][]>;
   caution?: number;
 };
-// BOOST is hold-to-nitro (9 Nov): candidates for its borrow rate, on top of balance B. Each runs
-// twice: the greedy player dodging spikes like a practised bot (caution 0.6) and like a first-timer (0.2).
-const CONFIGS: Cfg[] = [0.6, 0.2].flatMap((caution) =>
-  [0.75, 1.0, 1.5].map((rate) => ({ name: `nitro ${rate}x equity/s (caution ${caution})`, caution, rules: { NITRO_RATE_EQUITY_PER_S: rate } })),
-);
+// Default: the shipped rules (RULES.html), with the greedy player dodging spikes like a practised bot
+// (caution 0.6) and like a first-timer (0.2). Pass a configs JSON to compare candidates.
+const CONFIGS: Cfg[] = [0.6, 0.2].map((caution) => ({ name: `shipped rules (greedy caution ${caution})`, caution }));
 const extra = process.argv[3] ? (JSON.parse(process.argv[3]) as Cfg[]) : [];
 /** `--contacts`: run tools/sim/contacts.ts per config instead (arena size and encounter tuning). */
 const contactsMode = process.argv.includes("--contacts");
@@ -54,12 +52,12 @@ for (const c of extra.length ? extra : CONFIGS) {
     const r = JSON.parse(out.trim().split("\n").at(-1) as string);
     if (contactsMode) {
       rows.push(`| ${c.name} | ${JSON.stringify(r)} |`);
-      process.stderr.write(rows.at(-1) + "\n");
+      process.stderr.write(`${rows.length} configs done\n`);
       continue;
     }
     const pct = (x: number): string => `${Math.round(x * 100)}%`;
     rows.push(`| ${c.name} | ${r.liqPerMatch.toFixed(2)} | ${pct(r.pct1to3)} | ${pct(r.pctZero)} | ${pct(r.greedyPopped)} | ${pct(r.greedyEaten)} | ${pct(r.greedyLost)} | ${r.popsByDrone} | ${r.keeper} |`);
-    process.stderr.write(rows.at(-1) + "\n");
+    process.stderr.write(`${rows.length} configs done\n`);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
