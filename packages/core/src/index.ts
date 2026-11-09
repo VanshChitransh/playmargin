@@ -18,3 +18,4 @@ export * from "./views";
 export * from "./log";
 export * from "./settle";
 export * from "./scenario";
+export * from "./merkle";
