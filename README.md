@@ -19,12 +19,12 @@ npm run demo
 ```
 
 `npm run demo` plays one full paid match headless with the real engine and the real bots
-(6 bot-driven players + 2 liquidator drones), narrates it, then proves it (seed 37, about 10 s). Expected tail:
+(6 bot-driven players + 2 liquidator drones), narrates it, then proves it (seed 82, about 10 s). Expected tail:
 
 ```
-vault: lent 773.1, repaid 773.1, interest 4.8, fees 5.8 · reserve 7.6
-hash chain: 314 events, head b2c315a45ea7c3a8...
-5880 ticks · 0 micro-units created or destroyed · settle == live ✓ · 10.2 s
+vault: lent 552.5, repaid 552.5, interest 4.4, fees 4.1 · reserve 7.2
+hash chain: 437 events, head a91f6e2c3ffd8ed8...
+5880 ticks · 0 micro-units created or destroyed · settle == live ✓ · 10.6 s
 ```
 
 To play in a browser:
@@ -40,15 +40,17 @@ the room fills with labelled AI agents (🤖).
 
 | # | Do | See |
 |---|---|---|
-| 1 | `npm run demo` | A narrated paid match: BOOSTs (loans), two players going red and popped by liquidator drones, payouts, then `0 micro-units created or destroyed` and `settle == live` |
+| 1 | `npm run demo` | A narrated paid match: BOOSTs (loans), a player going red and escaping with REPAY, two players popped by liquidator drones (one at 89 s), payouts, then `0 micro-units created or destroyed` and `settle == live` |
 | 2 | `npm run sim -- --matches 500` | 500 full matches (2.94M ticks) with the conservation check every tick, every hash chain verified, `settle == live in 500/500` (1 to 3 minutes) |
 | 3 | `npm test` | The whole TypeScript suite (engine, settle, bots, server, client logic) passes |
 | 4 | `cd contracts/margin && cargo test` | Contract unit tests + near-sandbox integration tests pass |
-| 5 | `npm run dev`, open http://localhost:1234, press Play | A 90 s match: steer with the mouse, Space = BOOST (borrow), R = REPAY, E = cash out. Watch your ring go green, yellow, red |
-| 6 | Hold all 3 BOOST pips and run into a big spike | Your ring turns red. Within a moment a blob or a drone touches you: "LIQUIDATED", and your receipt shows what the vault took back |
+| 5 | `npm run dev`, open http://localhost:1234, press Play | A 90 s match: steer with the mouse, hold Space = BOOST (borrow, like nitro: the fuel ring empties as you borrow), R = REPAY, E = cash out. Watch your ring go green, yellow, red |
+| 6 | Hold BOOST until the fuel ring is empty, then run into a big spike | Your ring turns red. Within a moment a blob or a drone touches you: "LIQUIDATED", and your receipt shows what the vault took back |
 | 7 | After any match, open the receipt's Verify link (`/#/verify/<id>`) | The browser replays the log with the same code as the server, checks every hash, and shows settle == what you were paid. Press "Tamper" and the exact broken event turns red |
 | 8 | Open `/#/judge` | Judge Run: a published seed (20261114), normal rules, Drone-1 hunting red blobs. Most first-timers get greedy |
-| 9 | `npm run sweep -- 300` | The balance table behind the rules: liquidations per match and how often a greedy player is popped, under the current rules and the old ones |
+| 9 | `npm run sweep -- 300` | The balance table behind the rules: liquidations per match and how often a greedy player (holding BOOST to the cap) is popped, for each candidate setting |
+| 9b | `npx tsx tools/sim/human.ts 60` | Can a newcomer win? An average-human bot against 11 agents: median rank and survival (measured: rank 4 of 12, survives 63%) |
+| 9c | `npx tsx tools/sim/contacts.ts 40` | Do players meet on the big map? Contacts per minute, first contact time, liquidations per match (measured: 21 per minute, about 7 s, about 1) |
 | 10 | `npm run soak -- --rooms 50` | 50 rooms on the real server: CPU per room tick (measured 0.128 ms, budget 4 ms) |
 | 11 | Put `NEAR_AI_API_KEY` in `.env`, then `npm run commander` | One live match with the AI commander on NEAR AI Cloud. Each new plan prints with its one-line rationale |
 
@@ -75,7 +77,7 @@ USDC. Free matches are anchored hourly as one Merkle root on NEAR.
 
 | Feature | Code | Proof |
 |---|---|---|
-| BOOST = loan, interest, REPAY, health factor, liquidation | `packages/core/src/economy.ts` | `economy.test.ts` (the RULES worked example, exact) |
+| BOOST = loan (hold-to-nitro), interest, REPAY, health factor, liquidation | `packages/core/src/economy.ts` | `economy.test.ts` (the RULES worked example, exact) |
 | Fixed tick order (pops before eats, red eats nothing) | `packages/core/src/step.ts` | `step.test.ts` |
 | Conservation every tick | `packages/core/src/invariant.ts` | `invariant.test.ts` (20 seeds × 10k ticks), `npm run sim` |
 | Hash-chained log | `packages/core/src/log.ts` | `settle.test.ts` (tamper cases) |
@@ -83,7 +85,7 @@ USDC. Free matches are anchored hourly as one Merkle root on NEAR.
 | Micro-units to USDC settle args | `packages/core/src/settleargs.ts` | `settleargs.test.ts` (contract equality on 10 paid matches) |
 | Merkle anchor + proofs | `packages/core/src/merkle.ts`, `apps/server/src/anchor/job.ts` | `merkle.test.ts`, `job.test.ts` |
 | Judge Run scenario | `packages/core/src/scenario.ts` | `scenario.test.ts` |
-| Agent players (potential-field bot) | `apps/server/src/agents/freebot.ts` | `freebot.test.ts` |
+| Agent players (potential-field bot, AGENT_SKILL difficulty) | `apps/server/src/agents/freebot.ts` | `freebot.test.ts`, `tools/sim/human.ts` |
 | Liquidator drones | `apps/server/src/agents/drone.ts` | `drone.test.ts` |
 | AI commander (NEAR AI Cloud) | `apps/server/src/agents/commander.ts` | `commander.test.ts`, `npm run commander` |
 | Rooms, lobby, late join, paid join proof | `apps/server/src/rooms/` | `lobby.test.ts`, `paidMatch.test.ts`, `guard.test.ts` |
@@ -91,7 +93,7 @@ USDC. Free matches are anchored hourly as one Merkle root on NEAR.
 | Read API (logs, proofs, leaderboard, stats) | `apps/server/src/api.ts` | `api.test.ts` |
 | Browser client, HUD, Verify page | `apps/client/src/` | `checks.test.ts`, `logic.test.ts`, `interp.test.ts` |
 | Contract | `contracts/margin/src/` | `cargo test` |
-| Headless demo, sim, sweep, soak | `tools/sim/` | the commands above |
+| Headless demo, sim, sweep, soak, balance, encounter and newcomer checks | `tools/sim/` | the commands above |
 
 ### 6. NEAR features used
 
@@ -117,7 +119,7 @@ apps/server       Colyseus rooms, agents, settlement, anchor job, read API
 apps/client       PixiJS game client, HUD, Verify page, wallet and funds (src/chain)
 contracts/margin  Rust contract (near-sdk 5.30.1)
 services/relayer  meta-tx relayer, 1-Click proxy, NEAR Auth helper
-tools/sim         demo, sim, sweep, soak, client fixture
+tools/sim         demo, sim, sweep, soak, balance/contacts/human checks, client fixture
 tools/scripts     deploy, keys, testnet end-to-end money loop
 ops               server deploy files
 ```

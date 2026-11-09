@@ -11,7 +11,7 @@ const flag = (name: string): string | undefined => {
 };
 const fast = args.includes("--fast");
 // A seed where the drones get to work: chosen by scanning seeds for at least one drone pop.
-const seed = Number(flag("seed") ?? 37);
+const seed = Number(flag("seed") ?? 82);
 
 const n = (m: number): string => toUnits(m).toFixed(1);
 const label = (w: World, id: string): string => w.blobs.get(id)?.label ?? id;
