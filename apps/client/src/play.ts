@@ -46,8 +46,8 @@ async function connect(roomCode?: string, judge = false): Promise<Source> {
   offlineWhy = "";
   const paid = paidSeat;
   paidSeat = null;
-  // Reloaded mid-match: take the held seat back before anything else.
-  if (!paid && !roomCode && !judge) {
+  // Reloaded or came back mid-match: take the held seat back before anything else.
+  if (!paid) {
     const back = new MatchConnection();
     if (await back.resume()) return back;
   }

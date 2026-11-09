@@ -74,7 +74,10 @@ export class MatchConnection {
       this.owe = m.owe;
       this.rateBps = m.ratePerMinBps;
     });
-    this.room.onMessage("ev", (e: GameEventMsg) => this.listeners.forEach((l) => l(e)));
+    this.room.onMessage("ev", (e: GameEventMsg) => {
+      if (e.type === "matchEnd") seat.clear(); // nothing left to come back to
+      this.listeners.forEach((l) => l(e));
+    });
     // The NEAR AI commander's one-line plan for the agents (S1 A6), null until the first plan.
     // Paid room cancelled before GO (open_match failed): every ticket is refunded.
     this.room.onMessage("aborted", (m: { reason?: string }) => this.onAborted?.(m.reason ?? ""));
@@ -104,8 +107,11 @@ export class MatchConnection {
   }
 
   leave(): void {
-    seat.clear(); // leaving on purpose: a later reload must not pull me back in
-    void this.room?.leave();
+    // The seat token stays: after GO my blob stays in the match, so coming back resumes it.
+    // Not "consented": after GO the server then holds my seat (allowReconnection) for coming back.
+    // The SDK's own auto-reconnect is switched off first, or this closed tab would grab it back.
+    if (this.room) this.room.reconnection.enabled = false;
+    void this.room?.leave(false);
     this.listeners.clear();
   }
 
