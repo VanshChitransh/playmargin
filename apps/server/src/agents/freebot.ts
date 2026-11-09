@@ -18,12 +18,17 @@ export interface Personality {
 }
 
 /** Global free-room agent skill (later per league). Tuned with tools/sim/human.ts. */
-export const AGENT_SKILL = 0.5;
+export const AGENT_SKILL = 0.7;
 /** The engine bars agents from eating humans this early; agents also don't BOOST before it, so their
  *  early growth matches a human who has not found BOOST yet. */
 const HUMAN_SAFE_T = sToTicks(R.AGENT_NO_EAT_HUMAN_S);
+/** After 30 s, chance per decision (times skill) that a smaller human counts as prey. Tuned with
+ *  tools/sim/human.ts so a newcomer survives most matches but not all. */
+export const HUNT_HUMAN_P = 1;
 const CASHOUT_OPEN_T = sToTicks(R.CASHOUT_OPEN_S);
 const CASHOUT_CLOSE_T = sToTicks(R.CASHOUT_CLOSE_S);
+/** Agents stay in until 70 s, so the Hunt and Squeeze still have big blobs to fear and chase. */
+const AGENT_CASHOUT_T = sToTicks(70);
 const CHASE_RANGE = 450;
 /** Cash out once equity is up this much on the start mass (bps). */
 const CASHOUT_GAIN_BPS = 13_000;
@@ -69,7 +74,7 @@ export class FreeBot implements Brain {
 
     const t0 = this.liveSince === null ? 0 : tick - this.liveSince;
     // An agent hunts humans only by choice, after 30 s, on some decisions (fewer at lower skill).
-    this.huntHumans = v.self.kind !== "agent" || (t0 >= HUMAN_SAFE_T && rand(this.rng) < 0.5 * this.personality.skill);
+    this.huntHumans = v.self.kind !== "agent" || (t0 >= HUMAN_SAFE_T && rand(this.rng) < HUNT_HUMAN_P * this.personality.skill);
     let { dir, prey } = this.field(v, tick);
     // Less skill: sometimes wander or let prey go, and aim with noise, like a human on a touchpad.
     if (rand(this.rng) < 0.35 * slow) {
@@ -97,7 +102,7 @@ export class FreeBot implements Brain {
       this.boosting = cmd.boost = true;
     }
     const ahead = equity(me) * 10_000 >= this.startEquity * CASHOUT_GAIN_BPS;
-    if (ahead && state === "green" && t >= CASHOUT_OPEN_T && t < CASHOUT_CLOSE_T && !this.threatened(v) && rand(this.rng) < 0.3) {
+    if (ahead && state === "green" && t >= (me.kind === "agent" ? AGENT_CASHOUT_T : CASHOUT_OPEN_T) && t < CASHOUT_CLOSE_T && !this.threatened(v) && rand(this.rng) < 0.3) {
       cmd.cashout = true;
     }
     return cmd;

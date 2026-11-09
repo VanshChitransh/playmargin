@@ -167,7 +167,7 @@ export function settle(log: LogEntry[]): SettleResult {
   // Leftover food at the bell: an equal share to each human alive at the bell (dust < their count),
   // or, with none alive, all of it to the vault. A mid-match cash-out can't land on the bell tick
   // (it must start by 80 s and takes 4 s), so "closed by cash-out on the end tick" = alive at the bell.
-  const bell = [...blobs].filter(([, a]) => a.kind === "human" && a.cashed && a.closedAt === end.tick).map(([id]) => id);
+  const bell = [...blobs].filter(([, a]) => a.kind !== "drone" && a.cashed && a.closedAt === end.tick).map(([id]) => id);
   const shares = new Set<string>();
   for (const c of lateCashouts) {
     if (!bell.includes(c.blob) || shares.has(c.blob)) fail(c.seq, `${c.blob} is paid leftover but was not alive at the bell`);

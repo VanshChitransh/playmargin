@@ -15,8 +15,6 @@ async function paidMatch(seed: number) {
     id: `p${i}`, kind: i < 3 ? "human" : "drone", label: `P${i}`, accountId: `p${i}.testnet`,
   }));
   const w = newWorld(seed, "paid", players);
-  w.arena = { w: 700, h: 700 };
-  w.zone = { cx: 350, cy: 350, r: 500, targetR: 90 };
   startMatch(w, 1);
   const r = { rngState: seedRng(seed) };
   for (let t = 2; w.phase !== "ENDED"; t++) {

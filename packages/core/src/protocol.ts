@@ -73,6 +73,8 @@ export interface SpikeView {
   x: number;
   y: number;
   big: boolean;
+  /** Radius in px, drawn and hit-tested the same (SPIKE_RADIUS_SMALL_PX / SPIKE_RADIUS_BIG_PX). */
+  r: number;
 }
 
 export interface MatchView {

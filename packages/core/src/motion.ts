@@ -38,7 +38,15 @@ export function blobSpeed(b: Blob, tick: number): number {
   return s;
 }
 
-/** Move by dir * speed * dtS and keep the blob's centre inside the arena. */
+/**
+ * Seconds for velocity to close ~63% of the gap to its target: small blobs answer the mouse fast,
+ * big ones are heavy (agar feel, no twitch, no float). Drones are machines and turn sharply.
+ */
+export function easeS(b: Blob): number {
+  return b.kind === "drone" ? 0.06 : 0.08 + radius(b.mass) / 1000;
+}
+
+/** Ease velocity toward dir * speed, move by it, and keep the blob's centre inside the arena. */
 export function move(b: Blob, dtS: number, tick: number, arena: { w: number; h: number }): void {
   let { dirX, dirY } = b;
   if (!Number.isFinite(dirX) || !Number.isFinite(dirY)) dirX = dirY = 0;
@@ -47,7 +55,13 @@ export function move(b: Blob, dtS: number, tick: number, arena: { w: number; h: 
     dirX /= len;
     dirY /= len;
   }
-  const d = blobSpeed(b, tick) * dtS;
-  b.x = Math.min(arena.w, Math.max(0, b.x + dirX * d));
-  b.y = Math.min(arena.h, Math.max(0, b.y + dirY * d));
+  const s = blobSpeed(b, tick);
+  const k = 1 - Math.exp(-dtS / easeS(b));
+  b.vx += (dirX * s - b.vx) * k;
+  b.vy += (dirY * s - b.vy) * k;
+  b.x = Math.min(arena.w, Math.max(0, b.x + b.vx * dtS));
+  b.y = Math.min(arena.h, Math.max(0, b.y + b.vy * dtS));
+  // A wall stops you dead instead of letting speed build up against it.
+  if (b.x === 0 || b.x === arena.w) b.vx = 0;
+  if (b.y === 0 || b.y === arena.h) b.vy = 0;
 }

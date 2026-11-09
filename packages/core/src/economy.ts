@@ -2,7 +2,7 @@
 // Cash-out). Each function moves Micro between blob, vault, fees, reserve and food so that
 // checkInvariant always holds, logs the move for settle(log), and floors with dust to reserve.
 import * as C from "./constants";
-import { scatterFood, spawnFoodInZone } from "./food";
+import { scatterFood } from "./food";
 import { radius } from "./motion";
 import type { Blob, Micro, Ring, World } from "./types";
 import { mulBps, mulDivUp } from "./units";
@@ -11,7 +11,6 @@ const BPS = 10_000;
 const BOOST_LOCKOUT_T = C.sToTicks(C.R.BOOST_LOCKOUT_S);
 const REPAY_COOLDOWN_T = C.sToTicks(C.R.REPAY_COOLDOWN_S);
 /** Interest food lands at least this far from the payer, so nobody re-eats their own drain. */
-const INTEREST_FOOD_MIN_DIST = 400;
 
 /** Match time in ticks since GO. */
 export const matchT = (w: World, tick: number): number => tick - w.goTick;
@@ -147,7 +146,7 @@ export function accrueInterest(w: World, b: Blob, tick: number): Micro {
   const toReserve = amount - toFood - toVault;
   w.vault.interest += toVault;
   w.reserve += toReserve;
-  spawnFoodInZone(w, toFood, b.x, b.y, INTEREST_FOOD_MIN_DIST);
+  w.foodPool += toFood; // reappears as pellets via refillFood
   w.pendingLog.push({ type: "INTEREST", tick, data: { blob: b.id, amount, toFood, toVault, toReserve } });
   return amount;
 }
@@ -178,7 +177,7 @@ export function hitSpike(w: World, b: Blob, spikeId: number, big: boolean, tick:
 /** One second outside the zone (4% of mass); goes to one food piece inside the zone. Returns Micro lost. */
 export function zoneTick(w: World, b: Blob): Micro {
   const lost = takeMass(b, mulDivUp(b.mass, C.ZONE_DMG_BPS_PER_S, BPS));
-  spawnFoodInZone(w, lost, b.x, b.y, 0);
+  w.foodPool += lost;
   return lost;
 }
 

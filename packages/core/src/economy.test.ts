@@ -147,7 +147,8 @@ describe("interest, zone, keeper", () => {
     expect(a.debt).toBe(u(120));
     expect(w.vault.interest).toBe(u(0.018));
     expect(w.reserve).toBe(u(0.006));
-    expect(w.food[0]?.mass).toBe(u(0.096));
+    expect(w.foodPool).toBe(u(0.096)); // a crumb: pooled until it makes a whole pellet
+    expect(w.food).toHaveLength(0);
     expect(leak(w)).toBe(0);
   });
   it("zone takes 4%/s; keeper pops below HF 0.90 and the vault is whole", () => {

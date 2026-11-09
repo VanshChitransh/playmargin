@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Client } from "@colyseus/sdk";
-import { R, SPIKE_RADIUS, settleVerified, type LogEntry } from "@margin/core";
+import { R, settleVerified, type LogEntry } from "@margin/core";
 
 const fail = (msg: string): never => {
   console.error(`E2E FAIL: ${msg}`);
@@ -114,7 +114,10 @@ if (checks.status !== "settled") fail(`status ${checks.status}`);
 if (checks.seats !== 2) fail(`expected 2 seats, got ${checks.seats}`);
 if (!checks.ledgerExact) fail("credits ledger is not exact");
 // The client draws food and spikes at exactly the core hitbox.
-if (checks.radii !== `food:${R.FOOD_RADIUS_PX} spike:${SPIKE_RADIUS}`) fail(`wire radii ${checks.radii}`);
+// Spikes come in two sizes now (small and big); every wire radius must be one the core uses.
+const wireOk = new Set([`food:${R.FOOD_RADIUS_PX}`, `spike:${R.SPIKE_RADIUS_SMALL_PX}`, `spike:${R.SPIKE_RADIUS_BIG_PX}`]);
+const seen = checks.radii.split(" ");
+if (!seen.includes(`food:${R.FOOD_RADIUS_PX}`) || !seen.every((r) => wireOk.has(r))) fail(`wire radii ${checks.radii}`);
 if (!watch.joined || watch.sawEvents === 0 || watch.gotMe || watch.humans !== 2 || watch.blobs !== 12) fail(`spectate ${JSON.stringify(watch)}`);
 if (!checks.fuelSeen) fail("BlobView.fuel never reached the client");
 if (!checks.heldBoostBorrowed) fail("holding BOOST never borrowed");

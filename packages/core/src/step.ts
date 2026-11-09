@@ -11,7 +11,8 @@ import { move, radius } from "./motion";
 import type { GameEventMsg, InputCmd } from "./protocol";
 import type { Blob, Micro, World } from "./types";
 import { toUnits } from "./units";
-import { respawnSpikes, spikeRadius } from "./world";
+import { refillFood } from "./food";
+import { ranking, respawnSpikes, spikeRadius } from "./world";
 
 const T = C.sToTicks;
 const INPUT_EXPIRE_T = Math.round((C.R.INPUT_EXPIRE_MS * C.R.TICK_HZ) / 1000);
@@ -180,15 +181,18 @@ function cashouts(w: World, tick: number, ev: Ev): void {
   }
 }
 
-// 12: survivors settle at equity; leftover food goes to humans alive at the bell (dust to reserve).
-// No human alive at the bell: it all goes to the vault as LP yield, since paying popped players
-// would refund the very greed that got them liquidated (Vansh, 9 Nov).
+// 12: survivors settle at equity, and the final ranking is taken right there, so leftover food is
+// a bonus and never a rank changer. Leftover food is split equally among everyone alive at the bell,
+// agents too (dust to reserve). Nobody alive: it all goes to the vault as LP yield, since paying
+// popped players would refund the very greed that got them liquidated (Vansh, 9 Nov).
 function endMatch(w: World, tick: number, ev: Ev): void {
-  const survivors = players(w).filter((b) => b.kind === "human");
-  for (const b of players(w)) cashOut(w, b, tick);
+  const survivors = players(w);
+  for (const b of survivors) cashOut(w, b, tick);
   for (const d of live(w)) cashOut(w, d, tick); // drones leave with their bounties
-  const leftover: Micro = w.food.reduce((s, f) => s + f.mass, 0);
+  const rankingAtBell = ranking(w);
+  const leftover: Micro = w.food.reduce((s, f) => s + f.mass, w.foodPool);
   w.food = [];
+  w.foodPool = 0;
   const toVault = survivors.length > 0 ? 0 : leftover;
   w.vault.interest += toVault;
   const each = survivors.length > 0 ? Math.floor(leftover / survivors.length) : 0;
@@ -203,7 +207,7 @@ function endMatch(w: World, tick: number, ev: Ev): void {
   w.phase = "ENDED";
   const finalMasses: Record<string, Micro> = {};
   for (const b of w.blobs.values()) finalMasses[b.id] = b.payout;
-  w.pendingLog.push({ type: "MATCH_END", tick, data: { tick, finalMasses, dust, toVault } });
+  w.pendingLog.push({ type: "MATCH_END", tick, data: { tick, finalMasses, dust, toVault, ranking: rankingAtBell } });
   ev.push({ type: "phase", phase: "ENDED", tick }, { type: "matchEnd", tick });
 }
 
@@ -238,6 +242,7 @@ export function step(w: World, inputs: Map<string, InputCmd>, tick: number): Gam
   // 9. pops before 10. eats
   pops(w, tick, ev);
   eats(w, tick, ev);
+  refillFood(w); // eaten pellets come back from the pot's food pool, never more than the target
   // 11. cash-out channels
   cashouts(w, tick, ev);
   // 12. the bell
