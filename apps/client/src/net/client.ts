@@ -2,7 +2,7 @@
 // patch into a plain Frame snapshot, and exposes my private "owe" and the event stream.
 // The server is the only authority; this file never computes game state.
 import { Client, type Room } from "@colyseus/sdk";
-import { TICK_MS, type BlobView, type GameEventMsg, type InputCmd, type MatchView, type Phase, type RateTier, type Ring } from "@margin/core";
+import { TICK_MS, type BlobView, type GameEventMsg, type InputCmd, type JoinOpts, type MatchView, type Phase, type RateTier, type Ring } from "@margin/core";
 import type { Frame } from "../game/frame";
 import { SnapshotBuffer } from "./interp";
 
@@ -38,9 +38,9 @@ export class MatchConnection {
   private room?: Room;
   private listeners = new Set<(e: GameEventMsg) => void>();
 
-  /** Join a free match; rejects if the server is unreachable. */
-  async join(guestKey: string, roomCode?: string): Promise<void> {
-    this.room = await new Client(ENDPOINT).joinOrCreate("match", { mode: "free", guestKey, roomCode });
+  /** Join a match (free or paid); rejects if the server is unreachable or refuses the seat. */
+  async join(opts: JoinOpts): Promise<void> {
+    this.room = await new Client(ENDPOINT).joinOrCreate("match", opts);
     this.room.onStateChange((raw) => {
       const s = raw as RoomState;
       this.buffer.push({ at: this.stamp(s.tick), frame: this.toFrame(s) });

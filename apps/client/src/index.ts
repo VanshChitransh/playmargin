@@ -6,6 +6,7 @@ import { judge, notFound } from "./screens";
 import { verify } from "./screens/verify";
 import { landing } from "./screens/landing";
 import { play } from "./play";
+import { cash } from "./screens/cash";
 import { unlockAudioOnGesture } from "./audio";
 
 unlockAudioOnGesture();
@@ -15,6 +16,7 @@ if (isAuthCallback()) void runAuthCallback(app);
 else startRouter(app, {
   "/": landing,
   "/play": play,
+  "/cash": cash,
   "/judge": judge,
   "/verify/:id": verify,
   "/r/:code": play,

@@ -1,7 +1,7 @@
 // #/play: joins a live free match, or, if no server answers in 2.5 s (or ?local is set),
 // runs offline practice on the real rules with local bots. Either way the same renderer,
 // HUD, receipt and end screens run on top. Open /?fps#/play to see the frame rate.
-import type { GameEventMsg, InputCmd } from "@margin/core";
+import type { GameEventMsg, InputCmd, JoinOpts } from "@margin/core";
 import type { Frame } from "./game/frame";
 import { LocalMatch } from "./game/local";
 import { Receipt } from "./game/receipt";
@@ -26,12 +26,24 @@ interface Source {
 
 const JOIN_TIMEOUT_MS = 2500;
 
+/** A paid seat handed over by #/cash after the ticket is bought; used once. */
+let paidSeat: JoinOpts | null = null;
+export const setPaidSeat = (o: JoinOpts): void => void (paidSeat = o);
+
 async function connect(roomCode?: string): Promise<Source> {
+  const paid = paidSeat;
+  paidSeat = null;
+  // A paid seat never falls back to offline practice: the ticket is real, so the error must show.
+  if (paid) {
+    const conn = new MatchConnection();
+    await conn.join(paid);
+    return conn;
+  }
   if (!new URLSearchParams(location.search).has("local")) {
     const conn = new MatchConnection();
     const timeout = new Promise<never>((_, no) => setTimeout(() => no(new Error("join timeout")), JOIN_TIMEOUT_MS));
     try {
-      await Promise.race([conn.join(guestKey(), roomCode), timeout]);
+      await Promise.race([conn.join({ mode: "free", guestKey: guestKey(), roomCode }), timeout]);
       return conn;
     } catch (e) {
       conn.leave();
@@ -108,7 +120,9 @@ export const play: Screen = (root, params) => {
     }
   };
 
-  const again = (): void => rerender();
+  const wasPaid = paidSeat !== null;
+  // A paid rematch needs a new ticket, so it goes back through #/cash.
+  const again = (): void => (wasPaid ? void (location.hash = "#/cash") : rerender());
   const home = (): void => void (location.hash = "#/");
   const toVerify = async (): Promise<void> => {
     if (src instanceof LocalMatch) setLocalLog(await src.log());
@@ -142,7 +156,10 @@ export const play: Screen = (root, params) => {
     if (left) arena.destroy();
   });
 
-  void connect(params.code).then((s) => {
+  void connect(params.code).catch((e: Error) => {
+    status.textContent = `Could not join the paid match: ${e.message}. Your ticket stays on your account for the next one.`;
+    return new Promise<never>(() => {});
+  }).then((s) => {
     if (left) return s.leave?.();
     src = s;
     status.textContent = s instanceof LocalMatch ? "Offline practice: real rules, local bots" : "";
