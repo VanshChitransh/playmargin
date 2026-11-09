@@ -28,12 +28,13 @@ export function cashoutOpen(me: BlobView, m: MatchView): boolean {
   return m.phase === "LIVE" && me.state === "alive" && me.ring !== "red" && e >= R.CASHOUT_OPEN_S && e < R.CASHOUT_CLOSE_S;
 }
 
-// ponytail: the tier stands in for the real rate until the server sends it (ICR posted);
-// LOW = base, MED = at the kink, HIGH = kink plus half the steep slope.
+// Offline fallback only (live matches send ratePerMinBps): LOW = base, MED = at the kink,
+// HIGH = kink plus half the steep slope.
 const TIER_RATE_PER_MIN: Record<RateTier, number> = { LOW: 0.06, MED: 0.15, HIGH: 0.45 };
 
-/** Interest drained from my mass per second, in display units. */
-export const interestPerS = (owe: number, tier: RateTier): number => (owe * TIER_RATE_PER_MIN[tier]) / 60;
+/** Interest drained from my mass per second, in display units; exact when the server sent the rate. */
+export const interestPerS = (owe: number, tier: RateTier, rateBps?: number): number =>
+  (owe * (rateBps !== undefined ? rateBps / 10_000 : TIER_RATE_PER_MIN[tier])) / 60;
 
 /** Radii for the BOOST preview: after one tap, and after every lit pip (capped at 2.5x equity). */
 export function boostPreview(me: BlobView): { next: number; max: number } | null {

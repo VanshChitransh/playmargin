@@ -73,7 +73,7 @@ export const play: Screen = (root, params) => {
     if (!f) return null;
     lastFrame = f;
     hud.update(f, now);
-    receipt?.frame(f.blobs, f.match.rateTier, now, dt);
+    receipt?.frame(f.blobs, f.match.rateTier, now, dt, f.rateBps);
     if (f.match.phase === "ENDED") finish();
     // Dev-only hook so tests and agent-browser can read the drawn frame (stripped from builds).
     if (import.meta.env.DEV) (window as unknown as { __frame?: unknown }).__frame = f;

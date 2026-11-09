@@ -34,12 +34,12 @@ export class Receipt {
   constructor(private me: string, private start: number = R.ENTRY_FREE * R.START_MASS_RATIO) {}
 
   /** Feed every frame: remembers my last alive state and how long I have been red. */
-  frame(blobs: BlobView[], tier: RateTier, nowMs: number, dtS: number): void {
+  frame(blobs: BlobView[], tier: RateTier, nowMs: number, dtS: number, rateBps?: number): void {
     for (const b of blobs) this.labels.set(b.id, displayName(b));
     const me = blobs.find((b) => b.id === this.me);
     if (!me || me.state !== "alive") return;
     this.lastMe = me;
-    this.interest += interestPerS(me.owe, tier) * dtS;
+    this.interest += interestPerS(me.owe, tier, rateBps) * dtS;
     if (me.ring === "red") this.redSince ??= nowMs;
     else this.redSince = null;
     this.redS = this.redSince === null ? 0 : (nowMs - this.redSince) / 1000;

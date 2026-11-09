@@ -37,6 +37,7 @@ describe("hud logic", () => {
   it("charges interest only on debt", () => {
     expect(interestPerS(0, "HIGH")).toBe(0);
     expect(interestPerS(60, "LOW")).toBeCloseTo(0.06);
+    expect(interestPerS(60, "LOW", 1500)).toBeCloseTo(0.15); // the server rate wins over the tier
   });
   it("ranks by equity and drops drones and the dead", () => {
     const r = ranking([me({ id: "a", equity: 5 }), me({ id: "b", equity: 9 }), me({ id: "d", kind: "drone", equity: 99 }), me({ id: "x", state: "popped", equity: 50 })]);

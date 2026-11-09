@@ -25,4 +25,6 @@ export interface Frame {
   blobs: BlobView[];
   food: FoodView[];
   spikes: SpikeView[];
+  /** My match rate (private "me" message); absent offline, where the tier stands in. */
+  rateBps?: number;
 }

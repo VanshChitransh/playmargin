@@ -73,7 +73,7 @@ export class Hud {
       o.textContent = `owe ${owe}`;
       o.classList.toggle("hidden", owe <= 0);
     });
-    const drain = interestPerS(me.owe, m.rateTier);
+    const drain = interestPerS(me.owe, m.rateTier, f.rateBps);
     const txt = drain.toFixed(drain < 1 ? 2 : 1); // small loans still show a moving number
     this.set("drain", txt, () => {
       const d = this.q("drain");

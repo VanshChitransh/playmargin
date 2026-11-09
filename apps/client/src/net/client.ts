@@ -2,13 +2,11 @@
 // patch into a plain Frame snapshot, and exposes my private "owe" and the event stream.
 // The server is the only authority; this file never computes game state.
 import { Client, type Room } from "@colyseus/sdk";
-import type { BlobView, GameEventMsg, InputCmd, MatchView, Phase, RateTier, Ring } from "@margin/core";
+import { TICK_MS, type BlobView, type GameEventMsg, type InputCmd, type MatchView, type Phase, type RateTier, type Ring } from "@margin/core";
 import type { Frame } from "../game/frame";
 import { SnapshotBuffer } from "./interp";
 
 const ENDPOINT = import.meta.env.VITE_SERVER_URL ?? `${location.protocol}//${location.hostname}:2567`;
-// ponytail: arena size is not in the room state yet (ICR posted); matches the server stub.
-const ARENA = { w: 2000, h: 2000 };
 
 // Structural view of S2's MatchState schema, so the client never imports server code.
 interface Each<T> {
@@ -17,6 +15,9 @@ interface Each<T> {
 interface RoomState {
   mode: string;
   phase: string;
+  tick: number;
+  arenaW: number;
+  arenaH: number;
   timeLeftS: number;
   rateTier: string;
   zoneX: number;
@@ -31,14 +32,23 @@ interface RoomState {
 export class MatchConnection {
   readonly buffer = new SnapshotBuffer();
   owe = 0;
+  rateBps?: number;
+  /** Client ms minus server tick ms, tracked low so jitter never moves snapshots later. */
+  private offset = Infinity;
   private room?: Room;
   private listeners = new Set<(e: GameEventMsg) => void>();
 
   /** Join a free match; rejects if the server is unreachable. */
   async join(guestKey: string, roomCode?: string): Promise<void> {
     this.room = await new Client(ENDPOINT).joinOrCreate("match", { mode: "free", guestKey, roomCode });
-    this.room.onStateChange((s) => this.buffer.push({ at: performance.now(), frame: this.toFrame(s as RoomState) }));
-    this.room.onMessage("me", (m: { owe: number }) => (this.owe = m.owe));
+    this.room.onStateChange((raw) => {
+      const s = raw as RoomState;
+      this.buffer.push({ at: this.stamp(s.tick), frame: this.toFrame(s) });
+    });
+    this.room.onMessage("me", (m: { owe: number; ratePerMinBps?: number }) => {
+      this.owe = m.owe;
+      this.rateBps = m.ratePerMinBps;
+    });
     this.room.onMessage("ev", (e: GameEventMsg) => this.listeners.forEach((l) => l(e)));
   }
 
@@ -64,6 +74,15 @@ export class MatchConnection {
     this.listeners.clear();
   }
 
+  /** Snapshot time on the client clock from the server tick, so Wi-Fi jitter does not wobble motion. */
+  private stamp(tick: number): number {
+    const now = performance.now();
+    const serverMs = tick * TICK_MS;
+    // Min-filter the offset, but let it creep up 1 ms per patch in case the path got slower.
+    this.offset = Math.min(now - serverMs, this.offset + 1);
+    return serverMs + this.offset;
+  }
+
   private toFrame(s: RoomState): Frame {
     const me = this.room!.sessionId;
     const blobs: BlobView[] = [];
@@ -80,17 +99,18 @@ export class MatchConnection {
     s.spikes.forEach((p, k) => p.live && spikes.push({ id: Number(k), x: p.x, y: p.y, big: p.big }));
     const leaderboard: string[] = [];
     s.leaderboard.forEach((id) => leaderboard.push(id));
+    const arena = { w: s.arenaW || 2000, h: s.arenaH || 2000 };
     const match: MatchView = {
       mode: s.mode === "paid" ? "paid" : "free",
       phase: s.phase as Phase,
-      tick: 0,
+      tick: s.tick,
       timeLeftS: s.timeLeftS,
       rateTier: s.rateTier as RateTier,
       // No world yet (warm-up) sends r = 0: treat as "no zone" instead of tinting everything red.
-      zone: { cx: s.zoneX, cy: s.zoneY, r: s.zoneR || ARENA.w * 2 },
+      zone: { cx: s.zoneX, cy: s.zoneY, r: s.zoneR || arena.w * 2 },
       leaderboard,
     };
-    return { me, arena: ARENA, match, blobs, food, spikes };
+    return { me, arena, match, blobs, food, spikes, rateBps: this.rateBps };
   }
 }
 
