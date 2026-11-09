@@ -41,11 +41,11 @@ if (rooms[0]!.roomId !== rooms[1]!.roomId) fail("the two players landed in diffe
 const dupe = await sdk.joinOrCreate("match", { mode: "free", guestKey: keys[0] }).then(() => "joined", (e: Error) => e.message);
 if (!/already in this match/.test(dupe)) fail(`same guest joined twice: ${dupe}`);
 const phases: string[] = [];
-// Room 0's private owe numbers, one list per REPAY hold.
+// Room 0's private owe numbers with arrival time (ms), one list per REPAY hold.
 let repayHeld = false;
-const heldOwe: number[][] = [];
+const heldOwe: { owe: number; at: number }[][] = [];
 rooms.forEach((r, i) => {
-  r.onMessage("me", (m: { owe: number }) => i === 0 && repayHeld && heldOwe.at(-1)!.push(m.owe));
+  r.onMessage("me", (m: { owe: number }) => i === 0 && repayHeld && heldOwe.at(-1)!.push({ owe: m.owe, at: performance.now() }));
   r.onMessage("commander", () => {});
   r.onMessage("ev", (e: { type: string; phase?: string }) => i === 0 && e.type === "phase" && phases.push(e.phase!));
 });
@@ -114,8 +114,9 @@ const checks = {
   fuelSeen,
   radii: [...radii].sort().join(" "),
   heldBoostBorrowed: fuelDropped && served.log.some((e) => e.type === "BOOST"),
-  // Longest run of owe values that only fall while REPAY is held (each "me" is a change).
-  heldRepayFalls: Math.max(0, ...heldOwe.map((o) => (o.every((x, k) => k === 0 || x < o[k - 1]!) ? o.length - 1 : 0))),
+  // A REPAY hold clears the whole loan in 0.8 s: in some hold the owe falls on every update (each
+  // "me" is a change), in more than one step, and reaches 0 within about 1.2 s of the first update.
+  heldRepayClears: heldOwe.some((o) => o.length >= 3 && o.every((x, k) => k === 0 || x.owe < o[k - 1]!.owe) && o.at(-1)!.owe === 0 && o.at(-1)!.at - o[0]!.at <= 1200),
 };
 console.log(checks);
 if (checks.phases !== "WARMUP > COUNTDOWN > LIVE > ENDED") fail(`phases ${checks.phases}`);
@@ -130,7 +131,7 @@ if (!seen.includes(`food:${R.FOOD_RADIUS_PX}`) || !seen.every((r) => wireOk.has(
 if (!watch.joined || watch.sawEvents === 0 || watch.gotMe || watch.humans !== 2 || watch.blobs !== 12) fail(`spectate ${JSON.stringify(watch)}`);
 if (!checks.fuelSeen) fail("BlobView.fuel never reached the client");
 if (!checks.heldBoostBorrowed) fail("holding BOOST never borrowed");
-if (checks.heldRepayFalls < 5) fail(`holding REPAY did not pay the debt down continuously (${checks.heldRepayFalls} steps)`);
+if (!checks.heldRepayClears) fail(`holding REPAY did not clear the debt continuously within 1.2 s: ${JSON.stringify(heldOwe.map((o) => o.map((x) => x.owe)))}`);
 if (!checks.replayEqualsStored) fail("settleVerified(log) differs from stored payouts");
 console.log("E2E OK");
 process.exit(0);
