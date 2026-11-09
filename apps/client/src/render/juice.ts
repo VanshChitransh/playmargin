@@ -65,6 +65,10 @@ export const JUICE = {
   SPEED_LINE_ALPHA: 0.25,
   SPEED_LINE_FADE_MS: 250,
 
+  // Fuel ring
+  /** A refill eases in over this long, with a gold shimmer. */
+  FUEL_REFILL_MS: 300,
+
   // REPAY per tap (feel spec 2.2)
   /** Clink pitch over a run of taps (a tap within REPAY_RUN_MS of the last continues the run). */
   REPAY_PITCH: [1, 1.12, 1.25],

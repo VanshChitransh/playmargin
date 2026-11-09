@@ -25,6 +25,9 @@ export class Hud {
   private pipRing: HTMLElement;
   private lastBeat = 0;
   private tapHinted = false;
+  private shownFuel = 1;
+  private refill: { from: number; at: number } | null = null;
+  private wasDry = false;
 
   private coach: Coach;
   private touch = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
@@ -225,10 +228,30 @@ export class Hud {
 
   /** The fuel ring around BOOST: drains while held, refills as REPAY or eating raise equity. */
   private fuel(me: BlobView, blocked: boolean): void {
-    const fuel = fuelOf(me);
-    this.pipRing.style.background = fuelGradient(fuel, blocked ? "#8391B3" : C.gold, C.dim);
-    // Holding with an empty tank: the ring flashes so the player sees why nothing happens.
-    this.pipRing.classList.toggle("empty", this.held && fuel <= 0.01);
+    const target = fuelOf(me);
+    const now = performance.now();
+    // Draining shows at once; a refill (REPAY or eating raised equity) eases in with a shimmer.
+    if (target > this.shownFuel + 0.01 && !this.refill) {
+      this.refill = { from: this.shownFuel, at: now };
+      this.pipRing.classList.remove("shimmer");
+      void this.pipRing.offsetWidth;
+      this.pipRing.classList.add("shimmer");
+    }
+    if (this.refill) {
+      const k = Math.min(1, (now - this.refill.at) / JUICE.FUEL_REFILL_MS);
+      this.shownFuel = this.refill.from + (target - this.refill.from) * (1 - (1 - k) ** 3);
+      if (k >= 1) this.refill = null;
+    } else this.shownFuel = target;
+    this.pipRing.style.background = fuelGradient(this.shownFuel, blocked ? "#8391B3" : C.gold, C.dim);
+    // The tank running dry: the ring flashes grey twice (once per emptying), the button greys.
+    const dry = target <= 0.01;
+    if (dry && !this.wasDry) {
+      this.pipRing.classList.remove("empty");
+      void this.pipRing.offsetWidth;
+      this.pipRing.classList.add("empty");
+    }
+    if (!dry) this.pipRing.classList.remove("empty");
+    this.wasDry = dry;
     this.els.boost.classList.toggle("blocked", blocked);
   }
 

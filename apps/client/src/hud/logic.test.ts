@@ -43,8 +43,10 @@ describe("hud logic", () => {
     const r = ranking([me({ id: "a", equity: 5 }), me({ id: "b", equity: 9 }), me({ id: "d", kind: "drone", equity: 99 }), me({ id: "x", state: "popped", equity: 50 })]);
     expect(r.map((b) => b.id)).toEqual(["b", "a"]);
   });
-  it("draws one fuel arc", () => {
-    expect(fuelGradient(0.5, "red", "grey")).toBe("conic-gradient(red 0deg 180deg, grey 180deg 360deg)");
+  it("draws the fuel ring in three segments", () => {
+    const g = fuelGradient(0.5, "gold", "grey");
+    expect(g.match(/gold/g)).toHaveLength(3); // one arc per segment
+    expect(g).toContain("gold 124deg 180deg"); // half a tank fills segment 1 and half of segment 2
   });
   it("labels agents once with the robot", () => {
     expect(displayName({ kind: "agent", label: "Agent-1 \u{1F916}" })).toBe("\u{1F916} Agent-1");

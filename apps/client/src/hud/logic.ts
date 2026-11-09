@@ -63,9 +63,21 @@ export function ranking(blobs: BlobView[]): BlobView[] {
 
 /** conic-gradient for the pip ring: each pip is a 120 degree arc filled 0..1. */
 /** One fuel ring as a conic gradient: lit arc for the fuel left, dim for the rest. */
-export function fuelGradient(fuel: number, on: string, off: string): string {
-  const deg = Math.round(Math.max(0, Math.min(1, fuel)) * 360);
-  return `conic-gradient(${on} 0deg ${deg}deg, ${off} ${deg}deg 360deg)`;
+/**
+ * The fuel ring as a conic gradient, drawn in `segments` arcs with small gaps (each segment is
+ * 0.5x equity of loan, feel spec 2.1). Drains clockwise.
+ */
+export function fuelGradient(fuel: number, on: string, off: string, segments = 3, gapDeg = 8): string {
+  const lit = Math.max(0, Math.min(1, fuel)) * 360;
+  const seg = 360 / segments;
+  const stops: string[] = [];
+  for (let i = 0; i < segments; i++) {
+    const a0 = i * seg + gapDeg / 2;
+    const a1 = (i + 1) * seg - gapDeg / 2;
+    const mid = Math.max(a0, Math.min(a1, lit));
+    stops.push(`transparent ${i * seg}deg ${a0}deg`, `${on} ${a0}deg ${mid}deg`, `${off} ${mid}deg ${a1}deg`, `transparent ${a1}deg ${(i + 1) * seg}deg`);
+  }
+  return `conic-gradient(${stops.join(", ")})`;
 }
 
 const ROBOT = "\u{1F916}";
