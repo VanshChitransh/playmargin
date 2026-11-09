@@ -19,7 +19,8 @@
     "demo": "tsx tools/sim/demo.ts",
     "sim": "tsx tools/sim/sim.ts",
     "soak": "tsx tools/sim/soak.ts",
-    "sweep": "tsx tools/sim/sweep.ts"
+    "sweep": "tsx tools/sim/sweep.ts",
+    "commander": "tsx --env-file-if-exists=.env tools/sim/commander-live.ts"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",

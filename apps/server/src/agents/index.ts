@@ -7,6 +7,7 @@ import { FreeBot } from "./freebot";
 export { agentView, VIEW_R } from "./view";
 export { FreeBot, type Personality } from "./freebot";
 export { Drone } from "./drone";
+export { applyPlan, Commander, COMMANDER_MODELS, nearAiCall, parsePlan, roomSummary, sanitizeLabel, type AgentOrder, type Plan } from "./commander";
 
 /** Stable 32-bit hash so a blob id plus the match seed always makes the same bot. */
 function hashId(id: string): number {

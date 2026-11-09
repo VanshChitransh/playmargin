@@ -21,6 +21,8 @@ export class Drone implements Brain {
   private held = { x: 0, y: 0 };
   /** The blob this drone is going for, for the spectator label and tests. */
   target: string | null = null;
+  /** Commander's pick (A6): preferred over the default choice whenever it is a valid target. */
+  focus: string | null = null;
 
   constructor(seed: number) {
     this.rng = { rngState: seedRng(seed) };
@@ -41,7 +43,7 @@ export class Drone implements Brain {
     const drones = v.others.filter((o) => o.kind === "drone");
     // Bounty is 8% of debt, so the best red target is the biggest debt per px of travel.
     const reds = players.filter((o) => ring(o) === "red").sort((a, b) => b.debt / (dist(b, me) + 50) - a.debt / (dist(a, me) + 50));
-    const red = reds[0];
+    const red = reds.find((o) => o.id === this.focus) ?? reds[0];
     if (red) {
       this.target = red.id;
       const rival = drones.find((d) => dist(d, red) < dist(me, red));
@@ -53,7 +55,8 @@ export class Drone implements Brain {
       const side = (me.x - red.x) * -ay + (me.y - red.y) * ax >= 0 ? 1 : -1;
       return { x: red.x + (-ay / len) * PINCER_OFFSET * side, y: red.y + (ax / len) * PINCER_OFFSET * side };
     }
-    const weak = players.filter((o) => o.debt > 0).sort((a, b) => hfBps(a) - hfBps(b))[0] as Blob | undefined;
+    const indebted = players.filter((o) => o.debt > 0);
+    const weak = indebted.find((o) => o.id === this.focus) ?? (indebted.sort((a, b) => hfBps(a) - hfBps(b))[0] as Blob | undefined);
     this.target = weak?.id ?? null;
     if (!weak) return { x: v.zone.cx, y: v.zone.cy };
     const d = dist(me, weak) || 1;

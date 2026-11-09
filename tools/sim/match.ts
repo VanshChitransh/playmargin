@@ -11,10 +11,12 @@ export interface MatchOpts {
   /** Players that are not drones; paid rooms play them as FreeBot-driven "humans". */
   players: number;
   drones: number;
+  /** Free rooms only: how many of the players are (bot-driven) humans; the rest are agents. */
+  humans?: number;
   /** Optional brain override per blob (balance sweep: a greedy player); null falls back to the default. */
   brain?: (b: Blob) => Brain | null;
   /** Called after every tick with what clients would have seen. */
-  onTick?: (w: World, tick: number, events: GameEventMsg[], logged: LogEntry[]) => void | Promise<void>;
+  onTick?: (w: World, tick: number, events: GameEventMsg[], logged: LogEntry[], brains: ReadonlyMap<string, Brain>) => void | Promise<void>;
 }
 
 const WARMUP_TICKS = R.WARMUP_S * R.TICK_HZ;
@@ -22,14 +24,16 @@ const WARMUP_TICKS = R.WARMUP_S * R.TICK_HZ;
 /** FNV-1a, so each bot-driven human gets its own stable seed. */
 const fnv = (s: string): number => [...s].reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619), 2166136261) >>> 0;
 
-/** Who plays: paid rooms are humans (bot-driven here) plus drones, free rooms are agents. */
+/** Who plays: paid rooms are humans (bot-driven here) plus drones, free rooms are agents (plus `humans` bot-driven humans). */
 export function lineup(o: MatchOpts): PlayerSeed[] {
-  const kind = o.mode === "paid" ? "human" : "agent";
-  const ps: PlayerSeed[] = Array.from({ length: o.players }, (_, i) => ({
-    id: `${kind === "human" ? "player" : "agent"}-${i + 1}`,
-    kind, label: kind === "human" ? `Player-${i + 1}` : `Agent-${i + 1}`,
-    accountId: o.mode === "paid" ? `player-${i + 1}.testnet` : null,
-  }));
+  const ps: PlayerSeed[] = Array.from({ length: o.players }, (_, i) => {
+    const kind = o.mode === "paid" || i < (o.humans ?? 0) ? "human" : "agent";
+    return {
+      id: `${kind === "human" ? "player" : "agent"}-${i + 1}`,
+      kind, label: kind === "human" ? `Player-${i + 1}` : `Agent-${i + 1}`,
+      accountId: o.mode === "paid" ? `player-${i + 1}.testnet` : null,
+    };
+  });
   for (let i = 0; i < o.drones; i++) {
     ps.push({ id: `drone-${i + 1}`, kind: "drone", label: `Drone-${i + 1}`, accountId: `agent-${i + 1}.playmargin.testnet` });
   }
@@ -53,7 +57,7 @@ export async function runMatch(o: MatchOpts): Promise<{ w: World; log: LogEntry[
     if (tick === WARMUP_TICKS) startMatch(w, tick);
     else events = step(w, inputs, tick);
     const logged = await appendLog(log, w.pendingLog.splice(0));
-    await o.onTick?.(w, tick, events, logged);
+    await o.onTick?.(w, tick, events, logged, brains);
   }
   return { w, log, ticks: tick };
 }
