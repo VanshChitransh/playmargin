@@ -3,7 +3,7 @@
 // threats push by edge distance, food pulls, spikes push. On top, the MARGIN money habits a
 // careful human would have: BOOST to chase, REPAY when not green, cash out when ahead.
 import {
-  equity, outweighs, R, radius, rand, randRange, ring, seedRng, sToTicks, type AgentView, type Blob, type Brain, type InputCmd,
+  equity, leverageBps, outweighs, R, radius, rand, randRange, ring, seedRng, sToTicks, type AgentView, type Blob, type Brain, type InputCmd,
 } from "@margin/core";
 
 /** How this bot plays; the commander (A6) may nudge these later. Values in 0..1. */
@@ -35,8 +35,9 @@ export class FreeBot implements Brain {
   constructor(seed: number, personality?: Partial<Personality>) {
     this.rng = { rngState: seedRng(seed) };
     this.personality = {
-      greed: personality?.greed ?? randRange(this.rng, 0.2, 0.7),
-      caution: personality?.caution ?? randRange(this.rng, 0.5, 1.5),
+      // A spread from careful to reckless, like a real lobby: some bots will get liquidated.
+      greed: personality?.greed ?? randRange(this.rng, 0.2, 1),
+      caution: personality?.caution ?? randRange(this.rng, 0.1, 1.2),
     };
   }
 
@@ -59,8 +60,14 @@ export class FreeBot implements Brain {
     const me = v.self;
     const state = ring(me);
     const t = tick - this.liveSince;
-    if (state !== "green" && me.debt > 0) cmd.repay = true;
-    else if (prey && me.pips > 0 && rand(this.rng) < this.personality.greed) cmd.boost = true;
+    // Appetite: a greedy bot borrows to grow toward 1.3x to 2x leverage, like a player who
+    // wants size early; anyone boosts to catch prey. Not green means deleverage, never double down.
+    const appetiteBps = 10_000 + Math.round(this.personality.greed * 15_000);
+    // Careful bots deleverage at once; reckless ones hesitate, as panicking humans do.
+    if (state !== "green" && me.debt > 0 && rand(this.rng) < 0.3 + 0.6 * Math.min(1, this.personality.caution)) cmd.repay = true;
+    else if (state === "green" && me.pips > 0 && (prey ? rand(this.rng) < this.personality.greed : leverageBps(me) < appetiteBps && rand(this.rng) < 0.25)) {
+      cmd.boost = true;
+    }
     const ahead = equity(me) * 10_000 >= this.startEquity * CASHOUT_GAIN_BPS;
     if (ahead && state === "green" && t >= CASHOUT_OPEN_T && t < CASHOUT_CLOSE_T && !this.threatened(v) && rand(this.rng) < 0.3) {
       cmd.cashout = true;
