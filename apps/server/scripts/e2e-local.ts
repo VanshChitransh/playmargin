@@ -41,11 +41,12 @@ if (rooms[0]!.roomId !== rooms[1]!.roomId) fail("the two players landed in diffe
 const dupe = await sdk.joinOrCreate("match", { mode: "free", guestKey: keys[0] }).then(() => "joined", (e: Error) => e.message);
 if (!/already in this match/.test(dupe)) fail(`same guest joined twice: ${dupe}`);
 const phases: string[] = [];
-// Room 0's private owe numbers with arrival time (ms), one list per REPAY hold.
+// Each player's private owe numbers with arrival time (ms), one list per REPAY hold. Both players
+// count: at SIM_SPEED 4 either can be popped early, and a dead player gets no more owe updates.
 let repayHeld = false;
-const heldOwe: { owe: number; at: number }[][] = [];
+const heldOwe: { owe: number; at: number }[][][] = [[], []]; // per player, one list per hold
 rooms.forEach((r, i) => {
-  r.onMessage("me", (m: { owe: number }) => i === 0 && repayHeld && heldOwe.at(-1)!.push({ owe: m.owe, at: performance.now() }));
+  r.onMessage("me", (m: { owe: number }) => repayHeld && heldOwe[i]!.at(-1)!.push({ owe: m.owe, at: performance.now() }));
   r.onMessage("commander", () => {});
   r.onMessage("ev", (e: { type: string; phase?: string }) => i === 0 && e.type === "phase" && phases.push(e.phase!));
 });
@@ -83,11 +84,12 @@ const spectate = (async () => {
 let t = 0;
 const iv = setInterval(() => {
   t++;
-  // Hold BOOST for 1 s, rest, then hold REPAY for 1 s (both are held state, sent every message).
+  // Hold BOOST for 0.4 s (1.6 s of game time: a modest loan, rarely red), rest, then hold REPAY for 1 s
+  // (both are held state, sent every message).
   const repay = t % 80 >= 24 && t % 80 < 44;
-  if (repay && !repayHeld) heldOwe.push([]);
+  if (repay && !repayHeld) heldOwe.forEach((p) => p.push([]));
   repayHeld = repay;
-  rooms.forEach((r, i) => r.send("input", { seq: t, dirX: Math.cos(t / 8 + i * 3), dirY: Math.sin(t / 8 + i * 3), boost: t % 80 < 20, repay, cashout: false }));
+  rooms.forEach((r, i) => r.send("input", { seq: t, dirX: Math.cos(t / 8 + i * 3), dirY: Math.sin(t / 8 + i * 3), boost: t % 80 < 8, repay, cashout: false }));
 }, 50);
 await Promise.all(rooms.map((r) => new Promise<void>((res) => r.onLeave(() => res()))));
 clearInterval(iv);
@@ -116,7 +118,7 @@ const checks = {
   heldBoostBorrowed: fuelDropped && served.log.some((e) => e.type === "BOOST"),
   // A REPAY hold clears the whole loan in 0.8 s: in some hold the owe falls on every update (each
   // "me" is a change), in more than one step, and reaches 0 within about 1.2 s of the first update.
-  heldRepayClears: heldOwe.some((o) => o.length >= 3 && o.every((x, k) => k === 0 || x.owe < o[k - 1]!.owe) && o.at(-1)!.owe === 0 && o.at(-1)!.at - o[0]!.at <= 1200),
+  heldRepayClears: heldOwe.flat().some((o) => o.length >= 3 && o.every((x, k) => k === 0 || x.owe < o[k - 1]!.owe) && o.at(-1)!.owe === 0 && o.at(-1)!.at - o[0]!.at <= 1200),
 };
 console.log(checks);
 if (checks.phases !== "WARMUP > COUNTDOWN > LIVE > ENDED") fail(`phases ${checks.phases}`);
@@ -131,7 +133,7 @@ if (!seen.includes(`food:${R.FOOD_RADIUS_PX}`) || !seen.every((r) => wireOk.has(
 if (!watch.joined || watch.sawEvents === 0 || watch.gotMe || watch.humans !== 2 || watch.blobs !== 12) fail(`spectate ${JSON.stringify(watch)}`);
 if (!checks.fuelSeen) fail("BlobView.fuel never reached the client");
 if (!checks.heldBoostBorrowed) fail("holding BOOST never borrowed");
-if (!checks.heldRepayClears) fail(`holding REPAY did not clear the debt continuously within 1.2 s: ${JSON.stringify(heldOwe.map((o) => o.map((x) => x.owe)))}`);
+if (!checks.heldRepayClears) fail(`holding REPAY did not clear the debt continuously within 1.2 s: ${JSON.stringify(heldOwe.map((p) => p.map((o) => o.map((x) => x.owe))))}`);
 if (!checks.replayEqualsStored) fail("settleVerified(log) differs from stored payouts");
 console.log("E2E OK");
 process.exit(0);
