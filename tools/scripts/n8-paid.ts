@@ -67,10 +67,20 @@ async function ticketsFree(): Promise<void> {
   throw new Error("tickets still in a match after 200 s");
 }
 
+/** One machine = one IP, and the relayer allows one relay per IP per second: buy tickets in turn. */
+async function buyAll(): Promise<Awaited<ReturnType<typeof payToPlay>>[]> {
+  const out = [];
+  for (const p of PLAYERS) {
+    out.push(await payToPlay(p));
+    await sleep(1_200);
+  }
+  return out;
+}
+
 async function oneMatch(run: number): Promise<void> {
   await ticketsFree();
   const before = await Promise.all(PLAYERS.map((p) => balanceOf(p)));
-  const entries = await Promise.all(PLAYERS.map((p) => payToPlay(p)));
+  const entries = await buyAll();
   // Two clients, two sockets: what two browsers do.
   const rooms: Room[] = [];
   for (const [i, p] of PLAYERS.entries()) {
@@ -114,7 +124,7 @@ await oneMatch(2);
 // tickets, real settler, shape exactly as core emits it. Vault grows by leftover + fees.
 {
   await ticketsFree();
-  await Promise.all(PLAYERS.map((p) => payToPlay(p)));
+  await buyAll();
   const id = `n8-wipe-${Date.now()}`;
   await near.call(contract, "open_match", { match_id: id, players: PLAYERS }, { signerId: settler, ...fin });
   type V = { free: string };
