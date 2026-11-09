@@ -65,6 +65,15 @@ export const JUICE = {
   SPEED_LINE_ALPHA: 0.25,
   SPEED_LINE_FADE_MS: 250,
 
+  // Eating a pellet (agar-numbers: growth per pellet is tiny, so make it feel good)
+  PICKUP_SQUASH: 0.04,
+  PICKUP_SQUASH_MS: 90,
+  /** Blip pitch spread (fraction either way) and the shortest gap between blips. */
+  PICKUP_PITCH_JITTER: 0.08,
+  PICKUP_MIN_GAP_MS: 50,
+  /** Pellets fade in over this long when they appear. */
+  PELLET_FADE_S: 0.4,
+
   // Fuel ring
   /** A refill eases in over this long, with a gold shimmer. */
   FUEL_REFILL_MS: 300,

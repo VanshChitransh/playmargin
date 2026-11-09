@@ -48,6 +48,18 @@ export class FxLayer extends Container {
     this.items.push({ node: g, life: 0, ttl, vx: ((tx - x) / ttl) * 1.6, vy: ((ty - y) / ttl) * 1.6, spin: 0 });
   }
 
+  /** A faint "+" that drifts from a pellet into my blob: eating registered. */
+  mote(x: number, y: number, tx: number, ty: number, zoom: number): void {
+    const t = new Text({ text: "+", style: { fontFamily: ["Lilita One", "system-ui", "sans-serif"], fontSize: 20, fill: C.paper, stroke: { color: C.ink, width: 4 } } });
+    t.anchor.set(0.5);
+    t.alpha = 0.7;
+    t.scale.set(1 / zoom);
+    t.position.set(x, y);
+    this.addChild(t);
+    const ttl = 0.35;
+    this.items.push({ node: t, life: 0, ttl, vx: ((tx - x) / ttl) * 1.6, vy: ((ty - y) / ttl) * 1.6, spin: 0 });
+  }
+
   /** n hard-edged shards flying out of (x, y); more shards for a bigger hit. */
   shards(x: number, y: number, n: number, color: number, r: number): void {
     for (let i = 0; i < n; i++) {

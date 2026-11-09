@@ -3,7 +3,7 @@
 // (browser autoplay rule). Mute is a per-browser convenience in localStorage.
 import { JUICE } from "./render/juice";
 
-export type Sfx = "boost" | "repay" | "pop" | "spike" | "coin" | "tick" | "go" | "beat" | "denied" | "press" | "release" | "clink" | "clunk";
+export type Sfx = "boost" | "repay" | "pop" | "spike" | "coin" | "tick" | "go" | "beat" | "denied" | "press" | "release" | "clink" | "clunk" | "blip";
 
 const KEY = "margin.muted";
 let ctx: AudioContext | null = null;
@@ -79,6 +79,9 @@ export function play(s: Sfx, pitch = 1): void {
       break;
     case "release": // falling whoosh
       noise(t, 0.25, 2600, 500, 0.22);
+      break;
+    case "blip": // a pellet eaten: soft and short
+      tone(t, 520 * pitch, 780 * pitch, 0.06, "sine", 0.07);
       break;
     case "clunk": // the tank runs dry: a hollow knock
       tone(t, 180, 70, 0.18, "triangle", 0.25);

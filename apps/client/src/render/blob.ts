@@ -29,6 +29,7 @@ export class BlobSprite extends Container {
   private stretch = 0;
   private heading = 0;
   private squashUntil = 0;
+  private squashAmount = 0;
 
   constructor(v: BlobView, isMe: boolean) {
     super();
@@ -106,15 +107,17 @@ export class BlobSprite extends Container {
   }
 
   /** REPAY landed: compress then spring back (presentation only). */
-  squash(): void {
-    if (!reducedMotion) this.squashUntil = performance.now() + JUICE.REPAY_SQUASH_MS;
+  squash(amount: number = JUICE.REPAY_SQUASH, ms: number = JUICE.REPAY_SQUASH_MS): void {
+    if (reducedMotion) return;
+    this.squashAmount = amount;
+    this.squashUntil = performance.now() + ms;
   }
 
   /** Stretch along heading while boosting, squash on REPAY; never under reduced motion. */
   private feel(boosting: boolean): void {
     if (reducedMotion) return;
     this.stretch += ((boosting ? JUICE.BOOST_STRETCH : 0) - this.stretch) * Math.min(1, JUICE.STRETCH_EASE / 60);
-    const sq = performance.now() < this.squashUntil ? 1 - JUICE.REPAY_SQUASH : 1;
+    const sq = performance.now() < this.squashUntil ? 1 - this.squashAmount : 1;
     this.body.rotation = this.heading;
     this.body.scale.set((1 + this.stretch) * sq, (1 - this.stretch / 2) * sq);
   }

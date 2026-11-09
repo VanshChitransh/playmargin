@@ -40,6 +40,10 @@ export class ArenaRenderer {
   private lastFrame: Frame | null = null;
   private lastT = 0;
   private foods = new Map<number, Sprite>();
+  private foodBorn = new Map<number, number>();
+  /** Called when MY blob eats a pellet (presentation: blip, squash, mote). */
+  onPickup?: () => void;
+  private lastBlip = 0;
   private spikes = new Map<number, SpikeSprite>();
   private blobs = new Map<string, BlobSprite>();
   private dot!: Texture;
@@ -196,6 +200,7 @@ export class ArenaRenderer {
 
   private syncFood(f: Frame): void {
     const seen = new Set<number>();
+    const me = f.blobs.find((b) => b.id === f.me && b.state === "alive");
     for (const fd of f.food) {
       seen.add(fd.id);
       let s = this.foods.get(fd.id);
@@ -203,12 +208,27 @@ export class ArenaRenderer {
         s = new Sprite(this.dot);
         s.anchor.set(0.5);
         s.tint = pellet(fd.id);
+        this.foodBorn.set(fd.id, this.lastT);
         this.foods.set(fd.id, s);
         this.foodLayer.addChild(s);
       }
       s.position.set(fd.x, fd.y);
       s.width = s.height = fd.r * 2 * (0.94 + 0.06 * Math.sin(this.lastT * 3 + fd.id));
+      s.alpha = Math.min(1, (this.lastT - (this.foodBorn.get(fd.id) ?? 0)) / JUICE.PELLET_FADE_S);
     }
+    // A pellet that vanished touching my edge is one I ate: give it a little feedback.
+    if (me) {
+      for (const [id, s] of this.foods) {
+        if (seen.has(id) || Math.hypot(s.x - me.x, s.y - me.y) > me.radius + s.width / 2 + 12) continue;
+        this.fx.mote(s.x, s.y, me.x, me.y, this.zoom);
+        this.blobs.get(me.id)?.squash(JUICE.PICKUP_SQUASH, JUICE.PICKUP_SQUASH_MS);
+        if (performance.now() - this.lastBlip > JUICE.PICKUP_MIN_GAP_MS) {
+          this.lastBlip = performance.now();
+          this.onPickup?.();
+        }
+      }
+    }
+    for (const id of this.foodBorn.keys()) if (!seen.has(id)) this.foodBorn.delete(id);
     prune(this.foods, seen);
   }
 

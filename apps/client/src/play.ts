@@ -104,6 +104,7 @@ export const play: Screen = (root, params) => {
   root.appendChild(status);
 
   /** Event to effect: every money moment gets a visible number or burst where it happened. */
+  arena.onPickup = () => sfx("blip", 1 + (Math.random() * 2 - 1) * JUICE.PICKUP_PITCH_JITTER);
   let repayRun = 0;
   let lastRepayAt = -Infinity;
   // Nitro sound follows the tank: pitch rises, a coin ticks per 10% borrowed, a clunk when dry.
