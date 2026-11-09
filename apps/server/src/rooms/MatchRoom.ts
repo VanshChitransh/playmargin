@@ -45,6 +45,8 @@ const LATE_JOIN_TICKS = sToTicks(R.LATE_JOIN_S);
 const ENDED_HOLD_TICKS = sToTicks(5);
 const MAX_CATCHUP_TICKS = 10;
 const LOG_FLUSH_TICKS = sToTicks(5);
+/** Test-only fast forward (e2e:local runs a 90 s match in ~25 s). Ignored in production. */
+const SIM_SPEED = process.env.NODE_ENV === "production" ? 1 : Math.max(1, Number(process.env.SIM_SPEED ?? 1));
 
 /** Set when SIGTERM arrives: no new matches start while LIVE ones finish (drain deploys). */
 export const drain = { on: false };
@@ -114,7 +116,7 @@ export class MatchRoom extends Room {
     // Fixed timestep: timers fire late under load, so run as many ticks as wall time owes
     // (capped, so a long stall can't freeze the loop) and a match is always 90 real seconds.
     this.setSimulationInterval((dtMs) => {
-      this.owedMs = Math.min(this.owedMs + dtMs, MAX_CATCHUP_TICKS * TICK_MS);
+      this.owedMs = Math.min(this.owedMs + dtMs * SIM_SPEED, MAX_CATCHUP_TICKS * TICK_MS);
       while (this.owedMs >= TICK_MS) {
         this.owedMs -= TICK_MS;
         const t0 = performance.now();

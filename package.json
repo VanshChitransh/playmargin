@@ -20,7 +20,8 @@
     "sim": "tsx tools/sim/sim.ts",
     "soak": "tsx tools/sim/soak.ts",
     "sweep": "tsx tools/sim/sweep.ts",
-    "commander": "tsx --env-file-if-exists=.env tools/sim/commander-live.ts"
+    "commander": "tsx --env-file-if-exists=.env tools/sim/commander-live.ts",
+    "e2e:local": "npm run e2e -w @margin/server"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
