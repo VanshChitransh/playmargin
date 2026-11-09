@@ -5,6 +5,7 @@ import { MICRO, R, radius, type BlobView, type Phase } from "@margin/core";
 import type { Container } from "pixi.js";
 import { C } from "./colors";
 import type { FxLayer } from "./fx";
+import { reducedMotion } from "./motion";
 
 const TICK_S = 0.3; // how often the "+N" ticks while borrowing
 const TRAIL_S = 0.05;
@@ -39,7 +40,7 @@ export class NitroFeel {
       this.sinceTick = 0;
     }
     this.sinceTrail += dt;
-    if (borrowing && this.sinceTrail >= TRAIL_S) {
+    if (borrowing && !reducedMotion && this.sinceTrail >= TRAIL_S) {
       this.sinceTrail = 0;
       fx.ghost(me.x, me.y, me.radius, C.gold);
     }

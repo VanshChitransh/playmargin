@@ -49,7 +49,7 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
   const dead = o.kind === "popped";
   const s = o.stats;
   const tile = (label: string, value: string): string =>
-    `<div class="rounded-field bg-ink/5 px-2 py-1.5"><div class="font-display text-2xl tabular-nums leading-none">${value}</div><div class="tag mt-1 text-[10px] text-ink/60">${label}</div></div>`;
+    `<div class="rounded-field bg-ink/5 px-2 py-1.5"><div class="font-display text-2xl tabular-nums leading-none">${value}</div><div class="tag mt-1 text-[11px] text-ink/60">${label}</div></div>`;
   const stats = `<div class="mt-4 grid grid-cols-3 gap-2 text-center">
       ${tile("Food eaten", String(s.foodEaten))}
       ${tile("Time alive", `${Math.floor(s.aliveS / 60)}:${String(s.aliveS % 60).padStart(2, "0")}`)}

@@ -33,7 +33,7 @@ export class Hud {
     this.el.innerHTML = `
       <div class="absolute top-0 inset-x-0 flex flex-col items-center pt-[max(10px,env(safe-area-inset-top))]">
         <div class="flex items-center gap-2 self-start rounded-box bg-navy/80 px-3 py-1 max-sm:ml-[102px] max-sm:mt-[2px] max-sm:gap-1 max-sm:px-2 sm:self-center">
-          <span data-h=phase class="text-xs font-medium tracking-widest text-muted max-sm:text-[10px] max-sm:tracking-normal"></span>
+          <span data-h=phase class="text-xs font-medium tracking-widest text-muted max-sm:text-[11px] max-sm:tracking-normal"></span>
           <span data-h=clock class="num text-xl font-bold max-sm:text-base"></span>
         </div>
         <div data-h=banner class="mt-3 px-3 text-center font-display text-3xl tracking-wide max-sm:mt-40 max-sm:text-2xl"></div>

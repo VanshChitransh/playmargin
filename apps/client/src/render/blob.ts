@@ -6,6 +6,7 @@ import { Container, Graphics, Text } from "pixi.js";
 import type { BlobView, Ring } from "@margin/core";
 import { C, darken, vivid } from "./colors";
 import { displayName } from "../hud/logic";
+import { reducedMotion } from "./motion";
 
 const RING_GAP = 4;
 const RING_W = 4;
@@ -58,7 +59,7 @@ export class BlobSprite extends Container {
     this.warnSign.position.set(0, -r - 14 * k);
     this.shield.visible = v.shielded;
     // Red pulses fast (heartbeat), yellow breathes slowly, green is still.
-    const hz = v.ring === "red" ? 4 : v.ring === "yellow" ? 1 : 0;
+    const hz = reducedMotion ? 0 : v.ring === "red" ? 4 : v.ring === "yellow" ? 1 : 0;
     const p = hz ? 0.5 + 0.5 * Math.sin(tS * hz * Math.PI * 2) : 1;
     this.ring.alpha = hz ? 0.55 + 0.45 * p : 1;
     this.ring.scale.set(v.ring === "red" ? 1 + 0.05 * p : 1);
@@ -67,7 +68,7 @@ export class BlobSprite extends Container {
 
   /** agar.io membrane: a flat vivid body with a darker rim that ripples while moving. */
   private membrane(r: number, tS: number, force = false): void {
-    const amp = wobble(r, this.prev.speed);
+    const amp = reducedMotion ? 0 : wobble(r, this.prev.speed);
     if (amp < 0.3 && !force && this.calm) return;
     this.calm = amp < 0.3;
     const n = 48;

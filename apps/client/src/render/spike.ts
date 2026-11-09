@@ -3,6 +3,7 @@
 // would turn THIS player red (RULES.html, Spikes). Textures are baked once and shared.
 import { Container, Graphics, Sprite, Text, Texture, type Renderer } from "pixi.js";
 import { C } from "./colors";
+import { reducedMotion } from "./motion";
 
 const POINTS = 18;
 
@@ -41,9 +42,9 @@ export class SpikeSprite extends Container {
     this.sprite.texture = danger ? this.tex.red : this.tex.grey;
     this.sprite.tint = danger || !big ? 0xffffff : 0x9ccf9c;
     this.sprite.width = this.sprite.height = r * 2;
-    this.sprite.rotation = tS * 0.15;
+    this.sprite.rotation = reducedMotion ? 0 : tS * 0.15;
     this.warn.visible = danger;
-    if (danger) this.alpha = 0.75 + 0.25 * Math.sin(tS * 8 * Math.PI);
+    if (danger && !reducedMotion) this.alpha = 0.75 + 0.25 * Math.sin(tS * 8 * Math.PI);
     else this.alpha = 1;
   }
 }

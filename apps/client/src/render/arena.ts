@@ -12,6 +12,7 @@ import { boostBlocked, boostPreview } from "../hud/logic";
 import { FxLayer } from "./fx";
 import { NitroFeel } from "./nitro";
 import type { Shot } from "./director";
+import { reducedMotion } from "./motion";
 
 /** ~35 grid cells across the screen at start size (agar.io measured). */
 const CELL = 60;
@@ -95,6 +96,7 @@ export class ArenaRenderer {
 
   /** Freeze the world picture for ms (effects keep moving). */
   hitStop(ms: number): void {
+    if (reducedMotion) return;
     this.frozenUntil = performance.now() + ms;
   }
 
