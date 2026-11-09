@@ -3,7 +3,7 @@
 // 1 yocto forces a full-access key, so a leaked session key can never withdraw.
 
 use crate::*;
-use near_sdk::{Gas, NearToken, Promise, PromiseError, assert_one_yocto, ext_contract};
+use near_sdk::{Gas, NearToken, Promise, PromiseError, ext_contract};
 
 const GAS_FT_TRANSFER: Gas = Gas::from_tgas(10);
 const GAS_CALLBACK: Gas = Gas::from_tgas(10);
@@ -43,6 +43,8 @@ impl Contract {
         assert_one_yocto();
         require!(env::predecessor_account_id() == self.owner, "only the owner");
         self.reserve = sub(self.reserve, amount.0);
+        // Open matches may each draw bad debt up to BAD_DEBT_MAX_BPS of their budget (N11 L2).
+        require!(self.reserve >= self.vault.locked.0 * BAD_DEBT_MAX_BPS / 10_000, "reserve backs open matches");
         let owner = self.owner.clone();
         self.credit(&owner, amount.0);
         emit("reserve_withdraw", format!(r#"{{"amount":"{}"}}"#, amount.0));
@@ -100,6 +102,27 @@ mod tests {
         ctx("a.near", 1, 0);
         let _ = c.withdraw(U128(400_000));
         assert_eq!(c.balance_of(acc("a.near")).0, 600_000);
+    }
+
+    /// N11 M1: an emptied balance row is deleted, so the contract stops paying its storage.
+    #[test]
+    fn empty_balance_row_removed() {
+        let mut c = setup();
+        c.credit(&acc("a.near"), 1_000_000);
+        ctx("a.near", 1, 0);
+        let _ = c.withdraw(U128(1_000_000));
+        assert!(!c.balances.contains_key(&acc("a.near")));
+    }
+
+    /// N11 L2: the owner cannot pull the reserve below what open matches may need for bad debt.
+    #[test]
+    #[should_panic(expected = "reserve backs open matches")]
+    fn reserve_floor_while_matches_open() {
+        let mut c = setup();
+        c.reserve = 1_000_000;
+        c.vault.locked = U128(3_000_000);
+        ctx("owner.near", 1, 0);
+        c.reserve_withdraw(U128(800_000));
     }
 
     #[test]

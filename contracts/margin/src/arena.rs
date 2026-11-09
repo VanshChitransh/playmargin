@@ -79,6 +79,9 @@ impl Contract {
         require!(vault_repaid.0 <= lent.0, "vault_repaid above lent");
         require!(lent.0 - vault_repaid.0 <= m.budget.0, "outstanding debt above the budget reserved at open");
         let paid = payouts.iter().fold(0u128, |s, (_, a)| add(s, a.0));
+        for (who, _) in &payouts {
+            require!(m.players.contains(who), "payout to an account not in the match");
+        }
         let out = [vault_repaid.0, interest_to_vault.0, fees.0, reserve.0].into_iter().fold(paid, add);
         require!(out == add(m.stakes.0, lent.0), "settle does not conserve value");
 
@@ -93,6 +96,7 @@ impl Contract {
         }
 
         let bad_debt = lent.0 - vault_repaid.0;
+        require!(bad_debt <= m.budget.0 * BAD_DEBT_MAX_BPS / 10_000, "bad debt above 10% of the budget");
         self.reserve = add(self.reserve, reserve.0);
         require!(bad_debt <= self.reserve, "bad debt exceeds reserve: repay the vault from payouts");
         self.reserve -= bad_debt;
@@ -104,6 +108,7 @@ impl Contract {
         }
 
         m.status = MatchStatus::Settled;
+        m.players = Vec::new(); // tombstone: the settle event keeps the list (N11 M1)
         m.seq = seq;
         m.head = head.clone();
         self.matches.insert(match_id.clone(), m);
@@ -143,7 +148,8 @@ impl Contract {
     /// seq must grow, so an anchor can never be rolled back.
     pub fn anchor(&mut self, room_id: String, seq: u64, head: String) {
         self.assert_settler();
-        require!(room_id.len() <= MAX_ID_LEN && head.len() <= MAX_HEAD_LEN, "id or head too long");
+        require!(room_id == ANCHOR_ROOM, "only the free-match anchor");
+        require!(head.len() <= MAX_HEAD_LEN, "head too long");
         if let Some(a) = self.anchors.get(&room_id) {
             require!(seq > a.seq, "anchor seq must increase");
         }
@@ -166,6 +172,7 @@ impl Contract {
             return;
         }
         m.status = MatchStatus::Cancelled;
+        m.players = Vec::new(); // tickets still name the match, reclaim and refund need nothing else
         let budget = m.budget.0;
         self.vault.locked = U128(sub(self.vault.locked.0, budget));
         self.vault.free = U128(add(self.vault.free.0, budget));
@@ -317,14 +324,47 @@ mod tests {
         let mut c = two_players();
         c.reserve = 500_000;
         open(&mut c);
-        // Lent 1, repaid 0.6: 0.4 bad debt, covered by the 0.5 reserve.
-        st(&mut c, vec![("a.near", 2_400_000)], [USDC, 600_000, 0, 0, 0]);
+        // Lent 1, repaid 0.75: 0.25 bad debt (cap 10% of the 3 budget), covered by the 0.5 reserve.
+        st(&mut c, vec![("a.near", 2_250_000)], [USDC, 750_000, 0, 0, 0]);
         assert_eq!(c.vault().free.0, 10 * USDC);
-        assert_eq!(c.reserve().0, 100_000);
+        assert_eq!(c.reserve().0, 250_000);
     }
 
     #[test]
     #[should_panic(expected = "bad debt exceeds reserve")]
+    fn reserve_must_cover_bad_debt() {
+        let mut c = two_players();
+        open(&mut c);
+        st(&mut c, vec![("a.near", 2_200_000)], [USDC, 800_000, 0, 0, 0]);
+    }
+
+    /// N11 H2: a leaked settler key cannot pay an outsider, nor push more than 10% bad debt.
+    #[test]
+    #[should_panic(expected = "not in the match")]
+    fn payout_to_outsider_rejected() {
+        let mut c = two_players();
+        open(&mut c);
+        st(&mut c, vec![("thief.near", 1_800_000), ("b.near", 100_000)], [USDC, USDC, 50_000, 20_000, 30_000]);
+    }
+
+    #[test]
+    fn settle_tombstones_match() {
+        let mut c = two_players();
+        open(&mut c);
+        settle_ok(&mut c);
+        assert!(c.match_of("m1".into()).unwrap().players.is_empty());
+    }
+
+    #[test]
+    #[should_panic(expected = "only the free-match anchor")]
+    fn anchor_other_room_rejected() {
+        let mut c = setup();
+        ctx("settler.near", 0, 0);
+        c.anchor("spam-1".into(), 1, "h".into());
+    }
+
+    #[test]
+    #[should_panic(expected = "bad debt above")]
     fn settler_cannot_drain_vault() {
         let mut c = two_players();
         open(&mut c);
@@ -388,7 +428,7 @@ mod tests {
     fn anchor_cannot_roll_back() {
         let mut c = setup();
         ctx("settler.near", 0, 0);
-        c.anchor("free-2026-11-09T01".into(), 5, "h5".into());
-        c.anchor("free-2026-11-09T01".into(), 5, "h5b".into());
+        c.anchor("free".into(), 5, "h5".into());
+        c.anchor("free".into(), 5, "h5b".into());
     }
 }

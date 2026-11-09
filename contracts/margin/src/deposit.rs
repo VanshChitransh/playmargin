@@ -103,11 +103,21 @@ mod tests {
     #[test]
     fn new_owner_can_fund_vault_old_cannot() {
         let mut c = setup();
+        ctx("owner.near", 1, 0);
         c.set_owner(acc("lp.near"));
         ctx("usdc.near", 0, 0);
         let msg = r#"{"vault":true}"#.to_string();
         assert_eq!(unused(c.ft_on_transfer(acc("owner.near"), U128(1_000_000), msg.clone())), 1_000_000);
         assert_eq!(unused(c.ft_on_transfer(acc("lp.near"), U128(1_000_000), msg)), 0);
+    }
+
+    /// N11 H1: a function-call login key (no deposit) cannot hand the vault to someone else.
+    #[test]
+    #[should_panic(expected = "Requires attached deposit of exactly 1 yoctoNEAR")]
+    fn set_owner_needs_one_yocto() {
+        let mut c = setup();
+        ctx("owner.near", 0, 0);
+        c.set_owner(acc("thief.near"));
     }
 
     #[test]

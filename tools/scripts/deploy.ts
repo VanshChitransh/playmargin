@@ -57,7 +57,7 @@ async function ensureOwner(): Promise<void> {
   const cfg = await near.view<{ owner: string }>(IDS.contract, "config", {});
   if (cfg?.owner === IDS.owner) return;
   if (NETWORK === "testnet") await ensureSubAccount(IDS.owner, "0.5 NEAR");
-  await near.call(IDS.contract, "set_owner", { owner: IDS.owner }, { signerId: cfg?.owner ?? IDS.contract });
+  await near.call(IDS.contract, "set_owner", { owner: IDS.owner }, { signerId: cfg?.owner ?? IDS.contract, attachedDeposit: "1 yocto" });
   console.log(`owner set to ${IDS.owner}`);
 }
 

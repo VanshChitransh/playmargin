@@ -10,7 +10,7 @@ use near_sdk::json_types::U128;
 use near_sdk::serde::Serialize;
 use near_sdk::serde_json;
 use near_sdk::store::LookupMap;
-use near_sdk::{AccountId, BorshStorageKey, PanicOnDefault, env, near, require};
+use near_sdk::{AccountId, BorshStorageKey, PanicOnDefault, assert_one_yocto, env, near, require};
 
 /// Smallest deposit we credit, in USDC base units (0.1 USDC). Every new balance row costs the
 /// contract storage, so dust deposits from throwaway accounts are refunded instead.
@@ -31,6 +31,14 @@ pub const MAX_HEAD_LEN: usize = 128;
 
 /// RULES.html TICKET_REFUND_DEADLINE_MIN, in nanoseconds (block timestamps are ns).
 pub const TICKET_DEADLINE_NS: u64 = 15 * 60 * 1_000_000_000;
+
+/// Most bad debt one match may push onto the house reserve, in bps of its budget. The keeper pops
+/// at HF 0.90 so honest bad debt is ~0: this bounds what a leaked settler key can take (N11 H2).
+pub const BAD_DEBT_MAX_BPS: u128 = 1_000;
+
+/// The only anchor key: the hourly Merkle root of free matches. Paid heads land in settle.
+/// One fixed key stops a leaked settler key from bloating storage with new ids (N11 M2).
+pub const ANCHOR_ROOM: &str = "free";
 
 #[near]
 #[derive(BorshStorageKey)]
@@ -177,14 +185,22 @@ impl Contract {
 
     /// Owner: hand ownership to another account. The owner must not be the contract account
     /// itself, because NEP-141 forbids ft_transfer_call to self (the vault could never be funded).
+    /// 1 yocto: a dApp login key (function-call, no deposit) can never take the vault (N11 H1).
+    #[payable]
     pub fn set_owner(&mut self, owner: AccountId) {
+        assert_one_yocto();
         require!(env::predecessor_account_id() == self.owner, "only the owner");
+        require!(owner != env::current_account_id(), "owner must not be the contract account");
+        emit("owner_changed", format!(r#"{{"from":{},"to":{}}}"#, j(&self.owner), j(&owner)));
         self.owner = owner;
     }
 
     /// Owner: rotate the settler key (a leaked settler key needs no redeploy).
+    #[payable]
     pub fn set_settler(&mut self, settler: AccountId) {
+        assert_one_yocto();
         require!(env::predecessor_account_id() == self.owner, "only the owner");
+        emit("settler_changed", format!(r#"{{"from":{},"to":{}}}"#, j(&self.settler), j(&settler)));
         self.settler = settler;
     }
 
@@ -207,6 +223,9 @@ impl Contract {
         let b = self.balances.get_mut(account).expect("no balance");
         require!(*b >= amount, "insufficient balance");
         *b -= amount;
+        if *b == 0 {
+            self.balances.remove(account); // the contract pays storage, so drop empty rows (N11 M1)
+        }
     }
 
     pub(crate) fn assert_settler(&self) {
