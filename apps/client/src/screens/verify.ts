@@ -35,13 +35,14 @@ export const verify: Screen = (root, { id = "" }) => {
   </div>`;
   const body = root.querySelector<HTMLElement>("[data-v=body]")!;
 
-  const show = async (d: Loaded, note = ""): Promise<void> => {
-    render(body, d, await runChecks(d.log, d.anchorHead), note);
+  const show = async (d: Loaded, note = "", real?: Loaded): Promise<void> => {
+    render(body, d, await runChecks(d.log, d.anchorHead), note, !!real);
     body.querySelector("[data-v=download]")?.addEventListener("click", () => download(d.log, id));
     body.querySelector("[data-v=tamper]")?.addEventListener("click", () => {
       const t = tamper(d.log);
-      if (t) void show({ ...d, log: t.log }, `Tamper test: changed one number in event #${t.seq}.`);
+      if (t) void show({ ...d, log: t.log }, `Tamper test: changed one number in event #${t.seq}. Watch which check catches it.`, d);
     });
+    body.querySelector("[data-v=restore]")?.addEventListener("click", () => real && void show(real));
   };
 
   root.querySelector<HTMLInputElement>("[data-v=file]")!.addEventListener("change", async (e) => {
@@ -66,7 +67,7 @@ export const verify: Screen = (root, { id = "" }) => {
   }
 };
 
-function render(body: HTMLElement, d: Loaded, r: Report, note: string): void {
+function render(body: HTMLElement, d: Loaded, r: Report, note: string, tampered: boolean): void {
   const card = (title: string, c: Check): string => {
     const [icon, bg] = ICON[c.state];
     return `<article class="sticker flex gap-4 rounded-box bg-paper p-4">
@@ -79,7 +80,17 @@ function render(body: HTMLElement, d: Loaded, r: Report, note: string): void {
     .map((p) => `<tr><td>${esc(names.get(p.id) ?? p.id)}</td><td class="num text-right">${(p.amount / MICRO).toFixed(2)}</td></tr>`)
     .join("");
   const explorer = d.tx ? `https://${d.network === "mainnet" ? "" : "testnet."}nearblocks.io/txns/${encodeURIComponent(d.tx)}` : null;
+  // One verdict first, so a judge knows the answer before reading the three checks.
+  const bad = [r.chain, r.books, r.anchor].some((c) => c.state === "bad");
+  const verdict = bad
+    ? ["bg-ink text-paper", "\u2717", "This log does not add up.", "Someone changed it after the match. The check below shows where."]
+    : r.anchor.state === "ok"
+      ? ["bg-paper text-ink", "\u2713", "Honest match.", "Every hash links, the books balance to the millionth, and NEAR holds the same fingerprint."]
+      : ["bg-paper text-ink", "\u2713", "Honest so far.", "Every hash links and the books balance. The NEAR anchor comes with the next hourly batch."];
   body.innerHTML = `
+    <div class="sticker flex items-center gap-4 rounded-box p-4 ${verdict[0]}">
+      <span class="grid size-12 shrink-0 place-items-center rounded-full border-4 border-ink ${bad ? "bg-liq" : "bg-safe"} font-display text-2xl text-ink">${verdict[1]}</span>
+      <div><p class="font-display text-3xl leading-none">${verdict[2]}</p><p class="mt-1 text-sm">${verdict[3]}</p></div></div>
     ${note ? `<p class="tag">${esc(note)}</p>` : ""}
     ${card("Hash chain", r.chain)}
     ${card("Books balance", r.books)}
@@ -88,7 +99,9 @@ function render(body: HTMLElement, d: Loaded, r: Report, note: string): void {
       <table class="mt-2 w-full font-mono text-sm">${payouts}</table></article>` : ""}
     <div class="flex flex-wrap gap-3">
       <button data-v=download class="sticker sticker-press rounded-box bg-paper px-4 py-2 font-display text-lg">Download log</button>
-      <button data-v=tamper class="sticker sticker-press rounded-box bg-ink px-4 py-2 font-display text-lg text-paper">Tamper test</button>
+      ${tampered
+        ? `<button data-v=restore class="sticker sticker-press rounded-box bg-ink px-4 py-2 font-display text-lg text-paper">Restore the real log</button>`
+        : `<button data-v=tamper class="sticker sticker-press rounded-box bg-ink px-4 py-2 font-display text-lg text-paper">Tamper test</button>`}
       ${explorer ? `<a href="${explorer}" target="_blank" rel="noopener" class="sticker sticker-press rounded-box bg-paper px-4 py-2 font-display text-lg">✓ Verified → See proof</a>` : ""}
     </div>`;
 }
