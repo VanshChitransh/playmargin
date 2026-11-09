@@ -16,6 +16,7 @@ export const IDS = {
     contract: "playmargin.testnet",
     owner: "owner.playmargin.testnet",
     settler: "settler.playmargin.testnet",
+    relayer: "relayer.playmargin.testnet",
     usdc: "usdc.playmargin.testnet",
     player: "player1.playmargin.testnet",
   },
@@ -24,6 +25,7 @@ export const IDS = {
     // Vansh's personal account (payout wallet). Confirm with Vansh at N9 before mainnet.
     owner: "vanshverse.near",
     settler: "settler.playmargin.near",
+    relayer: "relayer.playmargin.near",
     usdc: "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
     player: "",
   },

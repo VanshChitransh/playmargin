@@ -62,4 +62,7 @@ if (NETWORK === "testnet") await deployMockUsdc();
 await deployMargin();
 await registerOnUsdc();
 await ensureOwner();
+// The relayer pays players' gas for enter_arena (services/relayer); its own account avoids
+// nonce clashes with the settler (EDGE-CASES NS-24).
+await ensureSubAccount(IDS.relayer, "1 NEAR");
 console.log("config", await near.view(IDS.contract, "config", {}));

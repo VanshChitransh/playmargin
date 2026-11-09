@@ -1,0 +1,13 @@
+{
+  "name": "@margin/relayer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "../../node_modules/.bin/tsx server.ts",
+    "smoke": "../../node_modules/.bin/tsx smoke.ts",
+    "typecheck": "../../node_modules/.bin/tsc -p ."
+  },
+  "dependencies": {
+    "near-kit": "^0.20.2"
+  }
+}
