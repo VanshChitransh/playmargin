@@ -2,7 +2,7 @@
 // contract panic is not retried and a sent tx is never sent twice.
 import { FunctionCallError, NetworkError, type Near } from "near-kit";
 import { describe, expect, it } from "vitest";
-import { accessKey, nearClients, rpcUrls, withFallback } from "./rpc";
+import { accessKey, firstCall, nearClients, rpcUrls, withFallback, type TxView } from "./rpc";
 
 const fake = (n: number) => ({ id: n }) as unknown as Near;
 const id = (near: Near) => (near as unknown as { id: number }).id;
@@ -50,5 +50,23 @@ describe("accessKey", () => {
     expect(await accessKey(withRpc(async () => Promise.reject(new Error("UNKNOWN_ACCESS_KEY"))), "a.testnet", "ed25519:x")).toBeNull();
     await expect(accessKey(withRpc(async () => Promise.reject(new NetworkError("fetch failed"))), "a.testnet", "ed25519:x")).rejects.toBeInstanceOf(NetworkError);
     expect(await accessKey(withRpc(async () => ({ nonce: 1 })), "a.testnet", "ed25519:x")).toEqual({ nonce: 1 });
+  });
+});
+
+describe("firstCall (Verify reads the anchor or settle tx itself)", () => {
+  const tx = (status: unknown, actions: TxView["transaction"]["actions"]): TxView => ({
+    transaction: { actions },
+    transaction_outcome: { block_hash: "h" },
+    receipts_outcome: [{ outcome: { status: { SuccessValue: "" } } }, { outcome: { status } }],
+  });
+  const anchor = { FunctionCall: { method_name: "anchor", args: btoa('{"room_id":"free","seq":498416,"head":"f971"}') } };
+
+  it("decodes the first function call and its JSON args", () => {
+    expect(firstCall(tx({ SuccessValue: "" }, ["CreateAccount", anchor]))).toEqual({ method: "anchor", args: { room_id: "free", seq: 498416, head: "f971" }, status: "ok" });
+  });
+
+  it("is failed when any receipt failed, and refuses a tx with no function call", () => {
+    expect(firstCall(tx({ Failure: { ActionError: {} } }, [anchor])).status).toBe("failed");
+    expect(() => firstCall(tx({ SuccessValue: "" }, ["Transfer"]))).toThrow(/not a function call/);
   });
 });

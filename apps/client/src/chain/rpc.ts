@@ -52,3 +52,47 @@ export async function withFallback<T>(clients: Near[], fn: (near: Near) => Promi
   }
   throw last;
 }
+
+/** withFallback over this network's RPCs, also reporting which RPC answered (the Verify page shows it). */
+async function answered<T>(network: Network, fn: (near: Near) => Promise<T>): Promise<{ value: T; rpc: string }> {
+  const urls = rpcUrls(network);
+  const clients = nearClients(network);
+  let rpc = "";
+  const value = await withFallback(clients, (near) => {
+    rpc = urls[clients.indexOf(near)]!;
+    return fn(near);
+  });
+  return { value, rpc };
+}
+
+/** A view call read straight from NEAR (no keys), e.g. anchor_of or match_of on the margin contract. */
+export function viewOnChain<T>(network: Network, contractId: string, method: string, args: object = {}): Promise<{ value: T; rpc: string }> {
+  return answered(network, async (near) => (await near.view<T>(contractId, method, args)) as T);
+}
+
+export type TxView = {
+  transaction: { actions: Array<string | { FunctionCall?: { method_name: string; args: string } }> };
+  transaction_outcome: { block_hash: string };
+  receipts_outcome: Array<{ outcome: { status: unknown } }>;
+};
+
+/**
+ * The first FunctionCall of a tx, args decoded, read from NEAR. An older free match is checked
+ * against ITS hour's anchor tx (anchor_of keeps only the latest hour), a paid match against its settle.
+ * "failed" when any receipt failed, so a reverted settle never verifies. Raw "tx" RPC, because
+ * near-kit's getTransactionStatus throws on a failed tx instead of returning it.
+ */
+export async function txFunctionCall(network: Network, txHash: string, signerId: string) {
+  const { value: tx, rpc } = await answered(network, async (near) => near.rpc.call<TxView>("tx", { tx_hash: txHash, sender_account_id: signerId, wait_until: "FINAL" }));
+  const { value: block } = await answered(network, (near) => near.rpc.getBlock({ blockId: tx.transaction_outcome.block_hash }));
+  return { ...firstCall(tx), block: Number(block.header.height), rpc };
+}
+
+/** Method, decoded JSON args and ok/failed of a tx's first FunctionCall (pure, for tests). */
+export function firstCall(tx: TxView): { method: string; args: unknown; status: "ok" | "failed" } {
+  const fc = tx.transaction.actions.map((a) => (typeof a === "object" ? a.FunctionCall : undefined)).find(Boolean);
+  if (!fc) throw new Error("not a function call transaction");
+  const args: unknown = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(fc.args), (c) => c.charCodeAt(0))));
+  const failed = tx.receipts_outcome.some((r) => JSON.stringify(r.outcome.status).includes("Failure"));
+  return { method: fc.method_name, args, status: failed ? "failed" : "ok" };
+}
