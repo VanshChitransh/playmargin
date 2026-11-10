@@ -1,5 +1,7 @@
 // The Judge Run: an openly labelled 90 s scenario, not a rigged outcome (EDGE-CASES PX-03).
-// Published seed, normal rules for everyone, works on /verify, kept off leaderboards. The map
+// Published seed, normal money rules for everyone, works on /verify, kept off leaderboards. One
+// disclosed difference (QA-B-07, shown at the start and in the README): its agents only hunt red
+// blobs (agents/index.ts createBrain), so the lesson is the judge's own loan, never a bot ambush. The map
 // only rearranges what the pot already paid for: the opening food lies around the player (get
 // big fast, borrow to get bigger), and big spikes ring the spot where the Squeeze ends.
 import { randRange } from "./rng";
