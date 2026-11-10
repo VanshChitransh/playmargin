@@ -106,3 +106,18 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .stamp { animation-duration: 1ms; }
 }
+
+/* Tailwind 4 preflight gives buttons the default arrow: everything clickable shows the hand. */
+@layer base {
+  button:not(:disabled),
+  a[href],
+  [role="button"],
+  summary,
+  label[for],
+  select {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
