@@ -10,7 +10,8 @@ export interface CertData extends Death {
   matchId: string;
 }
 
-const C = { ink: "#070A12", paper: "#EEF2FF", liq: "#E5484D", gold: "#F5B83D", agent: "#3BE3FF", muted: "#8391B3" };
+// Arcade Paper tokens (style.css): the card people share must look like the site.
+const C = { ink: "#1B1A2E", paper: "#FFF6E6", card: "#FFFFFF", liq: "#E5484D", warn: "#FFD43B", agent: "#3BE3FF", muted: "#4A4760", sky: "#7CC8FF", dot: "rgba(27,26,46,.10)" };
 const W = 1080;
 const H = 1350;
 
@@ -55,18 +56,50 @@ export async function drawCertificate(d: CertData): Promise<Blob> {
     g.fillText(t, x, y);
   };
 
-  g.fillStyle = C.liq;
-  g.fillRect(0, 0, W, H);
-  text("MARGIN", 70, 120, "64px 'Lilita One'", C.paper, "left", 14);
-  text("LIQUIDATION CERTIFICATE", W - 70, 110, "600 30px 'JetBrains Mono'", C.ink, "right");
+  const img = async (src: string): Promise<HTMLImageElement | null> => {
+    const i = new Image();
+    i.src = src;
+    await i.decode().catch(() => {});
+    return i.complete && i.naturalWidth ? i : null;
+  };
 
-  // Stamp
-  g.save();
-  g.translate(W / 2, 290);
-  g.rotate(-0.06);
-  g.lineWidth = 14;
-  g.strokeStyle = C.ink;
+  // Cream paper with the site's dot grid.
   g.fillStyle = C.paper;
+  g.fillRect(0, 0, W, H);
+  g.fillStyle = C.dot;
+  for (let y = 14; y < H; y += 28) for (let x = 14; x < W; x += 28) g.fillRect(x, y, 3, 3);
+
+  // Header: the cat on a sky tile + wordmark, certificate tag on the right.
+  sticker(70, 52, 96, 96, C.sky, 24);
+  const cat = await img("/brand/margin-cat-cutout.svg");
+  if (cat) {
+    g.save();
+    g.beginPath();
+    g.roundRect(70, 52, 96, 96, 24);
+    g.clip();
+    g.drawImage(cat, 64, 62, 108, 108);
+    g.restore();
+    g.lineWidth = 8;
+    g.strokeStyle = C.ink;
+    g.beginPath();
+    g.roundRect(70, 52, 96, 96, 24);
+    g.stroke();
+  }
+  text("MARGIN", 190, 124, "68px 'Lilita One'", C.ink);
+  sticker(W - 70 - 390, 70, 390, 64, C.warn, 32);
+  text("LIQUIDATION CERTIFICATE", W - 70 - 195, 113, "700 24px 'JetBrains Mono'", C.ink, "center");
+
+  // Stamp: red ink on white, slightly crooked, sticker shadow.
+  g.save();
+  g.translate(W / 2, 300);
+  g.rotate(-0.06);
+  g.fillStyle = C.ink;
+  g.beginPath();
+  g.roundRect(-388, -83, 800, 170, 26);
+  g.fill();
+  g.lineWidth = 14;
+  g.strokeStyle = C.liq;
+  g.fillStyle = C.card;
   g.beginPath();
   g.roundRect(-400, -95, 800, 170, 26);
   g.fill();
@@ -74,43 +107,51 @@ export async function drawCertificate(d: CertData): Promise<Blob> {
   text("LIQUIDATED", 0, 45, "130px 'Lilita One'", C.liq, "center");
   g.restore();
 
-  // Rekt + who did it
-  sticker(70, 450, 300, 300, C.ink);
-  const rekt = new Image();
-  rekt.src = "/brand/rekt.png";
-  await rekt.decode().catch(() => {});
-  if (rekt.complete && rekt.naturalWidth) g.drawImage(rekt, 80, 460, 280, 280);
+  // Rekt + who did it.
+  sticker(70, 470, 290, 290, C.ink);
+  const rekt = await img("/brand/rekt.png");
+  if (rekt) {
+    g.save();
+    g.beginPath();
+    g.roundRect(74, 474, 282, 282, 24);
+    g.clip();
+    g.drawImage(rekt, 74, 474, 282, 282);
+    g.restore();
+  }
   const agent = /^(agent|drone)/i.test(d.by);
-  text(d.keeper ? "Closed by" : "Popped by", 420, 510, "600 30px 'JetBrains Mono'", C.ink);
-  text(d.keeper ? "THE VAULT" : d.by, 420, 590, "72px 'Lilita One'", d.keeper ? C.paper : agent ? C.agent : C.paper, "left", 14);
-  if (agent) text("an AI agent with its own NEAR account", 420, 640, "500 28px Rubik", C.ink);
+  text(d.keeper ? "Closed by" : "Popped by", 410, 530, "600 30px 'JetBrains Mono'", C.muted);
+  text(d.keeper ? "THE VAULT" : d.by, 410, 612, "76px 'Lilita One'", C.ink);
+  if (agent) {
+    sticker(410, 652, 600, 60, C.agent, 30);
+    text("an AI agent with its own NEAR account", 710, 692, "600 26px Rubik", C.ink, "center");
+  }
 
-  // Numbers
-  sticker(70, 800, W - 140, 270, C.paper);
-  const stat = (label: string, value: string, x: number): void => {
-    text(label, x, 870, "600 26px 'JetBrains Mono'", C.muted, "center");
-    text(value, x, 960, "78px 'Lilita One'", C.ink, "center");
+  // Numbers.
+  sticker(70, 810, W - 140, 270, C.card);
+  const stat = (label: string, value: string, x: number, fill: string = C.ink): void => {
+    text(label, x, 880, "600 26px 'JetBrains Mono'", C.muted, "center");
+    text(value, x, 970, "80px 'Lilita One'", fill, "center");
   };
   stat("LEVERAGE", `${d.leverage.toFixed(1)}x`, 240);
   // A drone can pop a blob the instant it goes red: say "<1 s", never a bare "0 s".
-  stat("RED FOR", d.redS < 0.5 ? "<1 s" : `${Math.round(d.redS)} s`, W / 2);
+  stat("RED FOR", d.redS < 0.5 ? "<1 s" : `${Math.round(d.redS)} s`, W / 2, C.liq);
   stat("GREED", `${greedScore(d.peakLeverage)}/100`, W - 240);
   const hint = d.warnAtS !== null ? `Should have held REPAY at ${clock(R.MATCH_S - d.warnAtS)}.` : "Never saw it coming.";
-  text(hint, W / 2, 1035, "500 34px Rubik", C.ink, "center");
+  text(hint, W / 2, 1042, "500 34px Rubik", C.ink, "center");
 
-  // Footer: line + QR to verify
-  text("Get greedy.", 70, 1205, "76px 'Lilita One'", C.paper, "left", 14);
-  text("Get liquidated.", 70, 1285, "76px 'Lilita One'", C.paper, "left", 14);
+  // Footer: the line + QR to verify.
+  text("Get greedy.", 70, 1212, "80px 'Lilita One'", C.ink);
+  text("Get liquidated.", 70, 1292, "80px 'Lilita One'", C.liq);
   const qr = encode(verifyUrl(d.matchId), { border: 1 });
   const n = qr.data.length;
-  const size = 180;
+  const size = 170;
   const cell = size / n;
-  const qx = W - 70 - size;
-  const qy = 1120;
-  sticker(qx - 10, qy - 10, size + 20, size + 20, C.paper, 12);
+  const qx = W - 80 - size;
+  const qy = 1122;
+  sticker(qx - 10, qy - 10, size + 20, size + 20, C.card, 12);
   g.fillStyle = C.ink;
   qr.data.forEach((row, y) => row.forEach((on, x) => on && g.fillRect(qx + x * cell, qy + y * cell, Math.ceil(cell), Math.ceil(cell))));
-  text("scan to verify", qx + size / 2, qy + size + 38, "600 22px 'JetBrains Mono'", C.ink, "center");
+  text("scan to verify", qx + size / 2, qy + size + 44, "600 22px 'JetBrains Mono'", C.ink, "center");
 
   return new Promise((ok, no) => cv.toBlob((b) => (b ? ok(b) : no(new Error("canvas export failed"))), "image/png"));
 }
