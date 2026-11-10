@@ -29,6 +29,7 @@ import {
 import { Commander, agentView, createBrain, nearAiCall } from "../agents";
 import { sharedDb, userForAccount } from "../db";
 import { displayLabel } from "./label";
+import { socialName } from "../social/profile";
 import { settlementFor, sharedChain } from "../settlement";
 import { admitFree, chargeEntry } from "./freeMatch";
 import { admitPaid, refundTickets, seatedAccounts } from "./paidMatch";
@@ -150,7 +151,7 @@ export class MatchRoom extends Room {
     _client: Client,
     opts: unknown,
     ctx?: { ip?: string | string[] },
-  ): Promise<string | { accountId: string } | { spectator: true }> {
+  ): Promise<string | { accountId: string; name?: string | null } | { spectator: true }> {
     if (!joinLimit.allow(clientIp(ctx))) throw new Error("too many joins, slow down");
     // Spectators only watch public free rooms: private codes and paid tickets stay private.
     if ((opts as { spectate?: unknown } | null)?.spectate === true) {
@@ -168,14 +169,15 @@ export class MatchRoom extends Room {
       return userId;
     }
     const paid = await admitPaid(opts);
+    const name = await socialName(paid.accountId); // near.social display name (mainnet), null keeps the account
     // Claimed synchronously after the last await, so two parallel joins can't both pass.
     if (seatedAccounts.has(paid.accountId)) throw new Error("this account is already in a match");
     seatedAccounts.add(paid.accountId);
     this.accounts.add(paid.accountId);
-    return paid;
+    return { ...paid, name };
   }
 
-  override onJoin(client: Client, opts: unknown, auth?: string | { accountId: string } | { spectator: true }): void {
+  override onJoin(client: Client, opts: unknown, auth?: string | { accountId: string; name?: string | null } | { spectator: true }): void {
     const id = client.sessionId;
     if (typeof auth === "object" && "spectator" in auth) {
       this.spectators.add(id);
@@ -184,8 +186,9 @@ export class MatchRoom extends Room {
       return;
     }
     const accountId = typeof auth === "object" ? auth.accountId : null;
-    // Paid seats show the real account; free players pick a name (cleaned: shown to all and to the agents' LLM).
-    const name = accountId ?? cleanName((opts as { name?: unknown } | null)?.name);
+    // Paid seats show their near.social name or the real account (both verified); free players pick a
+    // name (cleaned: shown to all and to the agents' LLM).
+    const name = typeof auth === "object" ? (auth.name ?? auth.accountId) : cleanName((opts as { name?: unknown } | null)?.name);
     const p: PlayerSeed = { id, kind: "human", label: displayLabel(name ?? `Player ${++this.joined}`), accountId };
     if (this.started) {
       // Late join (free, first 15 s): pay now, then core charges the pot and shields 10 s.
