@@ -149,4 +149,6 @@ export const JUICE = {
 
   /** The dotted max-size outline shown only while BOOST is held. */
   PREVIEW_ALPHA: 0.25,
+  /** Smallest blob name on screen, CSS px (agar keeps names readable on the smallest cell). */
+  NAME_MIN_PX: 15,
 } as const;

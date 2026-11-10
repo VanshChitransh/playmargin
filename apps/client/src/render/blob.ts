@@ -91,11 +91,12 @@ export class BlobSprite extends Container {
     const k = 1 / zoom;
     this.feel(boosting);
     if (v.kind !== "drone") this.membrane(v, tS, around);
-    // Name inside the blob like agar.io: sized with it (about 11 px on screen at least), then
-    // shrunk so it never gets wider than 1.6 radius. Pressed on a wall it follows the outline's centre.
+    // Name inside the blob like agar.io: grows with the radius, shrinks to fit 1.6 radius, but never
+    // under NAME_MIN_PX on screen (a long name on a small cell may spill a little, as in agar).
+    // Pressed on a wall it follows the outline's centre.
     const c = v.kind === "drone" || !this.mem.n ? { x: 0, y: 0, mean: v.radius } : this.mem.centre();
     const inner = Math.min(v.radius, c.mean);
-    const ns = Math.min(Math.max(inner * 0.5, 11 / zoom) / 28, (inner * 1.6) / this.nameW);
+    const ns = Math.max(Math.min((inner * 0.5) / 28, (inner * 1.6) / this.nameW), JUICE.NAME_MIN_PX / zoom / 28);
     this.nameText.scale.set(ns);
     this.warnSign.scale.set(k);
     this.nameText.position.set(c.x, c.y);
