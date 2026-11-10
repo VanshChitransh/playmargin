@@ -26,6 +26,8 @@ const OUT = join(ROOT, "playtest-out", `${mode}-${new Date().toISOString().slice
 mkdirSync(OUT, { recursive: true });
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const report: Record<string, unknown> = { mode };
+/** Assertions that failed (edges asserts; other modes only measure). Non-empty = exit 1. */
+const failed: string[] = [];
 const procs: ChildProcess[] = [];
 process.on("exit", () => procs.forEach((p) => p.kill("SIGKILL")));
 
@@ -344,16 +346,29 @@ async function edges() {
   await t1.page.screenshot({ path: join(OUT, "edge-reload.png") });
   out.reload = { text: await text(t1.page), console: t1.consoleLog.filter((l) => /already|offline|unreach|error/i.test(l)).slice(-3) };
 
-  // Phone viewport 390 x 844: HUD present, no horizontal scroll.
+  // Phone 390 x 844 (touch only): MARGIN is laptop only (7bc0e1a), so every game route shows the
+  // "plays on a laptop" card, while home, How it works and Verify stay open. No horizontal scroll anywhere.
   const ph = await newPage(browser, { w: 390, h: 844, mobile: true, guest: `qa-phone-${Date.now()}` });
-  await ph.page.goto(`${env.web}/#/`);
-  await sleep(1500);
-  await ph.page.screenshot({ path: join(OUT, "edge-phone-landing.png") });
-  const landingScroll = await ph.page.evaluate("document.documentElement.scrollWidth");
-  await ph.page.goto(`${env.web}/#/play`);
-  await sleep(12_000);
-  await ph.page.screenshot({ path: join(OUT, "edge-phone-play.png") });
-  out.phone = { landingScrollWidth: landingScroll, playScrollWidth: await ph.page.evaluate("document.documentElement.scrollWidth"), console: ph.consoleLog.slice(0, 5) };
+  const CARD = "MARGIN plays on a laptop";
+  const phone: Record<string, { card: boolean; scrollWidth: number; text: string }> = {};
+  const visit = async (route: string, shot: string) => {
+    await ph.page.goto(`${env.web}/#${route}`);
+    await sleep(2500);
+    await ph.page.screenshot({ path: join(OUT, `edge-phone-${shot}.png`) });
+    const t = await text(ph.page);
+    phone[route] = { card: t.includes(CARD), scrollWidth: Number(await ph.page.evaluate("document.documentElement.scrollWidth")), text: t.slice(0, 80) };
+  };
+  for (const [route, shot] of [["/play", "play"], ["/r/ABCD", "room"], ["/judge", "judge"], ["/cash", "cash"], ["/watch", "watch"]] as const) {
+    await visit(route, shot);
+    if (!phone[route]!.card) failed.push(`phone ${route}: expected the "${CARD}" card, got "${phone[route]!.text}"`);
+  }
+  for (const [route, shot, mustSay] of [["/", "landing", "greedy"], ["/how", "how", "How it works"], ["/verify/local", "verify", "Verify"]] as const) {
+    await visit(route, shot);
+    if (phone[route]!.card) failed.push(`phone ${route}: shows the laptop card but must stay open`);
+    if (!phone[route]!.text.toLowerCase().includes(mustSay.toLowerCase()) && !(await text(ph.page)).toLowerCase().includes(mustSay.toLowerCase())) failed.push(`phone ${route}: missing "${mustSay}"`);
+  }
+  for (const [route, r] of Object.entries(phone)) if (r.scrollWidth > 390) failed.push(`phone ${route}: horizontal scroll (${r.scrollWidth} px)`);
+  out.phone = { routes: phone, console: ph.consoleLog.filter((l) => /error/i.test(l)).slice(0, 5) };
 
   // Out of credits: a guest whose balance is below the entry.
   const poor = `qa-poor-${Date.now()}`;
@@ -488,7 +503,9 @@ else if (mode === "runs") await runs(Number(argv[1] ?? 10), argv[2] ?? "food", N
 else if (mode === "survival") await survival(Number(argv[1] ?? 10));
 else if (mode === "edges") await edges();
 else if (mode === "walls") await walls({ w, h });
+report.failed = failed;
 writeFileSync(join(OUT, "report.json"), JSON.stringify(report, null, 1));
 console.log(JSON.stringify(report, null, 1));
 console.log(`artifacts: ${OUT}`);
-process.exit(0);
+console.log(failed.length ? `PLAYTEST FAIL (${failed.length}):\n${failed.join("\n")}` : "PLAYTEST OK");
+process.exit(failed.length ? 1 : 0);
