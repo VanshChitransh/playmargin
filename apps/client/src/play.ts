@@ -389,7 +389,7 @@ function askName(root: HTMLElement): Promise<void> {
   el.innerHTML = `<div class="pop w-full max-w-sm rounded-[28px] bg-paper p-6 text-center text-ink shadow-[10px_10px_0_var(--color-ink)]">
     <h2 class="font-display text-4xl">Your name</h2>
     <p class="mt-1 text-sm font-medium text-muted">Your friends see it in the arena and on the leaderboard.</p>
-    <input name=n maxlength=20 autocomplete=nickname placeholder="Player" class="pop-sm mt-4 w-full rounded-xl bg-card px-3 py-2 text-center font-display text-2xl" />
+    <input name=n maxlength=15 autocomplete=nickname placeholder="Player" class="pop-sm mt-4 w-full rounded-xl bg-card px-3 py-2 text-center font-display text-2xl" />
     <button class="pop pop-press mt-5 w-full rounded-2xl bg-safe px-5 py-3 font-display text-2xl">Join room</button></div>`;
   root.appendChild(el);
   const input = el.querySelector<HTMLInputElement>("input")!;
