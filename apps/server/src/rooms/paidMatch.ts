@@ -51,7 +51,10 @@ export async function verifyJoin(chain: Chain, join: unknown, nowMs = Date.now()
   ).catch(() => false);
   if (!ok) throw new Error("join signature invalid or expired");
   // No `near` option above: near-kit's own key check demands FullAccess and would refuse session keys.
-  const key = await chain.accessKey(accountId, publicKey).catch(() => null);
+  // null = the key is not on the account. Every RPC unreachable is a different answer: say so.
+  const key = await chain.accessKey(accountId, publicKey).catch(() => {
+    throw new Error("could not reach NEAR to check your key, try again in a moment");
+  });
   const p = key?.permission as unknown;
   const fc = typeof p === "object" && p !== null ? (p as { FunctionCall?: { receiver_id: string } }).FunctionCall : undefined;
   if (p !== "FullAccess" && fc?.receiver_id !== chain.cfg.contractId) throw new Error("join key is not a key of this account");
