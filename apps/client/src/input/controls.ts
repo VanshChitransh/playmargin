@@ -45,7 +45,7 @@ export class Controls {
       <div data-zone class="pointer-events-auto absolute inset-y-0 left-0 w-1/2 ${this.touch ? "" : "hidden"}"></div>
       <div class="absolute right-[max(8px,env(safe-area-inset-right))] bottom-[max(8px,env(safe-area-inset-bottom))] flex flex-col items-end gap-3">
         <button data-tap="cashout" class="pointer-events-auto btn pop pop-press hidden h-14 flex-col gap-0 rounded-2xl bg-safe px-5 font-display text-xl text-ink hover:bg-safe">CASH OUT${key("E")}</button>
-        <div class="pop flex items-end gap-3 rounded-[24px] bg-paper p-2 pt-7 sm:gap-4 sm:rounded-[28px] sm:px-5 sm:pt-11 sm:pb-4">
+        <div class="pop flex items-end gap-3 rounded-[24px] bg-paper p-2 sm:gap-3 sm:rounded-[28px] sm:p-2.5 sm:pl-4">
           <button data-tap="repay" class="pointer-events-auto btn btn-circle pop pop-press size-16 flex-col gap-0 bg-card font-display text-base text-ink hover:bg-card sm:size-26 sm:text-[1.375rem]">REPAY${key("R")}</button>
           <button data-tap="boost" class="pointer-events-auto btn btn-circle pop pop-press m-2 size-20 flex-col gap-0 bg-warn font-display text-lg text-ink hover:bg-warn sm:m-[19px] sm:size-28 sm:text-[1.75rem]"><svg class="lock absolute -top-2 -right-1 size-7 rounded-full border-2 border-ink bg-card p-1" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z" fill="none" stroke="#1B1A2E" stroke-width="2.5" stroke-linejoin="round"/></svg>BOOST${key("SPACE")}</button>
         </div>
