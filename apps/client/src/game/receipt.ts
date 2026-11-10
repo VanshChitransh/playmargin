@@ -201,7 +201,20 @@ export class Receipt {
  * or the log is not finished: the server saves entries as they happen, so a fetch right at the bell
  * can miss the bell CASHOUTs, which would read as "you keep 0" with the payout dumped on food.
  */
-export function receiptFromLog(log: readonly LogEntry[], me: string): { start: number; end: number; lines: Line[] } | null {
+/** What the log alone says about my match: the receipt plus the fate and the countable stats. */
+export interface LogReceipt {
+  start: number;
+  end: number;
+  lines: Line[];
+  kind: Outcome["kind"];
+  /** Who ended me (label), when I was popped or eaten. */
+  fate?: { by: string; keeper: boolean; eaten: boolean };
+  /** Seconds from my charge (GO or late join) to my pop, mid-match cash-out or the bell. */
+  aliveS: number;
+  blobsEaten: number;
+}
+
+export function receiptFromLog(log: readonly LogEntry[], me: string): LogReceipt | null {
   if (log.at(-1)?.type !== "MATCH_END") return null;
   const u = (x: number): number => x / MICRO;
   const names = new Map<string, string>();
@@ -210,13 +223,18 @@ export function receiptFromLog(log: readonly LogEntry[], me: string): { start: n
   let start: number | null = null;
   let paid = 0;
   let cashouts = 0;
+  let fate: LogReceipt["fate"];
+  let chargedAt = 0;
+  let outAt: number | null = null; // tick my match ended: pop, eat or the first CASHOUT
+  let blobsEaten = 0;
+  const endTick = log.at(-1)!.tick;
   for (const e of log) {
     switch (e.type) {
       case "JOIN":
         names.set(e.data.player.id, e.data.player.label);
         break;
       case "CHARGE":
-        if (e.data.blob === me) start = u(mulBps(e.data.entry, START_MASS_BPS)); // core world.ts startMass
+        if (e.data.blob === me) (start = u(mulBps(e.data.entry, START_MASS_BPS)), (chargedAt = e.tick)); // core world.ts startMass
         break;
       case "BOOST":
         if (e.data.blob === me) (add("Borrowed (BOOST)", e.data.borrowed), add("Borrow fees", -e.data.fee));
@@ -231,16 +249,20 @@ export function receiptFromLog(log: readonly LogEntry[], me: string): { start: n
         if (e.data.blob === me) add("Spikes", -e.data.damage);
         break;
       case "EAT":
-        if (e.data.by === me) add(`Ate ${names.get(e.data.victim) ?? e.data.victim}`, e.data.gained);
+        if (e.data.by === me) (add(`Ate ${names.get(e.data.victim) ?? e.data.victim}`, e.data.gained), blobsEaten++);
         if (e.data.victim === me) {
+          fate = { by: names.get(e.data.by) ?? e.data.by, keeper: false, eaten: true };
+          outAt ??= e.tick;
           add("Eaten: vault repaid", -e.data.debtRepaid);
           add(`Eaten: to ${names.get(e.data.by) ?? e.data.by}`, -e.data.gained);
           add("Eaten: scattered", -e.data.scattered);
         }
         break;
       case "POP":
-        if (e.data.by === me) add(`Popped ${names.get(e.data.victim) ?? e.data.victim}`, e.data.bounty);
+        if (e.data.by === me) (add(`Popped ${names.get(e.data.victim) ?? e.data.victim}`, e.data.bounty), blobsEaten++);
         if (e.data.victim === me) {
+          fate = { by: names.get(e.data.by) ?? e.data.by, keeper: false, eaten: false };
+          outAt ??= e.tick;
           add("Liquidated: vault repaid", -e.data.debtRepaid);
           add(`Liquidated: bounty to ${names.get(e.data.by) ?? e.data.by}`, -e.data.bounty);
           add("Liquidated: fee", -e.data.fee);
@@ -249,6 +271,8 @@ export function receiptFromLog(log: readonly LogEntry[], me: string): { start: n
         break;
       case "KEEPER_POP":
         if (e.data.victim === me) {
+          fate = { by: "the vault", keeper: true, eaten: false };
+          outAt ??= e.tick;
           add("Liquidated: vault repaid", -e.data.debtRepaid);
           add("Liquidated: keeper fee", -e.data.fee);
           add("Liquidated: scattered", -e.data.scattered);
@@ -256,7 +280,7 @@ export function receiptFromLog(log: readonly LogEntry[], me: string): { start: n
         break;
       case "CASHOUT":
         // A second CASHOUT for me is my equal share of the food left at the bell.
-        if (e.data.blob === me) (cashouts++ && add("Leftover food share", e.data.amount), (paid += u(e.data.amount)));
+        if (e.data.blob === me) (cashouts++ && add("Leftover food share", e.data.amount), (paid += u(e.data.amount)), (outAt ??= e.tick));
         break;
     }
   }
@@ -266,5 +290,23 @@ export function receiptFromLog(log: readonly LogEntry[], me: string): { start: n
   // Food eaten and the zone burn are not logged per blob (both are mass to and from food), so
   // they share the remainder line.
   const lines = [{ label: "Food minus zone", amount: food }, ...known].filter((l) => Math.abs(l.amount) >= 0.005);
-  return { start, end: paid, lines };
+  // A CASHOUT before the bell tick is a channelled cash-out; at the bell every survivor gets one.
+  const kind: Outcome["kind"] = fate ? "popped" : outAt !== null && outAt < endTick ? "cashed" : "survived";
+  const aliveS = Math.round(((outAt ?? endTick) - chargedAt) / R.TICK_HZ);
+  return { start, end: paid, lines, kind, fate, aliveS, blobsEaten };
+}
+
+/**
+ * Lay the log's truth over the live outcome: receipt, title, killer, time alive and blobs eaten
+ * all come from the log, so they can never disagree. The live receipt keeps what the log does not
+ * record (food pellets, peak equity, ranks, leverage at death). Mutates and returns o.
+ */
+export function mergeLog(o: Outcome, r: LogReceipt): Outcome {
+  o.start = r.start;
+  o.end = r.end;
+  o.lines = r.lines;
+  o.kind = r.kind;
+  o.death = r.fate ? { leverage: 0, redS: 0, peakLeverage: 1, warnAtS: null, ...o.death, ...r.fate } : undefined;
+  o.stats = { ...o.stats, aliveS: r.aliveS, blobsEaten: r.blobsEaten };
+  return o;
 }

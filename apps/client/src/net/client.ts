@@ -93,7 +93,9 @@ export class MatchConnection {
       this.rateBps = m.ratePerMinBps;
     });
     this.room.onMessage("ev", (e: GameEventMsg) => {
-      if (e.type === "matchEnd") seat.clear(); // nothing left to come back to
+      // Nothing left to come back to: the match is over, or my blob is (a resume would land a
+      // "Play again" back in this match as a dead blob).
+      if (e.type === "matchEnd" || ((e.type === "pop" || e.type === "eat") && e.victim === room.sessionId)) seat.clear();
       this.listeners.forEach((l) => l(e));
     });
     // The NEAR AI commander's one-line plan for the agents (S1 A6), null until the first plan.

@@ -4,7 +4,7 @@
 import type { GameEventMsg, InputCmd, JoinOpts, LogEntry } from "@margin/core";
 import type { Frame } from "./game/frame";
 import { LocalMatch } from "./game/local";
-import { Receipt, receiptFromLog, type ClutchSave } from "./game/receipt";
+import { Receipt, mergeLog, receiptFromLog, type ClutchSave } from "./game/receipt";
 import { Hud } from "./hud/hud";
 import { elapsedS } from "./hud/logic";
 import { shareCertificate, verifyUrl } from "./share/certificate";
@@ -237,7 +237,7 @@ export const play: Screen = (root, params) => {
     const beat = new Promise((r) => setTimeout(r, 900));
     void Promise.all([Promise.race([fromLog, wait]), beat]).then(([r]) => {
       if (left) return;
-      if (r) Object.assign(o, r);
+      if (r) mergeLog(o, r);
       overlay = showResults(root, o, (a) => (a === "again" ? again() : a === "verify" ? void toVerify() : a === "share" ? void shareResult(o, src!.matchId) : home()), wasPaid);
     });
   };

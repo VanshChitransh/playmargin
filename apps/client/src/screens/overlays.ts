@@ -28,6 +28,13 @@ const btn = (act: string, text: string, fill: string, size = "h-14 px-4 text-xl 
   `<button data-act="${act}" class="sticker sticker-press flex items-center justify-center gap-3 whitespace-nowrap rounded-box font-display text-ink ${size}" style="background:${fill}">${text}</button>`;
 const tape = (pos: string): string => `<span aria-hidden="true" class="pointer-events-none absolute h-7 w-24" style="background:${TAPE};${pos}"></span>`;
 
+// Results buttons read like the v8 tickets: label left, icon right.
+const BIG = "h-[72px] w-full !justify-between px-6 text-2xl";
+const icon = (d: string): string =>
+  `<svg viewBox="0 0 24 24" class="h-7 w-7 shrink-0" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+const chip = (act: string, text: string): string =>
+  `<button data-act="${act}" class="sticker-press rounded-field border-[3px] border-ink bg-white px-4 py-2.5 font-sans text-base font-bold text-ink" style="box-shadow:3px 3px 0 var(--color-ink)">${text}</button>`;
+
 /** The pop moment. Returns the element so the caller can remove it when Watch is pressed. */
 export function showDeath(root: HTMLElement, d: NonNullable<Outcome["death"]>, act: (a: "watch" | "again" | "share") => void): HTMLElement {
   const why = d.eaten ? `eaten by ${esc(d.by)}` : d.keeper ? "VAULT CLOSED YOUR LOAN" : `popped by ${esc(d.by)}`;
@@ -58,7 +65,10 @@ export function showDeath(root: HTMLElement, d: NonNullable<Outcome["death"]>, a
 
 /** The bell: a receipt whose lines add up to the final number (v8 Cover Story layout). */
 export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "home" | "verify" | "share") => void, paid = false): HTMLElement {
-  const title = o.kind === "cashed" ? "CASHED OUT" : o.kind === "survived" ? "SURVIVED" : o.death?.eaten ? "EATEN" : "LIQUIDATED";
+  // Stacked like the v8 poster (SUR / VIVED.): two short lines, giant, ink shadow. A death gets
+  // the same weight with a red shadow, so it never needs a rotated stamp over the text below.
+  const title =
+    o.kind === "cashed" ? "CASHED<br>OUT." : o.kind === "survived" ? "SUR<br>VIVED." : o.death?.eaten ? "EATEN." : "LIQUI<br>DATED.";
   const dead = o.kind === "popped";
   const s = o.stats;
   const why =
@@ -87,22 +97,20 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
   const el = shell(
     root,
     `<div class="flex min-h-full flex-col lg:flex-row" style="background:color-mix(in srgb, var(--color-paper) 88%, transparent)">
-      <section class="relative px-5 pb-8 pt-7 text-white sm:px-10 lg:w-[540px] lg:shrink-0 lg:pb-10 lg:pr-20 lg:pt-12 lg:[clip-path:polygon(0_0,100%_0,88%_100%,0_100%)]" style="background:${COBALT}">
-        <p class="tag text-warn">${paid ? `<span data-stake>$1</span> match` : "Practice match"} &middot; ${o.of} players</p>
-        <h2 class="${dead ? "mb-2 mt-6" : "mt-3"} font-display text-6xl leading-[.9] sm:text-7xl" style="text-shadow:5px 5px 0 var(--color-ink)">${
-          dead ? `<span class="stamp inline-block rounded-box border-[5px] border-liq bg-white px-4 py-1 text-liq" style="text-shadow:none">${title}</span>` : title
-        }</h2>
-        <p class="mt-4 max-w-sm text-lg text-white/90">${why}</p>
+      <section class="relative flex flex-col px-5 pb-10 pt-7 text-white sm:px-10 lg:w-[540px] lg:shrink-0 lg:pr-20 lg:pt-14 lg:[clip-path:polygon(0_0,100%_0,90%_100%,0_100%)]" style="background:radial-gradient(circle at 2px 2px, rgba(255,255,255,.13) 2px, transparent 0) 0 0/22px 22px, ${COBALT}">
+        <p class="tag flex items-center gap-3 text-warn"><span class="h-[3px] w-8 bg-warn"></span>${paid ? `<span data-stake>$1</span> match` : "Practice match"} &middot; ${o.of} players</p>
+        <h2 class="mt-4 font-display text-[84px] leading-[.86] sm:text-[100px]" style="text-shadow:6px 6px 0 ${dead ? "var(--color-liq)" : "var(--color-ink)"}">${title}</h2>
+        <p class="mt-5 max-w-sm text-xl text-white/90">${why}</p>
         ${s.clutches ? `<p class="mt-3"><span class="tag inline-block rounded-field bg-ink px-3 py-2 text-paper">\u2713 ${s.clutches} clutch save${s.clutches > 1 ? "s" : ""}</span></p>` : ""}
-        <div class="mt-5 flex items-end gap-3">
-          <b class="font-display text-[112px] leading-[.8] text-warn sm:text-[132px]" style="text-shadow:6px 6px 0 var(--color-ink)">#${o.rank}</b>
-          <span class="pb-1 font-display text-3xl">/${o.of}<small class="tag block text-warn">final rank</small></span>
+        <div class="mt-6 flex items-end gap-3">
+          <b class="font-display text-[120px] leading-[.8] text-warn sm:text-[148px]" style="text-shadow:7px 7px 0 var(--color-ink)">#${o.rank}</b>
+          <span class="pb-1 font-display text-4xl">/${o.of}<small class="tag block text-warn">final rank</small></span>
         </div>
-        <div class="mt-8 grid max-w-sm gap-4">
-          ${btn("again", "Play again", "var(--color-safe)")}
-          ${btn("share", o.death && !o.death.eaten ? "Get your Certificate" : "Share", CARD)}
-          <div class="grid grid-cols-2 gap-4">${btn("verify", "Verify this match", CARD, "h-12 px-3 text-base")}${btn("home", "Home", CARD, "h-12 px-3 text-base")}</div>
+        <div class="mt-10 grid max-w-[360px] gap-4">
+          ${btn("again", `Play again${icon("M3 12a9 9 0 1 0 3-6.7M3 4v5h5")}`, "var(--color-safe)", BIG)}
+          ${btn("share", `${o.death && !o.death.eaten ? "Get your Certificate" : "Share"}${icon("M7 17 17 7M8 7h9v9")}`, CARD, BIG)}
         </div>
+        <div class="mt-6 flex gap-3">${chip("verify", "Verify this match")}${chip("home", "Home")}</div>
       </section>
       <section class="flex-1 px-4 py-8 sm:px-10 lg:py-12 lg:pl-6">
         ${stats}
@@ -117,6 +125,7 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
           <p class="mt-3 text-sm font-semibold text-muted">${paid ? "Real dollars, paid to your balance when the match settles." : "Practice credits. Never cash, never bought."}</p>
         </div>
       </section>
+      <img src="/brand/margin-cat-cutout.svg" alt="" aria-hidden="true" class="pointer-events-none fixed bottom-6 right-10 hidden w-36 rotate-[8deg] lg:block" />
     </div>`,
     "backdrop-blur-sm",
   );
