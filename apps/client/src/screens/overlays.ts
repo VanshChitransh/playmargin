@@ -81,12 +81,17 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
           : o.death?.keeper
             ? "The vault closed your loan."
             : `Popped by ${esc(o.death?.by ?? "the vault")}.`;
+  // The tile shows the receipt's own food line, so the stat and the receipt can't disagree (QA-B-11).
+  const food = o.lines.find((l) => l.label.startsWith("Food"))?.amount ?? 0;
+  const foodNet = `${food >= 0 ? "+" : "\u2212"}${Math.abs(food).toFixed(1)}`;
+  const judge = location.hash.startsWith("#/judge"); // the Judge Run route (index.ts), QA-B-12
+  const alive = `${Math.floor(s.aliveS / 60)}:${String(s.aliveS % 60).padStart(2, "0")}`;
   const cell = (label: string, value: string, span: string, cls = ""): string =>
     `<div class="${span} px-3 py-3 sm:px-4" style="background:${CARD}"><div class="font-display text-3xl leading-none tabular-nums sm:text-4xl ${cls}">${value}</div><div class="mt-1.5 text-sm font-semibold text-muted">${label}</div></div>`;
   // Five cells: 3 + 2 on phones (col spans of a 6 grid), one row from sm up. The ink gap is the rule.
   const stats = `<div class="sticker grid grid-cols-6 gap-[3px] bg-ink sm:grid-cols-5">
-      ${cell("food eaten", String(s.foodEaten), "col-span-2 sm:col-span-1")}
-      ${cell("time alive", `${Math.floor(s.aliveS / 60)}:${String(s.aliveS % 60).padStart(2, "0")}`, "col-span-2 sm:col-span-1")}
+      ${cell("food minus zone", foodNet, "col-span-2 sm:col-span-1")}
+      ${cell("time alive", alive, "col-span-2 sm:col-span-1")}
       ${cell("blobs eaten", String(s.blobsEaten), "col-span-2 sm:col-span-1")}
       ${cell("top rank", `#${s.topRank}`, "col-span-3 sm:col-span-1")}
       ${cell("peak equity", s.peakEquity.toFixed(0), "col-span-3 sm:col-span-1", "text-[#B97A0F]")}
@@ -98,13 +103,13 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
     root,
     `<div class="flex min-h-full flex-col lg:flex-row" style="background:color-mix(in srgb, var(--color-paper) 88%, transparent)">
       <section class="relative flex flex-col px-5 pb-10 pt-7 text-white sm:px-10 lg:w-[540px] lg:shrink-0 lg:pr-20 lg:pt-14 lg:[clip-path:polygon(0_0,100%_0,90%_100%,0_100%)]" style="background:radial-gradient(circle at 2px 2px, rgba(255,255,255,.13) 2px, transparent 0) 0 0/22px 22px, ${COBALT}">
-        <p class="tag flex items-center gap-3 text-warn"><span class="h-[3px] w-8 bg-warn"></span>${paid ? `<span data-stake>$1</span> match` : "Practice match"} &middot; ${o.of} players</p>
+        <p class="tag flex items-center gap-3 text-warn"><span class="h-[3px] w-8 bg-warn"></span>${paid ? `<span data-stake>$1</span> match` : judge ? "Judge Run" : "Practice match"} &middot; ${o.of} players</p>
         <h2 class="mt-4 font-display text-[84px] leading-[.86] sm:text-[100px]" style="text-shadow:6px 6px 0 ${dead ? "var(--color-liq)" : "var(--color-ink)"}">${title}</h2>
         <p class="mt-5 max-w-sm text-xl text-white/90">${why}</p>
         ${s.clutches ? `<p class="mt-3"><span class="tag inline-block rounded-field bg-ink px-3 py-2 text-paper">\u2713 ${s.clutches} clutch save${s.clutches > 1 ? "s" : ""}</span></p>` : ""}
         <div class="mt-6 flex items-end gap-3">
-          <b class="font-display text-[120px] leading-[.8] text-warn sm:text-[148px]" style="text-shadow:7px 7px 0 var(--color-ink)">#${o.rank}</b>
-          <span class="pb-1 font-display text-4xl">/${o.of}<small class="tag block text-warn">final rank</small></span>
+          <b class="font-display text-[120px] leading-[.8] text-warn sm:text-[148px]" style="text-shadow:7px 7px 0 var(--color-ink)">${dead ? "OUT" : `#${o.rank}`}</b>
+          <span class="pb-1 font-display text-4xl">${dead ? `at ${alive}` : `/${o.of}`}<small class="tag block text-warn">${dead ? "no rank when popped" : "final rank"}</small></span>
         </div>
         <div class="mt-10 grid max-w-[360px] gap-4">
           ${btn("again", `Play again${icon("M3 12a9 9 0 1 0 3-6.7M3 4v5h5")}`, "var(--color-safe)", BIG)}

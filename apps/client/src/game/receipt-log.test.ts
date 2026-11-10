@@ -102,4 +102,22 @@ describe("receiptFromLog", () => {
     expect(run(3000)).toMatchObject({ kind: "cashed", aliveS: 50 });
     expect(run(5400)).toMatchObject({ kind: "survived", aliveS: 90 });
   });
+
+  it("names AI killers with the robot mark and gives a popped player no rank (QA-B-08, QA-B-11)", () => {
+    const entries = [
+      { type: "JOIN", tick: 0, data: { player: { id: "me", label: "Vansh", kind: "human", accountId: null } } },
+      { type: "JOIN", tick: 0, data: { player: { id: "a1", label: "Max Pain", kind: "agent", accountId: null } } },
+      { type: "JOIN", tick: 0, data: { player: { id: "s1", label: "Sam", kind: "human", accountId: null } } },
+      { type: "CHARGE", tick: 1, data: { blob: "me", entry: M(100) } },
+      { type: "CHARGE", tick: 1, data: { blob: "s1", entry: M(100) } },
+      { type: "EAT", tick: 900, data: { by: "a1", victim: "me", debtRepaid: 0, badDebt: 0, gained: M(56), scattered: M(24) } },
+      { type: "CASHOUT", tick: 5400, data: { blob: "s1", amount: M(90) } },
+      { type: "MATCH_END", tick: 5400, data: { tick: 5400, finalMasses: {}, dust: 0, toVault: 0, ranking: ["s1", "a1"] } },
+    ].map((e, seq) => ({ ...e, seq, prevHash: "", hash: "" }) as LogEntry);
+    const dead = receiptFromLog(entries, "me")!;
+    expect(dead.fate?.by).toBe("\u{1F916} Max Pain");
+    expect(dead.lines.map((l) => l.label)).toContain("Eaten: to \u{1F916} Max Pain");
+    expect(dead.rank).toBeNull();
+    expect(receiptFromLog(entries, "s1")!.rank).toBe(1);
+  });
 });

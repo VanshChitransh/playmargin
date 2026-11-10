@@ -1,6 +1,6 @@
 // The Brain hook for the room (S2): one brain per agent blob, asked for an InputCmd every tick
 // before core.step. Brains throttle themselves and emit each tap for exactly one tick.
-import type { Blob, Brain } from "@margin/core";
+import { JUDGE_SEED, type Blob, type Brain } from "@margin/core";
 import { Drone } from "./drone";
 import { FreeBot } from "./freebot";
 
@@ -19,7 +19,8 @@ function hashId(id: string): number {
 /** Brain for an agent or drone blob, or null for humans. */
 export function createBrain(blob: Blob, matchSeed: number): Brain | null {
   const seed = (matchSeed ^ hashId(blob.id)) >>> 0;
-  if (blob.kind === "agent") return new FreeBot(seed);
+  // The Judge Run room always plays the published JUDGE_SEED: its agents spare the judge (QA-B-07).
+  if (blob.kind === "agent") return new FreeBot(seed, matchSeed === JUDGE_SEED ? { spareHumans: true } : undefined);
   if (blob.kind === "drone") return new Drone(seed);
   return null;
 }

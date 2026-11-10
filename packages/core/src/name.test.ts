@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BOT_NAMES } from "./botnames";
-import { cleanName, NAME_MAX } from "./name";
+import { cleanName, NAME_MAX, nameProblem } from "./name";
 
 describe("cleanName", () => {
   it("keeps NEAR account ids and plain names", () => {
@@ -22,5 +22,19 @@ describe("cleanName", () => {
     for (const name of BOT_NAMES) expect(cleanName(name)).toBeNull();
     expect(cleanName("Greedy Gussie")).toBe("Greedy Gussie");
     expect(cleanName("Max")).toBe("Max");
+  });
+  it("explains every change or refusal in player words (QA-B-09)", () => {
+    expect(nameProblem("Rocky Bhai")).toBeNull();
+    expect(nameProblem("   ")).toBe("Type a name: letters or numbers.");
+    expect(nameProblem("\u0645\u062D\u0645\u062F")).toBe("Use English letters, numbers and spaces.");
+    expect(nameProblem("Agent-3")).toBe("That name belongs to the AI players. Pick another.");
+    expect(nameProblem("max pain")).toBe("That name belongs to the AI players. Pick another.");
+    expect(nameProblem("\u{1F525}greedy\u{1F525}")).toBe("Only English letters, numbers and spaces: some characters were dropped.");
+    expect(nameProblem("a".repeat(20))).toBe("15 characters max: the name was shortened.");
+    // Every refusal by cleanName comes with a reason.
+    for (const raw of ["", "  ", "<>", "Agent-3", "drone 1", "BOT", "Greedy Gus", "\u0645\u062D\u0645\u062F"]) {
+      expect(cleanName(raw)).toBeNull();
+      expect(nameProblem(raw)).not.toBeNull();
+    }
   });
 });

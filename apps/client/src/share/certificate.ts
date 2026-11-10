@@ -118,7 +118,8 @@ export async function drawCertificate(d: CertData): Promise<Blob> {
     g.drawImage(rekt, 74, 474, 282, 282);
     g.restore();
   }
-  const agent = /^(agent|drone)/i.test(d.by);
+  // Bot names (botnames.ts) carry the robot mark, not an "Agent-" prefix (QA-B-08).
+  const agent = d.by.includes("\u{1F916}") || /^(agent|drone)/i.test(d.by);
   text(d.keeper ? "Closed by" : "Popped by", 410, 530, "600 30px 'JetBrains Mono'", C.muted);
   text(d.keeper ? "THE VAULT" : d.by, 410, 612, "76px 'Lilita One'", C.ink);
   if (agent) {

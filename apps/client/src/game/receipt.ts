@@ -53,6 +53,9 @@ export interface Stats {
   peakEquity: number;
 }
 
+/** Every AI player (agent or drone) is named with the robot mark, wherever the name comes from (QA-B-08). */
+const shown = (kind: string, label: string): string => (kind === "human" ? label : displayName({ kind: "agent", label }));
+
 /** A pellet that vanished this close to my edge was eaten by me. */
 const FOOD_REACH = R.FOOD_RADIUS_PX + 12; // core eats when my edge touches the pellet edge
 
@@ -85,7 +88,7 @@ export class Receipt {
     elapsedS?: number,
     food?: ReadonlyArray<{ id: number; x: number; y: number }>,
   ): void {
-    for (const b of blobs) this.labels.set(b.id, displayName(b));
+    for (const b of blobs) this.labels.set(b.id, shown(b.kind, b.label));
     const me = blobs.find((b) => b.id === this.me);
     if (food) this.countFood(food, me);
     if (!me || me.state !== "alive") return;
@@ -212,6 +215,8 @@ export interface LogReceipt {
   /** Seconds from my charge (GO or late join) to my pop, mid-match cash-out or the bell. */
   aliveS: number;
   blobsEaten: number;
+  /** My place in the bell ranking (MATCH_END), or null when I was popped or eaten (QA-B-11). */
+  rank: number | null;
 }
 
 export function receiptFromLog(log: readonly LogEntry[], me: string): LogReceipt | null {
@@ -231,7 +236,7 @@ export function receiptFromLog(log: readonly LogEntry[], me: string): LogReceipt
   for (const e of log) {
     switch (e.type) {
       case "JOIN":
-        names.set(e.data.player.id, e.data.player.label);
+        names.set(e.data.player.id, shown(e.data.player.kind, e.data.player.label));
         break;
       case "CHARGE":
         if (e.data.blob === me) (start = u(mulBps(e.data.entry, START_MASS_BPS)), (chargedAt = e.tick)); // core world.ts startMass
@@ -293,7 +298,9 @@ export function receiptFromLog(log: readonly LogEntry[], me: string): LogReceipt
   // A CASHOUT before the bell tick is a channelled cash-out; at the bell every survivor gets one.
   const kind: Outcome["kind"] = fate ? "popped" : outAt !== null && outAt < endTick ? "cashed" : "survived";
   const aliveS = Math.round(((outAt ?? endTick) - chargedAt) / R.TICK_HZ);
-  return { start, end: paid, lines, kind, fate, aliveS, blobsEaten };
+  const ranking = (log.at(-1) as Extract<LogEntry, { type: "MATCH_END" }>).data.ranking;
+  const at = ranking.indexOf(me);
+  return { start, end: paid, lines, kind, fate, aliveS, blobsEaten, rank: kind === "popped" || at < 0 ? null : at + 1 };
 }
 
 /**
@@ -308,5 +315,6 @@ export function mergeLog(o: Outcome, r: LogReceipt): Outcome {
   o.kind = r.kind;
   o.death = r.fate ? { leverage: 0, redS: 0, peakLeverage: 1, warnAtS: null, ...o.death, ...r.fate } : undefined;
   o.stats = { ...o.stats, aliveS: r.aliveS, blobsEaten: r.blobsEaten };
+  if (r.rank !== null) o.rank = r.rank;
   return o;
 }
