@@ -3,7 +3,7 @@
 // `inputs` holds commands that arrived since the last tick: cashout is a tap, boost and repay are held.
 import * as C from "./constants";
 import {
-  accrueInterest, boostHold, canBoost, cashOut, eat, flushBoost, flushRepay, hitSpike, keeperCheck, liquidate, matchT, outweighs,
+  accrueInterest, bellShare, boostHold, humanSafeUntil, canBoost, cashOut, eat, flushBoost, flushRepay, hitSpike, keeperCheck, liquidate, matchT, outweighs,
   repayHold, ring, zoneTick,
 } from "./economy";
 import { checkInvariant } from "./invariant";
@@ -200,13 +200,13 @@ function pops(w: World, tick: number, ev: Ev): void {
 // nothing: REPAY is the only way out of red, or greedy players eat their way back (balance B, 9 Nov).
 function eats(w: World, tick: number, ev: Ev): void {
   const ps = players(w).sort(byMassDesc);
-  // Free-room agents can't eat a human in the first 30 s: a first-timer gets to find their feet.
-  const humanSafe = matchT(w, tick) < T(C.R.AGENT_NO_EAT_HUMAN_S);
+  // Free-room agents can't eat a human in their first 30 s (from GO, or from a late join): a
+  // first-timer gets to find their feet.
   for (const e of ps) {
     if (e.state !== "alive" || ring(e) === "red" || shielded(e, tick)) continue;
     for (const v of ps) {
       if (v === e || v.state !== "alive" || shielded(v, tick) || !outweighs(e, v)) continue;
-      if (humanSafe && e.kind === "agent" && v.kind === "human") continue;
+      if (e.kind === "agent" && v.kind === "human" && tick < humanSafeUntil(w.goTick, v.joinedAt)) continue;
       if (dist(e, v) >= radius(e.mass)) continue;
       const gained = eat(w, e, v, tick);
       ev.push({ type: "eat", by: e.id, victim: v.id, gained: toUnits(gained) });
@@ -235,26 +235,32 @@ function cashouts(w: World, tick: number, ev: Ev): void {
 
 // 12: survivors settle at equity, and the final ranking is taken right there, so leftover food is
 // a bonus and never a rank changer. Leftover food is split equally among everyone alive at the bell,
-// agents too (dust to reserve). Nobody alive: it all goes to the vault as LP yield, since paying
-// popped players would refund the very greed that got them liquidated (Vansh, 9 Nov).
+// agents too (dust to reserve), but each share is capped at BELL_BONUS_CAP of that survivor's own
+// equity at the bell; the capped part goes to the vault as LP yield. Waiting out the clock must not
+// pay more than playing (balance-2026-11-10.md: a newcomer kept +85% almost all from the bonus).
+// Nobody alive: it all goes to the vault, since paying popped players would refund the very greed
+// that got them liquidated (Vansh, 9 Nov).
 function endMatch(w: World, tick: number, ev: Ev): void {
   const survivors = players(w);
-  for (const b of survivors) cashOut(w, b, tick);
+  const equityAtBell = new Map(survivors.map((b) => [b, cashOut(w, b, tick)] as const));
   for (const d of live(w)) cashOut(w, d, tick); // drones leave with their bounties
   const rankingAtBell = ranking(w);
   const leftover: Micro = w.food.reduce((s, f) => s + f.mass, w.foodPool);
   w.food = [];
   w.foodPool = 0;
-  const toVault = survivors.length > 0 ? 0 : leftover;
-  w.vault.interest += toVault;
   const each = survivors.length > 0 ? Math.floor(leftover / survivors.length) : 0;
+  let shared: Micro = 0;
   for (const b of survivors) {
-    if (each === 0) break;
-    b.payout += each;
-    w.cashedOut += each;
-    w.pendingLog.push({ type: "CASHOUT", tick, data: { blob: b.id, amount: each } });
+    const share = bellShare(each, equityAtBell.get(b)!);
+    if (share === 0) continue;
+    b.payout += share;
+    w.cashedOut += share;
+    shared += share;
+    w.pendingLog.push({ type: "CASHOUT", tick, data: { blob: b.id, amount: share } });
   }
-  const dust = leftover - toVault - each * survivors.length;
+  const dust = survivors.length > 0 ? leftover - each * survivors.length : 0; // < survivors, as before the cap
+  const toVault = leftover - shared - dust; // capped excess, or everything when nobody survived
+  w.vault.interest += toVault;
   w.reserve += dust;
   w.phase = "ENDED";
   const finalMasses: Record<string, Micro> = {};

@@ -94,6 +94,7 @@ export const R = {
   "SPIKE_MIN_SPACING_PX": 600,
   "SPIKE_CLEARANCE_PX": 120,
   "AGENT_NO_EAT_HUMAN_S": 30,
+  "BELL_BONUS_CAP": 0.5,
   "SPIKE_RESPAWN_S": 3,
   "SPIKE_IMMUNITY_S": 1,
   "ZONE_START_S": 60,
@@ -151,6 +152,8 @@ export const HF_ULTRA_BPS = bps(R.HF_ULTRA);
 export const LEVERAGE_CAP_BPS = bps(R.LEVERAGE_CAP);
 export const NITRO_RATE_BPS = bps(R.NITRO_RATE_EQUITY_PER_S);
 export const BORROW_FEE_BPS = bps(R.BORROW_FEE);
+/** Bell leftover bonus cap, as a share of the survivor's own equity at the bell (Vansh, 10 Nov). */
+export const BELL_BONUS_CAP_BPS = bps(R.BELL_BONUS_CAP);
 export const BORROW_FEE_VAULT_BPS = bps(R.BORROW_FEE_SPLIT.vault);
 export const RATE_BASE_BPS = bps(R.RATE_PER_MIN.base);
 export const RATE_KINK_UTIL_BPS = bps(R.RATE_PER_MIN.kink_util);

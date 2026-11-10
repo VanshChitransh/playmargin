@@ -281,6 +281,17 @@ export function eat(w: World, eater: Blob, victim: Blob, tick: number): Micro {
   return gained;
 }
 
+/** Tick until which agents may not eat this human: AGENT_NO_EAT_HUMAN_S after GO, or after their own
+ *  late join, whichever is later (a late joiner gets the same window as everyone). */
+export function humanSafeUntil(goTick: number, joinedAt: number): number {
+  return Math.max(goTick, joinedAt) + C.sToTicks(C.R.AGENT_NO_EAT_HUMAN_S);
+}
+
+/** A survivor's bell leftover share: the equal split, capped at BELL_BONUS_CAP of their own equity at the bell (Micro). */
+export function bellShare(each: Micro, equity: Micro): Micro {
+  return Math.min(each, mulBps(equity, C.BELL_BONUS_CAP_BPS));
+}
+
 /** Leave with equity: debt auto-repaid from mass, the rest is paid out. Returns Micro paid. */
 export function cashOut(w: World, b: Blob, tick: number): Micro {
   repayFromMass(w, b, b.debt, tick);

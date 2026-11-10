@@ -54,6 +54,9 @@ export interface Blob {
   /** A REPAY press holds until this tick even if released sooner, so a tap pays a visible chunk. */
   repayMinUntil: number;
   shieldUntil: number;
+  /** Tick the blob entered (late joiners: their join tick). Agents may not eat a human until
+   *  AGENT_NO_EAT_HUMAN_S after max(GO, joinedAt), so a late joiner gets the full window. */
+  joinedAt: number;
   spikeImmuneUntil: number;
   /** Tick the blob turned red, for the 300 ms grace before a touch pops it. */
   redSince: number | null;

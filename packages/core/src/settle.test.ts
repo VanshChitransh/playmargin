@@ -73,6 +73,21 @@ describe("hand logs", () => {
     expect(settle(log)).toMatchObject({ vaultRepaid: u(40), fees: u(0.3), reserve: u(0.1) + 1, interestToVault: 0 });
   });
 
+  it("bell bonus capped at half the survivor's equity: the excess rides in interestToVault", async () => {
+    // b's 70 of spike damage is the leftover: 35 each. a (equity 100) takes 35, b (equity 30) is
+    // capped at 15, so 20 goes to the vault.
+    const log = await chain([
+      ...open(),
+      { type: "SPIKE", tick: 100, data: { blob: "b", spike: 1, damage: u(70) } },
+      { type: "CASHOUT", tick: 5401, data: { blob: "a", amount: u(100) } },
+      { type: "CASHOUT", tick: 5401, data: { blob: "b", amount: u(30) } },
+      { type: "CASHOUT", tick: 5401, data: { blob: "a", amount: u(35) } },
+      { type: "CASHOUT", tick: 5401, data: { blob: "b", amount: u(15) } },
+      { type: "MATCH_END", tick: 5401, data: { tick: 5401, finalMasses: { a: u(135), b: u(45) }, dust: 0, toVault: u(20), ranking: [] } },
+    ]);
+    expect(settle(log)).toMatchObject({ interestToVault: u(20), payouts: [{ id: "a", amount: u(135) }, { id: "b", amount: u(45) }] });
+  });
+
   it("nobody alive at the bell: the leftover goes to the vault", async () => {
     const log = await chain([
       ...open(),
@@ -161,6 +176,12 @@ describe("forgeries a live room cannot produce (money-auditor C5)", () => {
       cash("b", u(194.2)), cash("a", u(5)), end({ a: u(5), b: u(194.2) })]],
     ["leftover to the vault while a human is alive at the bell", [cash("a", u(100)), cash("b", u(90)), end({ a: u(100), b: u(90) }, 0, u(10))]],
     ["dust alongside a vault leftover", [cash("a", u(100), 3000), cash("b", u(99.999997), 3000), end({ a: u(100), b: u(99.999997) }, 1, 2)]],
+    ["bell bonus above the cap", [
+      { type: "SPIKE", tick: 100, data: { blob: "b", spike: 1, damage: u(70) } },
+      cash("a", u(100)), cash("b", u(30)), cash("a", u(35)), cash("b", u(35)), end({ a: u(135), b: u(65) })]],
+    ["capped bonus kept off the books (no vault share)", [
+      { type: "SPIKE", tick: 100, data: { blob: "b", spike: 1, damage: u(70) } },
+      cash("a", u(100)), cash("b", u(30)), cash("a", u(35)), cash("b", u(15)), end({ a: u(135), b: u(45) })]],
     ["non-integer charge", [{ type: "CHARGE", tick: 1, data: { blob: "a", entry: 0.5 } }, cash("a", u(100)), cash("b", u(100)), end({ a: u(100), b: u(100) })]],
   ];
   for (const [name, tail] of bad) {
@@ -178,6 +199,21 @@ describe("forgeries a live room cannot produce (money-auditor C5)", () => {
     ];
     await expect(chain(withAgent(1 + 29 * 60)).then(settle)).rejects.toThrow(/first 30 s/);
     await expect(chain(withAgent(1 + 30 * 60)).then(settle)).resolves.toBeDefined();
+  });
+
+  it("a late joiner gets the full 30 s from their own join, not from GO", async () => {
+    // a charges 10 s after GO (late join). 35 s after GO is only 25 s into a's match: refused.
+    const late = (eatTick: number): PendingLog[] => [
+      ...open().map((e) => {
+        if (e.type === "JOIN" && e.data.player.id === "b") return { ...e, data: { player: { ...e.data.player, kind: "agent" as const } } };
+        if (e.type === "CHARGE" && e.data.blob === "a") return { ...e, tick: 1 + 10 * 60 };
+        return e;
+      }),
+      { type: "EAT", tick: eatTick, data: { by: "b", victim: "a", debtRepaid: 0, badDebt: 0, gained: u(70), scattered: u(30) } },
+      cash("b", u(200)), end({ b: u(200) }),
+    ];
+    await expect(chain(late(1 + 35 * 60)).then(settle)).rejects.toThrow(/first 30 s/);
+    await expect(chain(late(1 + 40 * 60)).then(settle)).resolves.toBeDefined();
   });
 
   it("settleVerified refuses a broken chain even when the books balance", async () => {

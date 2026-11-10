@@ -1,7 +1,9 @@
 // `npx tsx tools/sim/newcomer.ts [matches] [variant]`: survival to the bell of a newcomer-style human
 // (eats food, flees bigger blobs, holds BOOST a bit when nothing big is near, holds REPAY when not
 // green) in a free room, plus the bell leftover split. Variants change one knob at a time:
-// base | hot (worst-case commander: greed 1, caution 0) | skill=0.45 | agents=8 | noeat=45 | hider.
+// base | hot (worst-case commander: greed 1, caution 0) | skill=0.45 | agents=8 | noeat=45 | hider |
+// late=S (joins S s after GO into 12 agents, as the server fills them) | lateold=S (same, but the
+// no-eat window counted from GO, the rule before 10 Nov).
 // Rule overrides are set on R before the agents load, so the engine and FreeBot both see them.
 import { R } from "@margin/core";
 
@@ -45,7 +47,8 @@ class Newcomer {
   }
 }
 
-const players = knob === "agents" ? Number(val) + 1 : 12;
+const late = knob === "late" || knob === "lateold";
+const players = knob === "agents" ? Number(val) + 1 : late ? 12 : 12;
 const med = (xs: number[]): number => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)] ?? 0;
 let survived = 0;
 const deaths: number[] = [];
@@ -55,7 +58,12 @@ const humanShare: number[] = [];
 const ev = { now: 0, cap50: 0, cap25: 0 };
 for (let m = 1; m <= n; m++) {
   const { w, log } = await runMatch({
-    seed: 7000 + m, mode: "free", players, humans: 1, drones: 0,
+    seed: 7000 + m, mode: "free", players, humans: late ? 0 : 1, drones: 0,
+    lateJoin: late ? { seed: { id: "late-human", kind: "human", label: "Late", accountId: null }, afterGoS: Number(val), brain: new Newcomer() as never } : undefined,
+    onTick: (w) => {
+      const lh = w.blobs.get("late-human");
+      if (knob === "lateold" && lh && lh.joinedAt !== 0) lh.joinedAt = 0; // old rule: the window counts from GO
+    },
     brain: (b) => {
       if (b.kind === "human") return new Newcomer(knob === "hider") as never;
       if (knob === "hot") return new FreeBot(9000 + m + b.id.length * 31, { greed: 1, caution: 0, skill: 0.6 });

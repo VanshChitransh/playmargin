@@ -1,7 +1,7 @@
 // One headless match driven by the real brains, shared by `npm run demo` and `npm run sim`.
 // Same engine, same order and same log as a live room; only the clock and the sockets are fake.
 import {
-  appendLog, newWorld, R, startMatch, step, type Blob, type Brain, type GameEventMsg, type InputCmd, type LogEntry, type Mode, type PlayerSeed, type World,
+  addPlayer, appendLog, newWorld, R, startMatch, step, type Blob, type Brain, type GameEventMsg, type InputCmd, type LogEntry, type Mode, type PlayerSeed, type World,
 } from "@margin/core";
 import { agentView, createBrain, FreeBot } from "../../apps/server/src/agents/index";
 
@@ -15,6 +15,8 @@ export interface MatchOpts {
   humans?: number;
   /** Optional brain override per blob (balance sweep: a greedy player); null falls back to the default. */
   brain?: (b: Blob) => Brain | null;
+  /** A player who joins after GO (free rooms, first LATE_JOIN_S), like a second tab joining late. */
+  lateJoin?: { seed: PlayerSeed; afterGoS: number; brain: Brain };
   /** Called after every tick with what clients would have seen. */
   onTick?: (w: World, tick: number, events: GameEventMsg[], logged: LogEntry[], brains: ReadonlyMap<string, Brain>) => void | Promise<void>;
 }
@@ -55,7 +57,13 @@ export async function runMatch(o: MatchOpts): Promise<{ w: World; log: LogEntry[
       if (v) inputs.set(id, brain.decide(v, tick));
     }
     if (tick === WARMUP_TICKS) startMatch(w, tick);
-    else events = step(w, inputs, tick);
+    else {
+      if (o.lateJoin && tick === WARMUP_TICKS + o.lateJoin.afterGoS * R.TICK_HZ) {
+        addPlayer(w, o.lateJoin.seed, tick); // the server's late join: charge now, 10 s shield
+        brains.set(o.lateJoin.seed.id, o.lateJoin.brain);
+      }
+      events = step(w, inputs, tick);
+    }
     const logged = await appendLog(log, w.pendingLog.splice(0));
     await o.onTick?.(w, tick, events, logged, brains);
   }
