@@ -87,6 +87,7 @@ export class Controls {
     this.listen(window, "keydown", (e) => {
       const h = HOLD_KEYS[e.code];
       if (!h && e.code !== "KeyE") return;
+      if (e.target instanceof HTMLInputElement) return; // typing a name: Space and R are letters there
       e.preventDefault();
       if (e.repeat) return; // the OS key repeat must not re-fire a press
       if (h) this.hold(h, true);

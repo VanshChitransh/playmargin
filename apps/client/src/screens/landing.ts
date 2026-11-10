@@ -7,6 +7,7 @@ import type { Screen } from "../router";
 import { newRoomCode } from "../net/room-code";
 import { ENDPOINT } from "../net/client";
 import { showStake } from "../stake";
+import { playerName, setPlayerName, signedInAccount } from "../player/name";
 
 export const landing: Screen = (root) => {
   root.innerHTML = `
@@ -30,7 +31,11 @@ export const landing: Screen = (root) => {
         </h1>
         <p class="tag mt-3">(then get liquidated.)</p>
         <p class="mt-6 max-w-md text-lg xl:max-w-lg xl:text-2xl">A 90-second arena where BOOST is a loan. Borrow to grow, hunt the ones who went red, cash out before the vault pops you.</p>
-        <div class="mt-8 flex flex-wrap items-center gap-4">
+        <label class="mt-8 flex max-w-sm items-center gap-3">
+          <span class="tag shrink-0">Your name</span>
+          <input data-name maxlength=20 autocomplete=nickname class="sticker w-full rounded-field bg-paper px-3 py-2 font-display text-xl text-ink placeholder:text-ink/40" />
+        </label>
+        <div class="mt-5 flex flex-wrap items-center gap-4">
           <a href="#/play" class="sticker sticker-press rounded-box bg-paper px-7 py-4 font-display text-2xl xl:px-9 xl:py-5 xl:text-3xl">Practice free</a>
           <a href="#/cash" class="sticker sticker-press rounded-box bg-ink px-5 py-3 font-display text-xl text-paper xl:px-7 xl:py-4 xl:text-2xl">Play for <span data-stake>$1</span></a>
           <button data-challenge class="tag basis-full text-left underline">Challenge a friend: private room link</button>
@@ -70,6 +75,11 @@ export const landing: Screen = (root) => {
       el.classList.remove("hidden");
     })
     .catch(() => {});
+  // Mini Militia style: the name is set here once and used in practice, public and private rooms.
+  const name = root.querySelector<HTMLInputElement>("[data-name]")!;
+  name.value = playerName() ?? "";
+  name.placeholder = signedInAccount() ?? "Player";
+  name.addEventListener("change", () => void (name.value = setPlayerName(name.value) ?? ""));
   root.querySelector("[data-challenge]")!.addEventListener("click", () => (location.hash = `#/r/${newRoomCode()}`));
   const box = root.querySelector<HTMLElement>("[data-hero]")!;
   const arena = new ArenaRenderer();

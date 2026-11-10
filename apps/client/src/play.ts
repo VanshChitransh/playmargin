@@ -12,6 +12,7 @@ import { shareLink } from "./share/link";
 import type { Outcome } from "./game/receipt";
 import { isRoomCode, shareRoom } from "./net/room-code";
 import { Controls } from "./input/controls";
+import { playerName, setPlayerName } from "./player/name";
 import { ENDPOINT, MatchConnection, guestKey } from "./net/client";
 import { refusalWords } from "./net/refusal";
 import { ArenaRenderer } from "./render/arena";
@@ -72,7 +73,7 @@ async function connect(roomCode?: string, judge = false): Promise<Source> {
     const conn = new MatchConnection();
     const timeout = new Promise<never>((_, no) => setTimeout(() => no(new Error("join timeout")), JOIN_TIMEOUT_MS));
     try {
-      await Promise.race([conn.join({ mode: "free", guestKey: guestKey(), roomCode }, judge), timeout]);
+      await Promise.race([conn.join({ mode: "free", guestKey: guestKey(), roomCode, name: playerName() ?? undefined }, judge), timeout]);
       return conn;
     } catch (e) {
       conn.leave();
@@ -277,7 +278,9 @@ export const play: Screen = (root, params) => {
       if (mounted) arena.destroy();
     };
   }
-  void connect(code, params.judge === "1").catch((e: Error) => {
+  // A friend's room link is often someone's first visit: ask for a name once (Mini Militia style).
+  const named = code && !playerName() ? askName(root) : Promise.resolve();
+  void named.then(() => connect(code, params.judge === "1")).catch((e: Error) => {
     if (e instanceof Refused) refusedCard(root, e.message);
     else status.textContent = `Could not join the paid match: ${e.message}. Your ticket stays on your account for the next one.`;
     return new Promise<never>(() => {});
@@ -379,6 +382,28 @@ function shareResult(o: Outcome, matchId: string): void {
 }
 
 /** The server said no: say why, offer offline practice as an explicit choice, or go home. */
+/** One field, one button: the name stays in this browser for every later match. Skipping = "Player N". */
+function askName(root: HTMLElement): Promise<void> {
+  const el = document.createElement("form");
+  el.className = "fixed inset-0 z-20 grid place-items-center bg-ink/80 p-4";
+  el.innerHTML = `<div class="sticker w-full max-w-sm rounded-box bg-paper p-6 text-center text-ink">
+    <h2 class="font-display text-4xl">Your name</h2>
+    <p class="mt-1 text-sm text-ink/70">Your friends see it in the arena and on the leaderboard.</p>
+    <input name=n maxlength=20 autocomplete=nickname placeholder="Player" class="mt-4 w-full rounded-field border-2 border-ink bg-white px-3 py-2 text-center font-display text-2xl" />
+    <button class="sticker sticker-press mt-4 w-full rounded-box bg-ink px-5 py-3 font-display text-xl text-paper">Join room</button></div>`;
+  root.appendChild(el);
+  const input = el.querySelector<HTMLInputElement>("input")!;
+  input.focus();
+  return new Promise((done) =>
+    el.addEventListener("submit", (e) => {
+      e.preventDefault();
+      setPlayerName(input.value);
+      el.remove();
+      done();
+    }),
+  );
+}
+
 function refusedCard(root: HTMLElement, why: string): void {
   const el = document.createElement("div");
   el.className = "fixed inset-0 z-20 grid place-items-center bg-ink/80 p-4";

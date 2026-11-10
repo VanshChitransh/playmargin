@@ -14,7 +14,7 @@ export interface InputCmd {
 }
 
 export type JoinOpts =
-  | { mode: "free"; guestKey: string; roomCode?: string }
+  | { mode: "free"; guestKey: string; roomCode?: string; name?: string }
   | { mode: "paid"; accountId: string; ticketId: string; roomCode?: string };
 
 /** Loan cost shown in the lobby instead of a rate number. */

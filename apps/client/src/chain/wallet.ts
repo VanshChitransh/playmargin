@@ -4,6 +4,7 @@
 
 import { NearConnector } from "@hot-labs/near-connect";
 import { NETWORK } from "./config";
+import { rememberAccount } from "../player/name";
 import type { WalletTx } from "./email";
 
 type Listener = (accountId: string | null) => void;
@@ -20,6 +21,7 @@ const listeners = new Set<Listener>();
 
 function emit(id: string | null): void {
   current = id;
+  rememberAccount(id); // so practice and free rooms use the account name without loading wallet code
   for (const l of listeners) l(id);
 }
 

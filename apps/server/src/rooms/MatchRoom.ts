@@ -11,6 +11,7 @@ import {
   TICK_MS,
   addPlayer,
   applyJudgeLayout,
+  cleanName,
   judgeLineup,
   matchT,
   newWorld,
@@ -173,7 +174,7 @@ export class MatchRoom extends Room {
     return paid;
   }
 
-  override onJoin(client: Client, _opts: unknown, auth?: string | { accountId: string } | { spectator: true }): void {
+  override onJoin(client: Client, opts: unknown, auth?: string | { accountId: string } | { spectator: true }): void {
     const id = client.sessionId;
     if (typeof auth === "object" && "spectator" in auth) {
       this.spectators.add(id);
@@ -182,7 +183,9 @@ export class MatchRoom extends Room {
       return;
     }
     const accountId = typeof auth === "object" ? auth.accountId : null;
-    const p: PlayerSeed = { id, kind: "human", label: accountId ?? `Player ${++this.joined}`, accountId };
+    // Paid seats show the real account; free players pick a name (cleaned: shown to all and to the agents' LLM).
+    const name = accountId ?? cleanName((opts as { name?: unknown } | null)?.name);
+    const p: PlayerSeed = { id, kind: "human", label: name ?? `Player ${++this.joined}`, accountId };
     if (this.started) {
       // Late join (free, first 15 s): pay now, then core charges the pot and shields 10 s.
       if (typeof auth !== "string" || !chargeEntry(sharedDb(), auth, this.roomId)) {

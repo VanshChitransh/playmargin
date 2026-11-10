@@ -3,6 +3,7 @@
 // actual game instead of a mock. The server stays the only authority for real matches.
 import { R, spikeRadius, TICK_MS, appendLog, blobView, foodView, matchView, newWorld, radius, startMatch, step, type Blob, type GameEventMsg, type InputCmd, type LogEntry, type PlayerSeed, type World } from "@margin/core";
 import type { Frame } from "./frame";
+import { playerName } from "../player/name";
 
 const ME = "me";
 const MAX_STEPS = 8; // after a background tab, catch up at most this many ticks per frame
@@ -30,7 +31,7 @@ export class LocalMatch {
 
   constructor(private o: LocalOpts) {
     const players: PlayerSeed[] = [];
-    if (o.withMe) players.push({ id: ME, kind: "human", label: "you", accountId: null });
+    if (o.withMe) players.push({ id: ME, kind: "human", label: playerName() ?? "you", accountId: null });
     for (let i = 0; i < o.bots; i++) players.push({ id: `bot${i}`, kind: "agent", label: `Bot-${i + 1}`, accountId: null });
     this.w = newWorld(o.seed, "free", players, `local-${o.seed}`);
     this.warmTicks = Math.round(o.warmupS * R.TICK_HZ);
