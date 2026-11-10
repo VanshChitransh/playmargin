@@ -1,5 +1,5 @@
 // First-match coach marks for a brand-new guest. Warm-up already teaches with the centre hints,
-// so the coach waits for GO and shows ONE bubble at a time next to its button: first BOOST, then
+// so the coach waits for GO and shows ONE bubble at a time above its button: first BOOST, then
 // (once the player has boosted, or after 10 s) REPAY, then it is done for good. Stored per
 // browser with try/catch: in a private window it may show again, which is harmless.
 import type { Phase } from "@margin/core";
@@ -29,7 +29,8 @@ export interface Coach {
   close(): void;
 }
 
-export function coachMarks(root: HTMLElement, touch: boolean): Coach {
+/** target(step) = the button the bubble points at; the bubble sits above that button's dock. */
+export function coachMarks(root: HTMLElement, touch: boolean, target: (s: "boost" | "repay") => HTMLElement): Coach {
   if (seen()) return { update: () => {}, close: () => {} };
   const el = document.createElement("div");
   el.className = "pointer-events-none fixed inset-0 z-10 hidden";
@@ -51,12 +52,17 @@ export function coachMarks(root: HTMLElement, touch: boolean): Coach {
     const text = boost
       ? `<b>${touch ? "Hold" : "Hold SPACE:"} BOOST</b>. Grow fast, on a loan.`
       : `<b>${touch ? "Hold" : "Hold R:"} REPAY</b> pays it back.`;
-    // Each bubble sits just left of its own button (BOOST bottom-right, REPAY above it).
-    const pos = boost ? "bottom:max(28px,calc(env(safe-area-inset-bottom) + 28px));right:122px" : "bottom:120px;right:98px";
+    // Measured from the real layout: the bubble floats above the whole dock (never over a
+    // control) and its tail sits over the button it names.
+    const btn = target(s).getBoundingClientRect();
+    const dock = (target(s).parentElement ?? target(s)).getBoundingClientRect();
+    const right = Math.max(8, innerWidth - (btn.left + btn.width / 2) - 28);
+    const pos = `bottom:${Math.round(innerHeight - dock.top + 16)}px;right:${Math.round(right)}px`;
     shownAt = lastE;
-    el.innerHTML = `<div class="sticker absolute flex max-w-52 items-center gap-2 rounded-box bg-paper px-2.5 py-1.5 text-xs text-ink" style="${pos}">
-      <span>${text}</span><b class="font-display text-lg text-liq">→</b>
-      <button data-got class="pointer-events-auto tag shrink-0 rounded-field border-2 border-ink px-2 py-0.5 text-[11px]">OK</button></div>`;
+    el.innerHTML = `<div class="pop absolute flex max-w-60 items-center gap-2 rounded-2xl bg-card px-3 py-2 text-sm text-ink" style="${pos}">
+      <span>${text}</span>
+      <i class="absolute -bottom-[11px] right-5 size-4 rotate-45 border-r-4 border-b-4 border-ink bg-card"></i>
+      <button data-got class="pop-sm pop-press pointer-events-auto shrink-0 cursor-pointer rounded-lg bg-warn px-2 py-1 font-display text-sm">OK</button></div>`;
     el.querySelector("[data-got]")!.addEventListener("click", () => (boost ? show("repay") : close()));
     el.classList.remove("hidden");
   };

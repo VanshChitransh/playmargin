@@ -90,7 +90,7 @@ export class Hud {
     els.repay.classList.add("relative"); // the badge is positioned against REPAY itself
     els.repay.appendChild(money);
     const noCoach = opts.coach === false || innerWidth < 640;
-    this.coach = noCoach ? { update: () => {}, close: () => {} } : coachMarks(root, this.touch);
+    this.coach = noCoach ? { update: () => {}, close: () => {} } : coachMarks(root, this.touch, (t) => els[t]);
   }
 
   destroy(): void {
@@ -304,7 +304,7 @@ export class Hud {
       this.shownFuel = this.refill.from + (target - this.refill.from) * (1 - (1 - k) ** 3);
       if (k >= 1) this.refill = null;
     } else this.shownFuel = target;
-    this.pipRing.style.background = fuelGradient(this.shownFuel, blocked ? C.muted : C.safe, C.track);
+    this.pipRing.style.background = fuelGradient(this.shownFuel, blocked ? C.muted : C.safe, C.track, 1, 0); // one tank: hold-to-nitro has no pips
     // The tank running dry: the ring flashes grey twice (once per emptying), the button greys.
     const dry = target <= 0.01;
     if (dry && !this.wasDry) {

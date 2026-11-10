@@ -63,11 +63,11 @@
 /* Arcade Paper HUD (REVAMP-PLAN v1): white sticker panels, 4 px ink outline, hard drop shadow.
    Colour carries meaning only: green safe, yellow warning, red danger, gold money, cyan agents. */
 .hud-pill {
-  display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px 0 9px;
+  display: inline-flex; align-items: center; gap: 7px; height: 40px; padding: 0 14px 0 10px;
   border: 3px solid var(--color-ink); border-radius: 999px; background: var(--color-card);
-  box-shadow: 0 3px 0 var(--color-ink); font: 700 14px/1 Rubik, sans-serif; color: var(--color-ink);
+  box-shadow: 0 3px 0 var(--color-ink); font: 700 15px/1 Rubik, sans-serif; color: var(--color-ink);
 }
-.hud-pill svg { width: 18px; height: 18px; }
+.hud-pill svg { width: 20px; height: 20px; }
 span.hud-pill { height: auto; padding: 4px 9px; color: var(--color-gold-dark); }
 
 .hud-timer {
@@ -82,7 +82,7 @@ span.hud-pill { height: auto; padding: 4px 9px; color: var(--color-gold-dark); }
 .hud-phase[data-p="HUNT"], .hud-phase[data-p="GET"] { background: var(--color-warn); }
 .hud-phase[data-p="SQUEEZE"] { background: var(--color-liq); color: var(--color-card); }
 .hud-phase[data-p="FINAL"] { background: var(--color-ink); color: var(--color-card); }
-.hud-clock { font: 400 34px/1 "Lilita One", sans-serif; font-variant-numeric: tabular-nums; }
+.hud-clock { font: 400 38px/1 "Lilita One", sans-serif; font-variant-numeric: tabular-nums; }
 .hud-clock:empty { display: none; }
 @media (max-width: 639px) {
   .hud-timer { gap: 8px; padding: 4px 12px 4px 5px; border-width: 3px; border-radius: 14px; box-shadow: 0 4px 0 var(--color-ink); }
@@ -117,7 +117,7 @@ span.hud-pill { height: auto; padding: 4px 9px; color: var(--color-gold-dark); }
   .hud-lb h4 { font-size: 12px; padding: 5px 8px 4px; border-bottom-width: 2.5px; }
   .hud-lb h4 small { font-size: 10px; }
   .hud-row { font-size: 12px; gap: 5px; padding: 0 5px; }
-  .hud-row .r { width: 17px; }
+  .hud-row .r { width: 19px; }
   [data-h="mute"] span { display: none; } /* phones: icon only, so the timer fits beside it */
   [data-h="mute"] { padding: 0 8px; }
   .hud-row .eq { font-size: 14px; }
