@@ -371,7 +371,10 @@ export class MatchRoom extends Room {
       if (brain) this.brains.set(b.id, brain);
     }
     this.autoDispose = false;
-    if (this.key.mode === "free" && !this.judge) void this.unlock(); // late joins for 15 s
+    // Late joins for 15 s, only while a seat is free: agents fill a public room to ROOM_SIZE, and
+    // maxClients counts clients, not agents, so reopening it let a 13th to 23rd blob in (QA-C-01).
+    // A late joiner then simply gets a fresh room. Private rooms (no agents) keep their late joins.
+    if (this.key.mode === "free" && !this.judge && this.world.blobs.size < R.ROOM_SIZE) void this.unlock();
     this.log.drain(this.world);
     this.log.open(this.world, this.seed, this.key.mode === "free" ? this.users : this.accountSeats(), this.opening === "ok");
     this.enter("LIVE");
