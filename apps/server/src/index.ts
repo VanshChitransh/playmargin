@@ -62,7 +62,7 @@ void anchor();
 
 listen(server).then((s) => {
   // After listen, so it wraps the router Colyseus just bound. No http server = nothing to guard.
-  if (s.transport.server) guardMatchmake(s.transport.server);
+  if (s.transport.server) guardMatchmake(s.transport.server, undefined, () => drain.on);
   else log.warn("matchmake_unguarded", { note: "transport has no http server" });
   log.info("up", { port: Number(process.env.PORT ?? 2567), network: sharedChain()?.cfg.network ?? "off", matchTicks: MATCH_TICKS });
 });

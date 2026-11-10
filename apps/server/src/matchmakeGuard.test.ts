@@ -1,7 +1,7 @@
 // QA-A-04 / QA-A-03: reservations are limited per IP and bad bodies get JSON, everything else passes.
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { afterEach, describe, expect, it } from "vitest";
-import { guardMatchmake } from "./matchmakeGuard";
+import { dropUntrustedProxyHeaders, guardMatchmake } from "./matchmakeGuard";
 import { RateLimiter } from "./rooms/guard";
 
 let srv: Server;
@@ -9,14 +9,14 @@ let seen: Array<{ url: string; body: unknown }> = [];
 afterEach(() => srv?.close());
 
 /** A stand-in for the Colyseus router: echoes what it received, including a pre-read body. */
-async function start(max = 3): Promise<string> {
+async function start(max = 3, draining = false): Promise<string> {
   seen = [];
   srv = createServer((req: IncomingMessage & { body?: unknown }, res) => {
     seen.push({ url: req.url ?? "", body: req.body });
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify({ ok: true }));
   });
-  guardMatchmake(srv, new RateLimiter(max, 60_000));
+  guardMatchmake(srv, new RateLimiter(max, 60_000), () => draining);
   await new Promise<void>((r) => srv.listen(0, "127.0.0.1", r));
   return `http://127.0.0.1:${(srv.address() as { port: number }).port}`;
 }
@@ -56,6 +56,33 @@ describe("guardMatchmake", () => {
     const base = await start();
     const r = await post(base, JSON.stringify({ mode: "free", name: "n".repeat(20_000) }));
     expect(r.status).toBe(413);
+    expect(seen).toHaveLength(0);
+  });
+});
+
+describe("proxy headers (QA-A-06)", () => {
+  const req = (remoteAddress: string) =>
+    ({ socket: { remoteAddress }, headers: { "x-real-ip": "10.0.0.1", "x-forwarded-for": "10.0.0.2", "x-client-ip": "10.0.0.3", host: "h" } }) as never;
+  it("keeps them from the local proxy (Caddy on loopback)", () => {
+    for (const addr of ["127.0.0.1", "::1", "::ffff:127.0.0.1"]) {
+      const r = req(addr) as { headers: Record<string, string> };
+      dropUntrustedProxyHeaders(r as never);
+      expect(r.headers["x-real-ip"]).toBe("10.0.0.1");
+    }
+  });
+  it("drops them from any other socket, so a client cannot rotate its own IP", () => {
+    const r = req("192.168.1.5") as { headers: Record<string, string> };
+    dropUntrustedProxyHeaders(r as never);
+    expect(r.headers).toEqual({ host: "h" });
+  });
+});
+
+describe("draining", () => {
+  it("answers JSON 503 instead of Colyseus's empty body", async () => {
+    const base = await start(3, true);
+    const r = await post(base, "{}");
+    expect(r.status).toBe(503);
+    expect(await r.json()).toEqual({ code: 503, error: "server is restarting, try again in a moment" });
     expect(seen).toHaveLength(0);
   });
 });

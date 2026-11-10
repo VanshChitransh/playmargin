@@ -14,6 +14,21 @@ function reply(res: ServerResponse, status: number, error: string): void {
   res.end(JSON.stringify({ code: status, error }));
 }
 
+/** True for a connection from this machine: Caddy on the droplet (ufw closes 2567 to the world). */
+export const isLoopback = (addr: string | undefined): boolean => addr === "127.0.0.1" || addr === "::1" || addr === "::ffff:127.0.0.1";
+
+/**
+ * Proxy headers are only believed from the proxy itself (QA-A-06): from any other socket a client could
+ * rotate X-Real-IP / X-Forwarded-For and dodge every per-IP limit. Strips them in place, so the join
+ * limit (Colyseus reads them into onAuth ctx.ip), /api limits and this guard all fall back to the socket.
+ */
+export function dropUntrustedProxyHeaders(req: IncomingMessage): void {
+  if (isLoopback(req.socket.remoteAddress)) return;
+  delete req.headers["x-real-ip"];
+  delete req.headers["x-forwarded-for"];
+  delete req.headers["x-client-ip"];
+}
+
 /** The caller's IP: X-Real-IP from Caddy (it overwrites any client value), else the socket. */
 export function requestIp(req: IncomingMessage): string {
   const h = req.headers["x-real-ip"];
@@ -25,12 +40,21 @@ export function requestIp(req: IncomingMessage): string {
  * listen(), once Colyseus has bound its router. 30 reservations a minute per IP: a player needs about
  * one per match, and a hostel or office behind one IP still fits several friends.
  */
-export function guardMatchmake(server: Server, limiter = new RateLimiter(Number(process.env.MATCHMAKE_LIMIT_PER_MIN ?? 30), 60_000)): void {
+export function guardMatchmake(
+  server: Server,
+  limiter = new RateLimiter(Number(process.env.MATCHMAKE_LIMIT_PER_MIN ?? 30), 60_000),
+  draining: () => boolean = () => false,
+): void {
   const listeners = server.listeners("request") as Array<(req: IncomingMessage, res: ServerResponse) => void>;
   server.removeAllListeners("request");
   const pass = (req: IncomingMessage, res: ServerResponse) => listeners.forEach((l) => l.call(server, req, res));
+  // Websocket joins arrive as upgrades: clean their headers before Colyseus reads ctx.ip.
+  server.prependListener("upgrade", (req: IncomingMessage) => dropUntrustedProxyHeaders(req));
   server.on("request", (req: IncomingMessage, res: ServerResponse) => {
+    dropUntrustedProxyHeaders(req);
     if (req.method !== "POST" || !req.url?.startsWith("/matchmake/")) return pass(req, res);
+    // Colyseus answers a draining server with an EMPTY 503 the SDK cannot parse ("Unexpected end of JSON").
+    if (draining()) return reply(res, 503, "server is restarting, try again in a moment");
     if (!limiter.allow(requestIp(req))) return reply(res, 429, "too many joins, slow down");
     let size = 0;
     const chunks: Buffer[] = [];
