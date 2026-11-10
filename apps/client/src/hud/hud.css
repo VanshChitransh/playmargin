@@ -24,7 +24,7 @@
   -webkit-mask: radial-gradient(circle closest-side, transparent calc(100% - var(--ring)), #000 calc(100% - var(--ring) + 1px));
   mask: radial-gradient(circle closest-side, transparent calc(100% - var(--ring)), #000 calc(100% - var(--ring) + 1px));
 }
-@media (max-width: 639px) { .pip-ring { --ring: 8px; border-width: 2.5px; } }
+@media (max-width: 639px), (max-height: 500px) { .pip-ring { --ring: 8px; border-width: 2.5px; } } /* matches S3 small dock */
 .blocked { filter: grayscale(1); opacity: 0.45; }
 @media (prefers-reduced-motion: reduce) {
   .punch, .banner { animation-duration: 1ms; }
@@ -141,7 +141,7 @@ span.hud-pill { height: auto; padding: 4px 9px; color: var(--color-gold-dark); }
 }
 .hud-owe { font: 700 15px/1 Rubik, sans-serif; }
 .hud-drain { font: 700 12px/1 "JetBrains Mono", monospace; }
-@media (max-width: 639px) {
+@media (max-width: 639px), (max-height: 500px) {
   .hud-money { top: -40px; padding: 3px 7px 4px; border-width: 2.5px; } /* above the small REPAY label */
   .hud-owe { font-size: 13px; }
   .hud-drain { font-size: 11px; }

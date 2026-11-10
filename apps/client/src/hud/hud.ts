@@ -94,7 +94,7 @@ export class Hud {
     const money = this.q("money");
     els.repay.classList.add("relative"); // the badge is positioned against REPAY itself
     els.repay.appendChild(money);
-    const noCoach = opts.coach === false || innerWidth < 640;
+    const noCoach = opts.coach === false || innerWidth < 640 || innerHeight < 500; // no room beside a small dock
     this.coach = noCoach ? { update: () => {}, close: () => {} } : coachMarks(root, this.touch, (t) => els[t]);
   }
 
@@ -250,7 +250,7 @@ export class Hud {
 
   private leaderboard(f: Frame): void {
     const ranked = ranking(f.blobs);
-    const rows = innerWidth < 640 ? 3 : R.LEADERBOARD_TOP; // phones: top 3 + my rank
+    const rows = innerWidth < 640 || innerHeight < 500 ? 3 : R.LEADERBOARD_TOP; // phones (and landscape phones): top 3 + my rank
     const top = ranked.slice(0, rows);
     const row = (b: BlobView, rank: number): string => {
       const mine = b.id === f.me;
