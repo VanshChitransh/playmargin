@@ -3,6 +3,7 @@
 import type { Screen } from "../router";
 import { reducedMotion } from "../render/motion";
 import { showStake } from "../stake";
+import { laptopCapable } from "../device";
 import { BTN, header } from "./chrome";
 
 // Each card plays a few seconds of real play (scripts/clips.sh, offline practice on the real rules).
@@ -35,10 +36,10 @@ export const how: Screen = (root) => {
         ).join("")}
       </div>
       <div class="mx-auto mt-12 flex max-w-6xl flex-wrap items-center justify-between gap-4">
-        <div class="flex flex-wrap gap-4">
+        ${laptopCapable() ? `<div class="flex flex-wrap gap-4">
           <a href="#/play" class="${BTN.go} px-7 py-4 text-2xl">▶ Practice free</a>
           <a href="#/cash" class="${BTN.ink} px-7 py-4 text-2xl">Play for <span data-stake>$1</span></a>
-        </div>
+        </div>` : `<p class="font-display text-2xl">Play it on a laptop: mouse and keyboard.</p>`}
         <nav class="flex flex-wrap gap-3">
           <a href="https://github.com/VanshChitransh/playmargin" target="_blank" rel="noopener" aria-label="MARGIN source code on GitHub (opens in a new tab)" class="${BTN.small}">Code on GitHub</a>
           <a href="https://x.com/playmargin" target="_blank" rel="noopener" aria-label="MARGIN on X, @playmargin (opens in a new tab)" class="${BTN.small}">@playmargin on X</a>
