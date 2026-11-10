@@ -463,14 +463,18 @@ function refusedCard(root: HTMLElement, why: string, retry = true): void {
     <h2 class="font-display text-4xl">Can't join right now</h2>
     <p data-why class="mt-2 font-medium"></p>
     <div class="mt-5 flex flex-wrap justify-center gap-3">
-      <button data-retry class="pop pop-press rounded-2xl bg-ink px-5 py-3 font-display text-xl text-card">Retry</button>
-      <button data-off class="pop pop-press rounded-2xl bg-safe px-5 py-3 font-display text-xl">Practice offline</button>
+      <button data-retry class="pop pop-press rounded-2xl bg-safe px-5 py-3 font-display text-xl">Retry</button>
+      <button data-off class="pop pop-press rounded-2xl bg-card px-5 py-3 font-display text-xl">Practice offline</button>
       <a href="#/" class="pop-sm pop-press basis-full rounded-2xl bg-card px-4 py-2 font-display text-lg">Home</a></div>
     <p class="mt-4 text-xs font-medium text-muted">Offline practice runs the real rules against local bots. Nothing counts.</p></div>`;
   el.querySelector("[data-why]")!.textContent = why;
   const again = el.querySelector<HTMLElement>("[data-retry]")!;
   if (retry) again.addEventListener("click", () => rerender());
-  else again.remove();
+  else {
+    // Nothing to retry: practice becomes the one green button.
+    again.remove();
+    el.querySelector("[data-off]")!.classList.replace("bg-card", "bg-safe");
+  }
   el.querySelector("[data-off]")!.addEventListener("click", () => {
     offlineOnPurpose = true;
     if (retry) rerender();
