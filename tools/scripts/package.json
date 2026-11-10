@@ -5,6 +5,7 @@
   "scripts": {
     "deploy": "../../node_modules/.bin/tsx deploy.ts",
     "e2e": "../../node_modules/.bin/tsx e2e.ts",
+    "proofs": "../../node_modules/.bin/tsx proofs.ts",
     "typecheck": "../../node_modules/.bin/tsc -p ."
   },
   "dependencies": {

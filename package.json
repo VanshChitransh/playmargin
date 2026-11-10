@@ -15,6 +15,7 @@
     "test": "vitest run --passWithNoTests",
     "typecheck": "npm run typecheck --workspaces --if-present && npm --prefix services/relayer run typecheck && npm --prefix tools/scripts run typecheck",
     "format": "prettier --write .",
+    "proofs": "npm --prefix tools/scripts run -s proofs --",
     "check:dashes": "! git grep -nIP '[\\x{2013}\\x{2014}]' -- . ':!package-lock.json'",
     "demo": "tsx tools/sim/demo.ts",
     "sim": "tsx tools/sim/sim.ts",
