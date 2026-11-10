@@ -264,6 +264,27 @@ async fn arena_lifecycle() -> testresult::TestResult<()> {
     e.call(&s, &m, "settle", bounty("1559999", "240001"), 0, false).await?; // over the 12% cap
     e.call(&s, &m, "settle", bounty("1700000", "100000"), 0, true).await?;
     assert_eq!(e.margin_balance(&d).await?, "100000");
+
+    // Bell bonus cap (core PR #20): survivors split the leftover food, each capped at 50% of
+    // their own bell equity. Equities 1.0 and 0.3, leftover 0.7, so each = 0.35 and b is capped
+    // at 0.15. The capped 0.2 rides in interest_to_vault like the no-survivor leftover, so the
+    // contract needs no change: a 1.35, b 0.45, vault +0.2, total = stakes 2.0.
+    e.deposit(&e.usdc, &a, "1000000", &json!({"for": b}).to_string()).await?;
+    let (a0, b0) = (e.margin_balance(&a).await?, e.margin_balance(&b).await?);
+    let free0 = e.view(&m, "vault", json!({})).await?["free"].as_str().unwrap_or_default().parse::<u128>()?;
+    for p in [&a, &b] {
+        e.call(p, &m, "enter_arena", json!({"stake": "1000000"}), 0, true).await?;
+    }
+    e.call(&s, &m, "open_match", json!({"match_id": "m6", "players": [a, b]}), 0, true).await?;
+    let bell = json!({"match_id": "m6", "payouts": [[a, "1350000"], [b, "450000"]], "lent": "0",
+                      "vault_repaid": "0", "interest_to_vault": "200000", "fees": "0", "reserve": "0",
+                      "seq": 6, "head": "bell"});
+    e.call(&s, &m, "settle", bell, 0, true).await?;
+    let gain = |before: &str, after: String| after.parse::<i128>().unwrap() - before.parse::<i128>().unwrap();
+    assert_eq!(gain(&a0, e.margin_balance(&a).await?), 350_000); // -1.0 stake + 1.35
+    assert_eq!(gain(&b0, e.margin_balance(&b).await?), -550_000); // -1.0 stake + 0.45
+    assert_eq!(e.view(&m, "vault", json!({})).await?["free"], (free0 + 200_000).to_string());
+    assert_eq!(e.view(&m, "vault", json!({})).await?["locked"], "0");
     Ok(())
 }
 
