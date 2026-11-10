@@ -96,3 +96,17 @@ describe("api errors over HTTP", () => {
     }
   });
 });
+
+describe("finishMatch payouts", () => {
+  it("stores 0, never NULL, for a player who got nothing (QA-D-06)", () => {
+    const db = openDb(":memory:");
+    const a = userForGuestKey(db, "qa-d06-a");
+    const b = userForGuestKey(db, "qa-d06-b");
+    createMatch(db, { id: "d6", mode: "free", seed: 1, pot: 200 * U });
+    addMatchPlayer(db, { matchId: "d6", userId: a, blobId: "a", entry: 100 * U });
+    addMatchPlayer(db, { matchId: "d6", userId: b, blobId: "b", entry: 100 * U });
+    finishMatch(db, "d6", { status: "settled", head: "h", payouts: new Map([["a", 180 * U]]) });
+    const rows = db.prepare("SELECT blob_id, payout FROM match_players WHERE match_id = 'd6' ORDER BY blob_id").all();
+    expect(rows).toEqual([{ blob_id: "a", payout: 180 * U }, { blob_id: "b", payout: 0 }]);
+  });
+});

@@ -55,6 +55,8 @@ export function finishMatch(
   );
   const up = db.prepare("UPDATE match_players SET payout = ? WHERE match_id = ? AND blob_id = ?");
   for (const [blobId, amount] of f.payouts ?? []) up.run(amount, id, blobId);
+  // A popped player is not in the payouts: store a real 0, never NULL (QA-D-06), once the books are known.
+  if (f.payouts) db.prepare("UPDATE match_players SET payout = 0 WHERE match_id = ? AND payout IS NULL").run(id);
 }
 
 /** The stored log in seq order (what the Verify page replays). */
