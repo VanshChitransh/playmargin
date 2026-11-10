@@ -330,7 +330,7 @@ export class MatchRoom extends Room {
   private countdown(): void {
     void this.lock();
     const human = [...this.world.blobs.values()].find((b) => b.kind === "human");
-    const fill = this.judge && human ? judgeLineup(human).slice(1) : this.key.mode === "free" ? (this.key.roomCode ? [] : agentFill(this.state.humans)) : droneFill(this.state.humans);
+    const fill = this.judge && human ? judgeLineup(human).slice(1) : this.key.mode === "free" ? (this.key.roomCode ? [] : agentFill(this.state.humans, this.seed)) : droneFill(this.state.humans);
     for (const p of fill) addPlayer(this.world, p);
     this.world.phase = "COUNTDOWN";
     if (this.key.mode === "paid") this.openOnChain();

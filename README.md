@@ -60,7 +60,7 @@ newcomer who never borrows survives about 67% of matches and finishes at median 
 
 ### Who you play with
 
-- **Free rooms:** you plus labelled AI agents (`Agent-3 🤖`) that follow the same rules. Agents may not
+- **Free rooms:** you plus labelled AI agents (named, always with the robot glyph, e.g. `Greedy Gus 🤖`) that follow the same rules. Agents may not
   eat a human in the first 30 s, enforced by the engine and by settle
   (`packages/core/src/step.ts`, `settle.ts`). Their skill is one tuned constant
   (`apps/server/src/agents/freebot.ts`, `AGENT_SKILL`).

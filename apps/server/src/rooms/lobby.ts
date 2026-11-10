@@ -1,7 +1,7 @@
 // Matchmaking rules. The warm-up IS the lobby window: Colyseus joinOrCreate keeps putting
 // players into the same unlocked room, filtered by mode and private room code, so no
 // separate LobbyRoom is needed. Pure functions here, so the rules are testable without sockets.
-import { R, sToTicks, type Mode, type PlayerSeed } from "@margin/core";
+import { R, botNames, sToTicks, type Mode, type PlayerSeed } from "@margin/core";
 
 export interface RoomKey {
   mode: Mode;
@@ -40,12 +40,14 @@ export function warmupNext(s: { mode: Mode; private?: boolean; humans: number; p
   return enough ? "countdown" : "close";
 }
 
-/** Labelled agents that fill a free room up to ROOM_SIZE (never hidden: kind and label say so). */
-export function agentFill(humans: number): PlayerSeed[] {
-  return Array.from({ length: Math.max(0, R.ROOM_SIZE - humans) }, (_, i) => ({
+/** Labelled agents that fill a free room up to ROOM_SIZE (never hidden: kind and the robot glyph say so).
+ *  Names come from core BOT_NAMES with the room seed, so the client hero and practice use the same list. */
+export function agentFill(humans: number, seed: number): PlayerSeed[] {
+  const names = botNames(seed, Math.max(0, R.ROOM_SIZE - humans));
+  return names.map((name, i) => ({
     id: `agent-${i + 1}`,
     kind: "agent" as const,
-    label: `Agent-${i + 1} \u{1F916}`,
+    label: `${name} \u{1F916}`,
     accountId: null,
   }));
 }

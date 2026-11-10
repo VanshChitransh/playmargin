@@ -31,7 +31,7 @@ const r = {
   wrongCode,
   phase: st.phase,
   counter: `${st.humans + st.agents}/12 · ${st.humans} humans · ${st.agents} agents`,
-  agentsLabelled: agents.length === 10 && agents.every((x) => x.label.startsWith("Agent-")),
+  agentsLabelled: agents.length === 10 && agents.every((x) => x.label.endsWith("\u{1F916}")),
 };
 console.log(JSON.stringify(r, null, 1));
 const ok = r.sameRoom && r.friendsTogether && r.privateSeparate && noCode === "rejected" && wrongCode === "rejected" &&

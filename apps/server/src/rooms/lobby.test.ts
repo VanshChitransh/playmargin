@@ -37,10 +37,13 @@ describe("warmupNext", () => {
 
 describe("agentFill", () => {
   it("fills to ROOM_SIZE with labelled agents", () => {
-    const a = agentFill(2);
+    const a = agentFill(2, 42);
     expect(a).toHaveLength(R.ROOM_SIZE - 2);
-    expect(a.every((p) => p.kind === "agent" && p.label.includes("Agent-"))).toBe(true);
-    expect(agentFill(R.ROOM_SIZE)).toHaveLength(0);
+    // Named, but always labelled as AI: kind agent, robot glyph, ids stay agent-N.
+    expect(a.every((p, i) => p.kind === "agent" && p.label.endsWith("\u{1F916}") && p.id === `agent-${i + 1}`)).toBe(true);
+    expect(new Set(a.map((p) => p.label)).size).toBe(a.length);
+    expect(agentFill(2, 42)).toEqual(a); // seeded
+    expect(agentFill(R.ROOM_SIZE, 42)).toHaveLength(0);
   });
 });
 
