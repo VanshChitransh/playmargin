@@ -5,6 +5,7 @@ import { isAuthCallback, runAuthCallback } from "./auth-callback";
 import { notFound } from "./screens";
 import { verify } from "./screens/verify";
 import { landing } from "./screens/landing";
+import { how } from "./screens/how";
 import { play } from "./play";
 import { cash } from "./screens/cash";
 import { watch } from "./screens/watch";
@@ -16,6 +17,7 @@ const app = document.getElementById("app")!;
 if (isAuthCallback()) void runAuthCallback(app);
 else startRouter(app, {
   "/": landing,
+  "/how": how,
   "/play": play,
   "/cash": cash,
   "/watch": watch,

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The three "How it works" loops on the landing page, filmed from real play in offline practice
+# The three "How it works" loops on the #/how page, filmed from real play in offline practice
 # (core rules, labelled bots). Nothing is staged or edited beyond trimming:
 #   nitro:      hold BOOST after GO, the blob grows, the fuel ring drains
 #   repay:      borrow to the cap, steer into spikes until the rim turns red, hold REPAY to PAID OFF
