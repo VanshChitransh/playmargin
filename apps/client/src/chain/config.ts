@@ -26,4 +26,7 @@ export const USDC_ID = IDS.usdc;
 export const RELAYER_URL: string =
   env.VITE_RELAYER_URL ?? (typeof location === "undefined" ? "http://localhost:3030" : `${location.protocol}//${location.hostname}:3030`);
 
+/** Extra RPCs tried before FastNEAR and NEAR's own (comma list, e.g. a keyed provider). */
+export const RPC_EXTRA: string = env.VITE_RPC_URLS ?? "";
+
 export const EXPLORER = NETWORK === "mainnet" ? "https://nearblocks.io" : "https://testnet.nearblocks.io";

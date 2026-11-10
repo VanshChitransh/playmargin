@@ -7,8 +7,9 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { Near, decodeSignedDelegateAction } from "near-kit";
+import { decodeSignedDelegateAction } from "near-kit";
 import { FileKeyStore } from "near-kit/keys/file";
+import { accessKey, nearClients, withFallback } from "../../apps/client/src/chain/rpc.ts";
 import { createError, signError } from "./fastauth.ts";
 import * as oneclick from "./oneclick.ts";
 import { WindowCap, RateLimit, delegateKey, keyRefusal, refuseReason, signatureOk, type KeyView, type Policy } from "./validate.ts";
@@ -27,9 +28,16 @@ const policy: Policy = {
 };
 
 // On the server the key comes from env; locally from ~/.near-credentials like every script.
-const near = process.env.RELAYER_PRIVATE_KEY
-  ? new Near({ network: NETWORK, privateKey: process.env.RELAYER_PRIVATE_KEY as `ed25519:${string}`, defaultSignerId: RELAYER_ID })
-  : new Near({ network: NETWORK, keyStore: new FileKeyStore(join(homedir(), ".near-credentials"), NETWORK) });
+// RPC_URLS (comma list) goes first, then FastNEAR, then NEAR's own RPC (apps/client/src/chain/rpc.ts).
+const clients = nearClients(
+  NETWORK,
+  process.env.RPC_URLS,
+  process.env.RELAYER_PRIVATE_KEY
+    ? { privateKey: process.env.RELAYER_PRIVATE_KEY as `ed25519:${string}`, defaultSignerId: RELAYER_ID }
+    : { keyStore: new FileKeyStore(join(homedir(), ".near-credentials"), NETWORK) },
+);
+/** Next RPC only when one is unreachable, so a tx is never sent twice (see withFallback). */
+const rpc = <T>(fn: (near: (typeof clients)[number]) => Promise<T>): Promise<T> => withFallback(clients, fn);
 
 const limiter = new RateLimit(Number(process.env.RELAYER_WINDOW_MS ?? 2_000));
 const ipLimiter = new RateLimit(Number(process.env.RELAYER_IP_WINDOW_MS ?? 1_000));
@@ -86,7 +94,7 @@ async function relay(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const pk = delegateKey(sd)!;
   const fc = sd.delegateAction.actions[0]!;
   const method = "functionCall" in fc ? fc.functionCall.methodName : "";
-  const [key, status] = await Promise.all([near.getAccessKey(sender, pk).catch(() => null), near.getStatus()]);
+  const [key, status] = await Promise.all([rpc((n) => accessKey(n, sender, pk)), rpc((n) => n.getStatus())]);
   const height = BigInt(status.sync_info.latest_block_height);
   const refusal = keyRefusal(sd, key as KeyView | null, height, policy.contractId, method);
   if (refusal) return reply(res, 400, { error: refusal });
@@ -94,7 +102,7 @@ async function relay(req: IncomingMessage, res: ServerResponse): Promise<void> {
   if (!perMinute.take(now) || !perDay.take(now)) return reply(res, 503, { error: "relayer busy, try again in a minute" });
 
   try {
-    const r = (await near.transaction(RELAYER_ID).signedDelegateAction(decoded).send({ waitUntil: "FINAL" })) as unknown as Outcome;
+    const r = (await rpc((n) => n.transaction(RELAYER_ID).signedDelegateAction(decoded).send({ waitUntil: "FINAL" }))) as unknown as Outcome;
     const logs = r.receipts_outcome.flatMap((o) => o.outcome.logs);
     const failed = JSON.stringify(r.status).includes("Failure") || JSON.stringify(r.receipts_outcome).includes("Failure");
     reply(res, failed ? 422 : 200, { ok: !failed, hash: r.transaction.hash, logs });
@@ -146,10 +154,9 @@ async function fastauthCreate(req: IncomingMessage, res: ServerResponse): Promis
   if (daily.n >= daily.cap || !createLimiter.allow(ip(req), Date.now())) return reply(res, 429, { error: "slow down" });
   daily.n++;
   const args = { new_account_id: b.accountId, new_public_key: b.publicKey };
-  const r = (await near
-    .transaction(RELAYER_ID)
-    .functionCall(REGISTRAR, "create_account", args, { gas: "50 Tgas", attachedDeposit: FUND })
-    .send({ waitUntil: "FINAL" })) as unknown as Outcome;
+  const r = (await rpc((n) =>
+    n.transaction(RELAYER_ID).functionCall(REGISTRAR, "create_account", args, { gas: "50 Tgas", attachedDeposit: FUND }).send({ waitUntil: "FINAL" }),
+  )) as unknown as Outcome;
   const failed = JSON.stringify(r.receipts_outcome).includes("Failure");
   reply(res, failed ? 422 : 200, { ok: !failed, hash: r.transaction.hash });
 }
@@ -161,17 +168,16 @@ async function fastauthSign(req: IncomingMessage, res: ServerResponse): Promise<
   if (why) return reply(res, 400, { error: why });
   if (!signLimiter.allow(ip(req), Date.now())) return reply(res, 429, { error: "slow down" });
   const args = { guard_id: b.guardId, verify_payload: b.verifyPayload, sign_payload: b.signPayload, algorithm: "eddsa" };
-  const r = (await near
-    .transaction(RELAYER_ID)
-    .functionCall(FAST_AUTH, "sign", args, { gas: "300 Tgas", attachedDeposit: "1 yocto" })
-    .send({ waitUntil: "FINAL" })) as unknown as Outcome & { status: { SuccessValue?: string } };
+  const r = (await rpc((n) =>
+    n.transaction(RELAYER_ID).functionCall(FAST_AUTH, "sign", args, { gas: "300 Tgas", attachedDeposit: "1 yocto" }).send({ waitUntil: "FINAL" }),
+  )) as unknown as Outcome & { status: { SuccessValue?: string } };
   const signature = r.status.SuccessValue;
   if (!signature) return reply(res, 422, { error: "MPC did not sign", hash: r.transaction.hash });
   reply(res, 200, { signature, hash: r.transaction.hash });
 }
 
 async function health(res: ServerResponse): Promise<void> {
-  const balance = Number(await near.getBalance(RELAYER_ID));
+  const balance = Number(await rpc((n) => n.getBalance(RELAYER_ID)));
   // Alarm also when a relay cap refused someone in the last 10 min (flood, or real demand to raise caps).
   const capped = Date.now() - Math.max(perMinute.hitAt, perDay.hitAt) < 600_000;
   reply(res, 200, { relayer: RELAYER_ID, contract: policy.contractId, balance, capped, alarm: balance < LOW_BALANCE || capped });

@@ -2,11 +2,12 @@
 // are full-key wallet actions (withdraw needs 1 yocto, which a session key can never attach).
 // On testnet "Get test USDC" mints from the mock token's open faucet (contracts/mock-usdc).
 
-import { Near } from "near-kit";
-import { CONTRACT_ID, NETWORK, USDC_ID } from "./config";
+import { CONTRACT_ID, NETWORK, RPC_EXTRA, USDC_ID } from "./config";
+import { nearClients, withFallback } from "./rpc";
 import { wallet } from "./wallet";
 
-const reader = new Near({ network: NETWORK });
+const readers = nearClients(NETWORK, RPC_EXTRA);
+const reader = { view: <T>(id: string, method: string, args: object) => withFallback(readers, (n) => n.view<T>(id, method, args)) };
 
 export interface Ticket {
   stake: string;

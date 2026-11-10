@@ -3,9 +3,10 @@
 // no pop-up and no gas for the player. It cannot withdraw (no 1 yocto), proven by
 // tools/scripts/session-probe.ts.
 
-import { Near, generateKey, parseKey } from "near-kit";
-import { CONTRACT_ID, NETWORK, RELAYER_URL } from "./config";
+import { generateKey, parseKey } from "near-kit";
+import { CONTRACT_ID, NETWORK, RELAYER_URL, RPC_EXTRA } from "./config";
 import { entryStake, forgetEntryStake } from "./funds";
+import { accessKey, nearClients, withFallback } from "./rpc";
 import { wallet } from "./wallet";
 
 /** Explicit allowance (the near-api-js default is 0.25 NEAR). Relaying never spends it. */
@@ -32,13 +33,13 @@ function save(accountId: string, secret: Secret): void {
 }
 
 const memory = new Map<string, Secret>();
-const reader = new Near({ network: NETWORK });
+const readers = nearClients(NETWORK, RPC_EXTRA);
 
 /** The stored session key, if it is still an access key on the account (user may have removed it). */
 export async function sessionKey(accountId: string): Promise<Secret | null> {
   const secret = memory.get(accountId) ?? load(accountId);
   if (!secret) return null;
-  const onChain = await reader.getAccessKey(accountId, parseKey(secret).publicKey.toString());
+  const onChain = await withFallback(readers, (n) => accessKey(n, accountId, parseKey(secret).publicKey.toString()));
   return onChain ? secret : null;
 }
 
@@ -73,11 +74,12 @@ export interface RelayResult {
 
 /** Buys a ticket at the contract's entry stake with the session key via the relayer. No pop-up, no gas. */
 export async function enterArena(accountId: string, secret: Secret, relayerUrl = RELAYER_URL): Promise<RelayResult> {
-  const signer = new Near({ network: NETWORK, privateKey: secret, defaultSignerId: accountId });
-  const { payload } = await signer
-    .transaction(accountId)
-    .functionCall(CONTRACT_ID, "enter_arena", { stake: await entryStake() }, { gas: "30 Tgas" })
-    .delegate({ blockHeightOffset: 100 });
+  const stake = await entryStake();
+  // Signing a delegate only reads the nonce and a block hash, so trying the next RPC is safe.
+  const signers = nearClients(NETWORK, RPC_EXTRA, { privateKey: secret, defaultSignerId: accountId });
+  const { payload } = await withFallback(signers, (n) =>
+    n.transaction(accountId).functionCall(CONTRACT_ID, "enter_arena", { stake }, { gas: "30 Tgas" }).delegate({ blockHeightOffset: 100 }),
+  );
   const res = await fetch(`${relayerUrl}/relay`, {
     method: "POST",
     headers: { "content-type": "application/json" },
