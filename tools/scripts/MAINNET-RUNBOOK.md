@@ -104,6 +104,24 @@ recreated) and, as the owner, calls `set_agents` (1 yocto) so settle may pay dro
 $CONTRACT_ID is_agent json-args '{"account_id":"drone-1.'$CONTRACT_ID'"}' network-config mainnet now`
 prints `true`. Then point the server's paid-room drones at these accounts.
 
+### 3c. near.social profiles for the house and drones (S2 script, about 1 min, 8 txs of 1 Ggas, no deposit)
+
+near.social is mainnet only. Each account gets a name, an "Automated account" about line, the
+website and an avatar on FastFS (Agent-3 for drones, the logo for the house). From the repo root,
+dry run first (prints every write, sends nothing), then send:
+
+```
+npx tsx apps/server/scripts/social-profiles.ts --contract $CONTRACT_ID --drones 3
+npx tsx apps/server/scripts/social-profiles.ts --contract $CONTRACT_ID --drones 3 --send
+```
+
+It signs with `~/.near-credentials/mainnet/<account>.json` for `$CONTRACT_ID` and
+`drone-1..3.$CONTRACT_ID` (written by steps 3 and 3b) and prints `OK https://near.social/<account>`
+for each once the indexer shows the profile. Every receipt fails with `CodeDoesNotExist` BY DESIGN:
+FastData writes go to the account `social`, which has no contract, and the indexer reads the tx
+args. The script confirms through the indexer and never retries on that error. Cost: gas only,
+about 0.0005 NEAR per tx. Check: open `https://near.social/drone-1.$CONTRACT_ID`.
+
 ## 4. Check the deploy (free)
 
 ```
@@ -143,6 +161,13 @@ Then, in the browser on playmargin.fun as a player (all wallet approvals, Vansh 
 - **[TX 8]** Enable quick play (AddKey, enter_arena only). After that, PLAY needs no approval.
 - The settle tx is sent by the server (settler). Copy its nearblocks link for the README.
 - **[TX 9]** Withdraw to prove the money comes back.
+
+**6b. Proof post on near.social** (Vansh, about 0.001 NEAR of gas): sign in on playmargin.fun with
+`vanshverse.near`, finish a match, press "Post to near.social" on the results screen and approve
+in the wallet. The page shows the real link `https://near.social/vanshverse.near/post/<id>`. Hand
+it to S2 for README Part 2 and `docs/NEAR.md`. The wallet pays its own gas, so `vanshverse.near`
+must keep at least 0.01 NEAR after funding step 2 (it held 0 on 10 Nov). No storage deposit is
+needed on `social`.
 
 ## 7. Rollback and cleanup (how the NEAR comes back, rehearsed)
 
