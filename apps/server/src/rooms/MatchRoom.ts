@@ -28,6 +28,7 @@ import {
 } from "@margin/core";
 import { Commander, agentView, createBrain, nearAiCall } from "../agents";
 import { sharedDb, userForAccount } from "../db";
+import { displayLabel } from "./label";
 import { settlementFor, sharedChain } from "../settlement";
 import { admitFree, chargeEntry } from "./freeMatch";
 import { admitPaid, refundTickets, seatedAccounts } from "./paidMatch";
@@ -185,7 +186,7 @@ export class MatchRoom extends Room {
     const accountId = typeof auth === "object" ? auth.accountId : null;
     // Paid seats show the real account; free players pick a name (cleaned: shown to all and to the agents' LLM).
     const name = accountId ?? cleanName((opts as { name?: unknown } | null)?.name);
-    const p: PlayerSeed = { id, kind: "human", label: name ?? `Player ${++this.joined}`, accountId };
+    const p: PlayerSeed = { id, kind: "human", label: displayLabel(name ?? `Player ${++this.joined}`), accountId };
     if (this.started) {
       // Late join (free, first 15 s): pay now, then core charges the pot and shields 10 s.
       if (typeof auth !== "string" || !chargeEntry(sharedDb(), auth, this.roomId)) {
