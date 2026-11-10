@@ -31,7 +31,7 @@ export const cash: Screen = (root) => {
   <div class="min-h-full bg-paper text-ink">
     ${header()}
     <div class="mx-auto max-w-xl px-4 pb-16 pt-2">
-      <span class="sticker inline-block rounded-field bg-gold px-3 py-1 text-sm font-bold" style="box-shadow:3px 3px 0 var(--color-ink)">Real stakes</span>
+      <span class="sticker inline-block rounded-field bg-gold px-3 py-1 text-sm font-bold" style="box-shadow:3px 3px 0 var(--color-ink)">${NETWORK === "testnet" ? "Test money" : "Real money"}</span>
       <h1 class="mt-3 font-display text-6xl">Play for <span data-stake>$1</span></h1>
       <p class="mt-2 text-muted">Humans only. Winners split the pot by equity. ${NETWORK === "testnet" ? "<b>Test money for now, nothing real at stake.</b>" : ""}</p>
       <div data-c=body class="mt-6 space-y-4"></div>

@@ -2,7 +2,7 @@
 // (cat on a sky tile + MARGIN, How it works, Judge Run) and the sticker button classes,
 // so every action on every page is a filled button, never an underlined link.
 
-const base = "sticker sticker-press inline-flex items-center justify-center gap-2 rounded-box font-display disabled:opacity-50";
+const base = "sticker sticker-press inline-block text-center rounded-box font-display disabled:opacity-50";
 /** Filled sticker buttons, one per meaning: safe green = main action, card = secondary, ink = strong secondary, warn = friend. */
 export const BTN = {
   go: `${base} bg-safe px-6 py-3 text-xl text-ink`,
