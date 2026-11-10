@@ -25,6 +25,11 @@ export class Director {
     const id = e.type === "pop" || e.type === "eat" ? e.victim : e.type === "cashedOut" ? e.blob : null;
     const b = id && f?.blobs.find((x) => x.id === id);
     if (b) this.spot = { x: b.x, y: b.y, r: Math.max(b.radius, 80), until: nowS + EVENT_S };
+    // Then stay on whoever made the kill (Brawl Stars style): the story continues with them.
+    if ((e.type === "pop" || e.type === "eat") && e.by) {
+      this.target = e.by;
+      this.since = nowS + EVENT_S; // the hold starts once the pop shot ends
+    }
   }
 
   /** Where the camera should look now. */

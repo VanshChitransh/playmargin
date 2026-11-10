@@ -25,4 +25,14 @@ describe("director", () => {
     d.event({ type: "pop", by: "a", victim: "b", bounty: 1, keeper: false }, frame([a, b]), 5);
     expect(d.shot(frame([a]), 5.5)!.x).toBe(900);
   });
+  it("after a kill, stays on the killer once the pop shot ends", () => {
+    const d = new Director();
+    const big = blob({ id: "big", x: 0, radius: 200 });
+    const killer = blob({ id: "k", x: 700, radius: 60 });
+    const victim = blob({ id: "me", x: 720, radius: 40 });
+    d.shot(frame([big, killer, victim]), 0); // director on the biggest blob
+    d.event({ type: "pop", by: "k", victim: "me", bounty: 1, keeper: false }, frame([big, killer, victim]), 10);
+    expect(d.shot(frame([big, killer]), 11)!.x).toBe(720); // the pop itself
+    expect(d.shot(frame([big, killer]), 13)!.x).toBe(700); // then the killer, not the biggest
+  });
 });

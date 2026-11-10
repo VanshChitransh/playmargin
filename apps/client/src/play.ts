@@ -15,6 +15,7 @@ import { Controls } from "./input/controls";
 import { ENDPOINT, MatchConnection, guestKey } from "./net/client";
 import { refusalWords } from "./net/refusal";
 import { ArenaRenderer } from "./render/arena";
+import { Director } from "./render/director";
 import { rerender, type Screen } from "./router";
 import { showAborted, showDeath, showResults } from "./screens/overlays";
 import { setLocalLog } from "./screens/verify";
@@ -86,6 +87,9 @@ async function connect(roomCode?: string, judge = false): Promise<Source> {
 export const play: Screen = (root, params) => {
   const arena = new ArenaRenderer();
   let src: Source | null = null;
+  // After my blob pops or cashes out, keep watching the match: killer first, then the action.
+  const director = new Director();
+  arena.director = (f, tS) => director.shot(f, tS);
   let left = false;
   let mounted = false;
   let receipt: Receipt | null = null;
@@ -309,6 +313,7 @@ export const play: Screen = (root, params) => {
       receipt?.event(e);
       juice(e, s.me);
       if ((e.type === "pop" || e.type === "eat") && e.victim === s.me && !ended) {
+      director.event(e, lastFrame, performance.now() / 1000);
         const death = receipt!.outcome(lastFrame?.blobs ?? []).death!;
         overlay = showDeath(root, death, (a) => {
           if (a === "again") return again();

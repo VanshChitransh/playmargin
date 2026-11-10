@@ -158,7 +158,8 @@ export class ArenaRenderer {
   }
 
   private draw(f: Frame, tS: number): void {
-    const meView = f.blobs.find((b) => b.id === f.me);
+    // Only a living blob drives the camera: once popped or cashed out, the director takes over.
+    const meView = f.blobs.find((b) => b.id === f.me && b.state === "alive");
     // agar: the wall is invisible, the same grid runs on past it; the only cue is no food out there.
     this.grid.position.set(-BEYOND, -BEYOND);
     this.grid.width = f.arena.w + BEYOND * 2;
@@ -173,12 +174,13 @@ export class ArenaRenderer {
     this.nitro.update(meView, meView && this.blobs.get(meView.id), f.match.phase, this.held, this.fx, this.zoom, dt);
     if (meView) this.boostCam(meView, f.match.phase === "LIVE" && this.held && (meView.fuel ?? 1) > 0.001, dt);
     if (meView) this.follow(meView.x, meView.y, meView.radius, dt);
-    else this.direct(f, tS);
+    else this.direct(f);
   }
 
   /** Smooth pan and zoom toward the director's shot, so cuts read as camera moves. */
-  private direct(f: Frame, tS: number): void {
-    const s = this.director?.(f, tS);
+  private direct(f: Frame): void {
+    // Absolute seconds, the same clock callers stamp director events with.
+    const s = this.director?.(f, performance.now() / 1000);
     if (!s) return;
     const c = (this.cam ??= { ...s });
     const k = 0.05;
@@ -350,6 +352,8 @@ export class ArenaRenderer {
     const ox = this.lead.x + this.kick.x;
     const oy = this.lead.y + this.kick.y;
     this.world.position.set(width / 2 - ox - x * this.zoom, height / 2 - oy - y * this.zoom);
+    // Remember the shot, so a hand-off to the director pans from here instead of jumping.
+    this.cam = { x, y, r };
   }
 }
 
