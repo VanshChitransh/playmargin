@@ -68,6 +68,8 @@ export function keyRefusal(sd: SignedDelegate, key: KeyView | null, height: bigi
   if (maxBlockHeight <= height) return "delegate expired";
   if (!key) return "unknown key for this account";
   if (nonce <= BigInt(key.nonce)) return "nonce already used";
+  // NEAR refuses nonces above height x 1e6 (DelegateActionNonceTooLarge): no point sending it.
+  if (nonce > height * 1_000_000n) return "nonce too large";
   if (key.permission === "FullAccess") return null;
   const fc = key.permission.FunctionCall;
   if (fc.receiver_id !== contractId) return "key not scoped to the contract";

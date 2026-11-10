@@ -79,6 +79,9 @@ describe("relayer allow-list", () => {
     expect(ok(null)).toMatch(/unknown key/);
     expect(ok(scoped, 100n)).toMatch(/expired/);
     expect(ok({ ...scoped, nonce: 1 })).toMatch(/nonce/);
+    const far = sd();
+    (far.delegateAction as { nonce: bigint }).nonce = 50_000_001n; // above height 50 x 1e6
+    expect(keyRefusal(far, scoped, 50n, "playmargin.testnet", "enter_arena")).toMatch(/too large/);
     expect(ok({ nonce: 0, permission: { FunctionCall: { receiver_id: "evil.testnet", method_names: [] } } })).toMatch(/scoped/);
     expect(ok({ nonce: 0, permission: { FunctionCall: { receiver_id: "playmargin.testnet", method_names: ["withdraw"] } } })).toMatch(/method/);
   });

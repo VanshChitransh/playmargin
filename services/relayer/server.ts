@@ -73,7 +73,8 @@ async function relay(req: IncomingMessage, res: ServerResponse): Promise<void> {
   let payload: unknown;
   try {
     payload = (await readJson(req)).payload;
-  } catch {
+  } catch (err) {
+    if (err instanceof Error && err.message === "body too large") return reply(res, 413, { error: "body too large" });
     return reply(res, 400, { error: "bad json" });
   }
   if (typeof payload !== "string") return reply(res, 400, { error: "payload must be a base64 string" });
