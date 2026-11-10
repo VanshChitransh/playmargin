@@ -332,8 +332,16 @@ export const play: Screen = (root, params) => {
       s instanceof LocalMatch
         ? "Offline practice: real rules, local bots, nothing counts"
         : params.judge === "1"
-          ? "Judge Run: a 90 s scenario. Seeded map, normal rules, Drone-1 hunts red blobs. Most first-timers get greedy. Will you?"
+          ? "Judge Run: a 90 s scenario on a published seed, normal money rules. Here the agents only hunt red blobs, so the lesson is your own loan: hold BOOST, go red, and Drone-1 liquidates you. Will you?"
           : "";
+    // The Judge Run changes how agents behave, so it is disclosed on phones too (short form there).
+    if (params.judge === "1" && !(s instanceof LocalMatch)) {
+      status.classList.remove("max-sm:hidden");
+      status.innerHTML = `<span class="max-sm:hidden"></span><span class="sm:hidden">Judge Run: agents only hunt red blobs here, so the lesson is your loan. Drone-1 liquidates anyone who goes red.</span>`;
+      status.firstElementChild!.textContent = "Judge Run: a 90 s scenario on a published seed, normal money rules. Here the agents only hunt red blobs, so the lesson is your own loan: hold BOOST, go red, and Drone-1 liquidates you. Will you?";
+      // A card, not the grey footer: a disclosure has to be read. Phones: left of the dock, never under it.
+      status.className = "pop-sm pointer-events-none fixed bottom-3 left-3 z-10 max-w-[min(44rem,60vw)] rounded-xl bg-card px-3 py-2 text-sm font-semibold leading-snug text-ink max-sm:max-w-[calc(100vw-216px)] max-sm:text-xs";
+    }
     if (code && !(s instanceof LocalMatch)) roomChip(root, code);
     receipt = new Receipt(s.me);
     if (import.meta.env.DEV) (window as unknown as { __receipt: Receipt }).__receipt = receipt;
