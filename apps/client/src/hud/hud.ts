@@ -12,8 +12,10 @@ import { JUICE } from "../render/juice";
 import { reducedMotion } from "../render/motion";
 
 const LB_MS = 1000 / R.LEADERBOARD_HZ;
-const ROW_PX = 22;
-const C = { gold: "#F5B83D", liq: "#E5484D", dim: "#1A2742", paper: "#EEF2FF" };
+const ROW_PX = 30;
+// Arcade Paper: fuel is green (safe to borrow), the empty track is the paper shade, blocked is muted.
+const C = { gold: "#F5B83D", liq: "#E5484D", safe: "#38D96B", track: "#DDD3BE", muted: "#A9A3B8", paper: "#FFF6E6" };
+const SPEAKER = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/>`;
 
 
 export class Hud {
@@ -41,34 +43,39 @@ export class Hud {
   constructor(root: HTMLElement, private els: ControlsEls, private onCashoutWindow: (open: boolean) => void, opts: { coach?: boolean } = {}) {
     this.el = document.createElement("div");
     // invisible until the first frame: no empty clock, leaderboard or pills while connecting
-    this.el.className = "pointer-events-none invisible fixed inset-0 select-none font-sans text-paper";
+    this.el.className = "hud pointer-events-none invisible fixed inset-0 select-none font-sans text-ink";
     this.el.innerHTML = `
       <div class="absolute top-0 inset-x-0 flex flex-col items-center pt-[max(10px,env(safe-area-inset-top))]">
-        <div class="flex items-center gap-2 self-start rounded-box bg-navy/80 px-3 py-1 max-sm:ml-[102px] max-sm:mt-[2px] max-sm:gap-1 max-sm:px-2 sm:self-center">
-          <span data-h=phase class="text-xs font-medium tracking-widest text-muted max-sm:text-[11px] max-sm:tracking-normal"></span>
-          <span data-h=clock class="num text-xl font-bold max-sm:text-base"></span>
+        <div class="hud-timer self-start max-sm:ml-[60px] sm:self-center">
+          <span data-h=phase class="hud-phase"></span>
+          <span data-h=clock class="hud-clock"></span>
         </div>
         <div data-h=banner class="mt-3 px-3 text-center font-display text-3xl tracking-wide max-sm:mt-40 max-sm:text-2xl"></div>
       </div>
       <div class="absolute right-0 top-0 p-3 pr-[max(12px,env(safe-area-inset-right))] pt-[max(12px,env(safe-area-inset-top))]">
-        <ol data-h=lb class="relative w-36 overflow-hidden rounded-box bg-navy p-2 text-xs transition-[height] duration-300 sm:w-44 sm:text-sm" style="height:${ROW_PX + 16}px"></ol>
-        <div data-h=myrank class="mt-1 hidden w-36 rounded-box bg-navy/90 px-2 py-1 text-xs sm:w-44 sm:text-sm"></div>
+        <div class="hud-lb">
+          <h4><span>EQUITY</span><small data-h=lbtop></small></h4>
+          <ol data-h=lb class="relative transition-[height] duration-300" style="height:${ROW_PX + 8}px"></ol>
+          <div data-h=myrank class="hidden"></div>
+        </div>
       </div>
       <div data-h=center class="absolute inset-x-0 top-[14%] grid place-items-center text-center"></div>
       <div data-h=frame class="call-frame"></div>
-      <span data-h=off class="tag absolute left-3 top-12 mt-[max(0px,env(safe-area-inset-top))] hidden rounded-field bg-navy/90 px-2 py-0.5 text-[11px] text-gold">offline practice</span>
-      <p data-h=cmd style="display:none" class="absolute left-0 top-12 m-3 hidden max-w-[min(22rem,60vw)] rounded-field bg-navy/90 px-2 py-1 text-xs text-agent max-sm:line-clamp-3 max-sm:max-w-[calc(100vw-180px)] max-sm:text-[11px]"></p>
-      <button data-h=mute class="tag pointer-events-auto absolute left-0 top-0 m-3 mt-[max(12px,env(safe-area-inset-top))] rounded-field bg-navy/80 px-2 py-1 text-muted"></button>
-      <div data-h=tap class="pointer-events-none absolute left-1/2 top-[calc(50%+64px)] hidden -translate-x-1/2"><span class="sticker rounded-field bg-paper px-3 py-1 font-display text-xl text-ink">${this.touch ? "HOLD REPAY" : "HOLD R"}</span></div>
-      <div data-h=call class="tag absolute inset-x-0 bottom-28 hidden text-center"><span class="rounded-field bg-liq px-3 py-1 text-paper">Margin call: hold REPAY to get out</span></div>
+      <span data-h=off class="hud-pill absolute left-3 top-[62px] mt-[max(0px,env(safe-area-inset-top))] hidden text-[11px]">offline practice</span>
+      <p data-h=cmd style="display:none" class="hud-cmd absolute left-0 top-[58px] m-3 hidden max-w-[min(22rem,60vw)] max-sm:line-clamp-3 max-sm:max-w-[calc(100vw-180px)] max-sm:text-[11px]"></p>
+      <button data-h=mute class="hud-pill pointer-events-auto absolute left-0 top-0 m-2.5 mt-[max(10px,env(safe-area-inset-top))] cursor-pointer"></button>
+      <div data-h=tap class="pointer-events-none absolute left-1/2 top-[calc(50%+64px)] hidden -translate-x-1/2"><span class="hud-hint">${this.touch ? "HOLD REPAY" : "HOLD R"}</span></div>
+      <div data-h=call class="absolute inset-x-0 bottom-28 hidden text-center"><span class="hud-call">MARGIN CALL: hold REPAY to get out</span></div>
       <div data-h=pay class="pointer-events-none absolute hidden -translate-x-1/2 -translate-y-full"><span data-h=payt class="block whitespace-nowrap font-display text-5xl tabular-nums text-gold" style="-webkit-text-stroke:6px var(--color-ink);paint-order:stroke fill"></span></div>
-      <div data-h=money class="pointer-events-none hidden items-baseline gap-2 rounded-field bg-navy/90 px-2 py-0.5">
-        <span data-h=owe class="num text-gold"></span>
-        <span data-h=drain class="num hidden text-xs text-liq"></span>
+      <div data-h=money class="hud-money pointer-events-none hidden items-center gap-1.5">
+        <span data-h=owe class="hud-owe"></span>
+        <span data-h=drain class="hud-drain hidden"></span>
       </div>`;
     root.appendChild(this.el);
     const mute = this.q("mute");
-    const label = (): void => void (mute.textContent = isMuted() ? "Sound off" : "Sound on");
+    const label = (): void =>
+      void (mute.innerHTML = isMuted() ? `${SPEAKER}<path d="m22 9-6 6M16 9l6 6"/></svg><span>Sound off</span>` : `${SPEAKER}<path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg><span>Sound on</span>`);
+    mute.setAttribute("aria-label", "Toggle sound");
     label();
     mute.addEventListener("click", () => {
       setMuted(!isMuted());
@@ -78,10 +85,10 @@ export class Hud {
     this.pipRing.className = "pip-ring";
     els.boost.classList.add("relative");
     els.boost.appendChild(this.pipRing);
-    // The loan chip sits at the top of the control column, so it stacks above REPAY and BOOST
-    // (and the cash-out button when it shows) instead of floating over the play area.
+    // The loan chip rides on top of REPAY (v1 "owe 3"): the debt sits on the button that clears it.
     const money = this.q("money");
-    els.boost.parentElement?.prepend(money);
+    els.repay.classList.add("relative"); // the badge is positioned against REPAY itself
+    els.repay.appendChild(money);
     const noCoach = opts.coach === false || innerWidth < 640;
     this.coach = noCoach ? { update: () => {}, close: () => {} } : coachMarks(root, this.touch);
   }
@@ -163,6 +170,7 @@ export class Hud {
     const lobby = m.phase === "WARMUP" && !!f.lobby; // private room: no timer, the host starts it
     this.set("clock", `${label}${t}${lobby}`, () => {
       this.q("phase").textContent = lobby ? "LOBBY" : label;
+      this.q("phase").dataset.p = lobby ? "WAIT" : label.split(" ")[0]!; // chip colour: GROW green, HUNT yellow, SQUEEZE red
       this.q("clock").textContent = lobby ? "" : `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
     });
     if (m.phase !== "LIVE") return;
@@ -193,8 +201,8 @@ export class Hud {
       this.set("center", `P${n}/${f.lobby.host}`, () => {
         const line = !f.lobby!.host ? "Waiting for the host to start" : ready ? "Everyone in? Start when ready" : "Waiting for friends · send them the link";
         c.innerHTML = `<div><div class="outlined font-display text-7xl tabular-nums text-paper">${n}/${R.ROOM_SIZE}</div>
-          <div class="mt-1 font-medium text-ink/70">${line}</div>
-          ${f.lobby!.host ? `<button data-h=start ${ready ? "" : "disabled"} class="sticker pointer-events-auto mt-3 rounded-box px-6 py-3 font-display text-2xl ${ready ? "sticker-press cursor-pointer bg-paper text-ink" : "cursor-not-allowed bg-navy/60 text-paper/60"}">${ready ? "START MATCH" : "START: needs 1 friend"}</button>` : ""}
+          <div class="mt-1 font-semibold text-ink">${line}</div>
+          ${f.lobby!.host ? `<button data-h=start ${ready ? "" : "disabled"} class="pop pointer-events-auto mt-3 rounded-box px-6 py-3 font-display text-2xl ${ready ? "pop-press cursor-pointer bg-safe text-ink" : "cursor-not-allowed bg-cream text-muted"}">${ready ? "START MATCH" : "START: needs 1 friend"}</button>` : ""}
           ${this.hints()}</div>`;
         c.querySelector("[data-h=start]")?.addEventListener("click", (e) => {
           (e.currentTarget as HTMLButtonElement).disabled = true;
@@ -205,7 +213,7 @@ export class Hud {
       const n = f.blobs.filter((b) => b.kind !== "drone").length;
       this.set("center", `W${n}/${m.timeLeftS}`, () => {
         c.innerHTML = `<div><div class="outlined font-display text-7xl tabular-nums text-paper">${n}/${R.ROOM_SIZE}</div>
-          <div class="mt-1 font-medium text-ink/70">${this.offline ? "Offline practice" : "Finding players"} · starts in <span class="num">${m.timeLeftS}</span></div>
+          <div class="mt-1 font-semibold text-ink">${this.offline ? "Offline practice" : "Finding players"} · starts in <span class="num">${m.timeLeftS}</span></div>
           ${this.hints()}</div>`;
       });
     } else if (m.phase === "COUNTDOWN") {
@@ -229,10 +237,11 @@ export class Hud {
     const top = ranked.slice(0, rows);
     const row = (b: BlobView, rank: number): string => {
       const mine = b.id === f.me;
-      const name = esc(displayName(b));
-      return `<div class="flex h-full items-center justify-between gap-2 rounded px-1 ${mine ? "bg-grid font-bold" : ""}">
-        <span class="truncate ${b.kind === "agent" ? "text-agent" : ""}"><span class="num text-muted">${rank}</span> ${name}</span>
-        <span class="num text-gold">${Math.round(b.equity)}</span></div>`;
+      const bot = b.kind !== "human"; // agents and drones get the robot glyph instead of the emoji
+      const name = esc(bot ? displayName(b).replace(/\u{1F916}/gu, "").trim() : displayName(b));
+      return `<div class="hud-row${mine ? " me" : ""}"><span class="r">${rank}</span>
+        <span class="nm">${bot ? '<i class="bot" aria-label="AI agent"></i>' : ""}<span class="truncate">${name}</span></span>
+        <span class="eq">${Math.round(b.equity)}</span></div>`;
     };
     // Rows are keyed by blob id and placed with translateY, so a rank change slides the
     // same element (CSS transition) instead of re-creating it. Rows are opaque and the one
@@ -255,8 +264,7 @@ export class Hud {
       if (!li) {
         li = document.createElement("li");
         li.dataset.id = b.id;
-        li.className = "bg-navy";
-        li.style.cssText = `position:absolute;left:8px;right:8px;top:8px;height:${ROW_PX}px`;
+        li.style.cssText = `position:absolute;left:6px;right:6px;top:4px;height:${ROW_PX}px`;
         lb.appendChild(li);
       }
       li.style.transition = snap ? "none" : "transform 250ms ease";
@@ -271,7 +279,8 @@ export class Hud {
       }
     });
     lb.querySelectorAll<HTMLElement>("li").forEach((li) => keep.has(li.dataset.id!) || li.remove());
-    lb.style.height = `${Math.max(1, top.length) * ROW_PX + 16}px`; // sized to its rows, no empty box
+    lb.style.height = `${Math.max(1, top.length) * ROW_PX + 8}px`; // sized to its rows, no empty box
+    this.set("lbtop", String(rows), () => (this.q("lbtop").textContent = `top ${rows}`));
     const myRank = ranked.findIndex((b) => b.id === f.me);
     const mine = this.q("myrank");
     const show = myRank >= rows;
@@ -295,7 +304,7 @@ export class Hud {
       this.shownFuel = this.refill.from + (target - this.refill.from) * (1 - (1 - k) ** 3);
       if (k >= 1) this.refill = null;
     } else this.shownFuel = target;
-    this.pipRing.style.background = fuelGradient(this.shownFuel, blocked ? "#8391B3" : C.gold, C.dim);
+    this.pipRing.style.background = fuelGradient(this.shownFuel, blocked ? C.muted : C.safe, C.track);
     // The tank running dry: the ring flashes grey twice (once per emptying), the button greys.
     const dry = target <= 0.01;
     if (dry && !this.wasDry) {
@@ -315,8 +324,8 @@ export class Hud {
       ? ["Hold BOOST to grow (you borrow)", "Red? You can't eat. Hold REPAY", "Cash out from 0:45"]
       : ["Hold SPACE to boost (you borrow)", "Red? You can't eat. Hold R to repay", "Cash out from 0:45"];
     return `<ul class="mx-auto mt-3 flex max-w-sm flex-col items-center gap-1.5 text-sm">${lines
-      .map((l) => `<li class="rounded-field bg-navy/85 px-3 py-1 text-paper">${l}</li>`)
-      .join("")}<li class="text-xs text-ink/60">Try BOOST now: it is free practice until GO.</li></ul>`;
+      .map((l) => `<li class="hud-hint-line">${l}</li>`)
+      .join("")}<li class="text-xs font-semibold text-muted">Try BOOST now: it is free practice until GO.</li></ul>`;
   }
 
   /** Edge speed lines while BOOST burns: started by the press, faded over 250 ms on release. */
