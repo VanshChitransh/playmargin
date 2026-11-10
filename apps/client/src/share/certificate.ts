@@ -156,21 +156,49 @@ export async function drawCertificate(d: CertData): Promise<Blob> {
   return new Promise((ok, no) => cv.toBlob((b) => (b ? ok(b) : no(new Error("canvas export failed"))), "image/png"));
 }
 
-/** Native share sheet with the PNG when the browser can, else a download. */
+/**
+ * Show the certificate itself, then let the player save, share or copy the link. Desktop
+ * share sheets (macOS) show only the URL and hide the image, so the card is never skipped.
+ */
 export async function shareCertificate(d: CertData): Promise<void> {
   const blob = await drawCertificate(d);
   const file = new File([blob], `margin-liquidated-${d.matchId}.png`, { type: "image/png" });
-  const data = { files: [file], text: `Got greedy. Got liquidated at ${d.leverage.toFixed(1)}x on MARGIN.`, url: verifyUrl(d.matchId) };
-  if (navigator.canShare?.(data)) {
-    try {
-      return await navigator.share(data);
-    } catch (e) {
-      if ((e as Error).name === "AbortError") return;
+  const src = URL.createObjectURL(blob);
+  const link = verifyUrl(d.matchId);
+  const text = `Got greedy. Got liquidated at ${d.leverage.toFixed(1)}x on MARGIN. ${link}`;
+  // Files only: with a url too, macOS shares just the link.
+  const canShare = !!navigator.canShare?.({ files: [file] });
+  const b = (act: string, label: string, fill: string): string =>
+    `<button data-act="${act}" class="sticker sticker-press h-12 rounded-box px-4 font-display text-lg text-ink" style="background:${fill}">${label}</button>`;
+  const el = document.createElement("div");
+  el.className = "fixed inset-0 z-30 grid place-items-center overflow-y-auto bg-ink/80 p-4";
+  el.innerHTML = `<div class="flex w-full max-w-sm flex-col gap-3">
+      <img src="${src}" alt="Liquidation Certificate" class="sticker mx-auto max-h-[62vh] w-auto max-w-full rounded-box" />
+      <div class="grid grid-cols-2 gap-3">${b("save", "Save image", "var(--color-warn)")}${canShare ? b("share", "Share", "var(--color-safe)") : b("copy", "Copy link", "#fff")}</div>
+      ${canShare ? b("copy", "Copy link", "#fff") : ""}
+      ${b("close", "Close", "#fff")}
+    </div>`;
+  const close = (): void => {
+    el.remove();
+    URL.revokeObjectURL(src);
+  };
+  el.addEventListener("click", async (e) => {
+    if (e.target === el) return close();
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>("button[data-act]");
+    if (!btn) return;
+    const act = btn.dataset.act;
+    if (act === "close") return close();
+    if (act === "save") {
+      const a = document.createElement("a");
+      a.href = src;
+      a.download = file.name;
+      a.click();
+    } else if (act === "share") {
+      await navigator.share({ files: [file], text }).catch(() => {}); // cancel is fine
+    } else if (act === "copy") {
+      const ok = await navigator.clipboard.writeText(link).then(() => true, () => false);
+      btn.textContent = ok ? "Link copied" : link;
     }
-  }
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = file.name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+  document.body.appendChild(el);
 }
