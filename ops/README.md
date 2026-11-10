@@ -91,16 +91,25 @@ curl https://api.playmargin.fun/relay/health
 ```
 
 ### 8. Client (Cloudflare Pages)
-Build command `npm run build`, output directory `apps/client/dist`, environment variables:
+One command builds with the right settings and deploys to the Pages project `playmargin` (direct upload,
+production branch `main`), then attaches `playmargin.fun` and `www.playmargin.fun`:
+```
+ENV_FILE=/path/to/.env apps/client/scripts/deploy-pages.sh testnet     # testnet now
+VITE_CONTRACT_ID=playmargin.near ENV_FILE=... apps/client/scripts/deploy-pages.sh mainnet   # later
+```
+It reads `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` (Pages Edit, DNS Edit) from the env file for
+that command only and never prints them. Testnet: `VITE_NETWORK=testnet`, contract `playmargin.testnet`,
+email login off. The custom domains go live once the `playmargin.fun` zone is active on Cloudflare.
+The variables it sets (also usable for a Pages git build: command `npm run build`, output `apps/client/dist`):
 - `NODE_VERSION=24`
 - `VITE_SERVER_URL=https://api.playmargin.fun` (https, not wss: the client also `fetch`es `/api/*`
   from it, and the Colyseus SDK upgrades to wss itself)
 - `VITE_RELAYER_URL=https://api.playmargin.fun/relay`
-- `VITE_NETWORK=mainnet`, `VITE_CONTRACT_ID=<CONTRACT_ID>`
+- `VITE_NETWORK=testnet` and `VITE_CONTRACT_ID=playmargin.testnet` now; `mainnet` and `<CONTRACT_ID>` on mainnet day
 - `VITE_NEAR_AUTH=1` and `VITE_NEAR_AUTH_CLIENT_ID=<id>` only once NEAR approves the Auth0 app
 
 ### 9. Smoke
-Play one free match from a phone on 4G (S9 gate), then one paid match per the runbook.
+Play one free match from a laptop on the public URL (S9 gate; phones get the laptop card), then one paid match per the runbook.
 
 ## Day to day
 - Health: `curl -s localhost:2567/health` (503 while draining, `settler.low` under 0.12 NEAR) and `curl -s localhost:3030/health` (relayer NEAR balance + `alarm`).
