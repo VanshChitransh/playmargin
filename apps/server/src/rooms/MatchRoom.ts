@@ -56,6 +56,9 @@ const SIM_SPEED = process.env.NODE_ENV === "production" ? 1 : Math.max(1, Number
 /** Set when SIGTERM arrives: no new matches start while LIVE ones finish (drain deploys). */
 export const drain = { on: false };
 
+/** Seconds a private lobby keeps a dropped seat (a reload takes about 2 s). */
+const LOBBY_HOLD_S = 20;
+
 export class MatchRoom extends Room {
   override state = new MatchState();
   override maxClients: number = R.ROOM_SIZE;
@@ -230,7 +233,15 @@ export class MatchRoom extends Room {
   override onDrop(client: Client): void {
     if (this.spectators.has(client.sessionId)) return; // watchers just rejoin, nothing to hold
     // Before GO leaving is free (onLeave runs next), except a paid 3-2-1: the ticket is being bound.
-    if (!this.started && !this.paidLocked) return;
+    // A private lobby holds a dropped seat briefly, so a reload keeps the blob and the host role
+    // (host = earliest human still here) instead of handing START to whoever joined next.
+    if (!this.started && !this.paidLocked) {
+      if (this.key.roomCode) {
+        this.inputs.close(client.sessionId);
+        this.allowReconnection(client, LOBBY_HOLD_S);
+      }
+      return;
+    }
     this.inputs.close(client.sessionId);
     const ticksLeft = (this.started ? sToTicks(R.MATCH_S) - matchT(this.world, this.roomTick) : sToTicks(R.MATCH_S + 20)) + ENDED_HOLD_TICKS;
     this.allowReconnection(client, Math.max(1, Math.ceil(ticksLeft / R.TICK_HZ)));
