@@ -13,7 +13,7 @@
     "dev": "concurrently -k -n server,client -c cyan,magenta \"npm run dev -w @margin/server\" \"npm run dev -w @margin/client\"",
     "build": "npm run build -w @margin/client",
     "test": "vitest run --passWithNoTests",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present && npm --prefix services/relayer run typecheck && npm --prefix tools/scripts run typecheck",
     "format": "prettier --write .",
     "check:dashes": "! git grep -nIP '[\\x{2013}\\x{2014}]' -- . ':!package-lock.json'",
     "demo": "tsx tools/sim/demo.ts",
