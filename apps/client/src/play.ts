@@ -347,7 +347,7 @@ export const play: Screen = (root, params) => {
 /** Private room: the code stays on screen with one tap to send the link to a friend. */
 function roomChip(root: HTMLElement, code: string): void {
   const b = document.createElement("button");
-  b.className = "sticker sticker-press fixed bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-box bg-paper px-4 py-2 font-display text-lg text-ink";
+  b.className = "pop-sm pop-press fixed bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-2xl bg-warn px-4 py-2 font-display text-lg text-ink";
   const num = document.createElement("span");
   num.className = "num";
   num.textContent = code;
@@ -385,12 +385,12 @@ function shareResult(o: Outcome, matchId: string): void {
 /** One field, one button: the name stays in this browser for every later match. Skipping = "Player N". */
 function askName(root: HTMLElement): Promise<void> {
   const el = document.createElement("form");
-  el.className = "fixed inset-0 z-20 grid place-items-center bg-ink/80 p-4";
-  el.innerHTML = `<div class="sticker w-full max-w-sm rounded-box bg-paper p-6 text-center text-ink">
+  el.className = "fixed inset-0 z-20 grid place-items-center bg-ink/55 p-4 backdrop-blur-[3px]";
+  el.innerHTML = `<div class="pop w-full max-w-sm rounded-[28px] bg-paper p-6 text-center text-ink shadow-[10px_10px_0_var(--color-ink)]">
     <h2 class="font-display text-4xl">Your name</h2>
-    <p class="mt-1 text-sm text-ink/70">Your friends see it in the arena and on the leaderboard.</p>
-    <input name=n maxlength=20 autocomplete=nickname placeholder="Player" class="mt-4 w-full rounded-field border-2 border-ink bg-white px-3 py-2 text-center font-display text-2xl" />
-    <button class="sticker sticker-press mt-4 w-full rounded-box bg-ink px-5 py-3 font-display text-xl text-paper">Join room</button></div>`;
+    <p class="mt-1 text-sm font-medium text-muted">Your friends see it in the arena and on the leaderboard.</p>
+    <input name=n maxlength=20 autocomplete=nickname placeholder="Player" class="pop-sm mt-4 w-full rounded-xl bg-card px-3 py-2 text-center font-display text-2xl" />
+    <button class="pop pop-press mt-5 w-full rounded-2xl bg-safe px-5 py-3 font-display text-2xl">Join room</button></div>`;
   root.appendChild(el);
   const input = el.querySelector<HTMLInputElement>("input")!;
   input.focus();
@@ -406,15 +406,15 @@ function askName(root: HTMLElement): Promise<void> {
 
 function refusedCard(root: HTMLElement, why: string): void {
   const el = document.createElement("div");
-  el.className = "fixed inset-0 z-20 grid place-items-center bg-ink/80 p-4";
-  el.innerHTML = `<div class="sticker max-w-sm rounded-box bg-paper p-6 text-center text-ink">
+  el.className = "fixed inset-0 z-20 grid place-items-center bg-ink/55 p-4 backdrop-blur-[3px]";
+  el.innerHTML = `<div class="pop max-w-sm rounded-[28px] bg-paper p-6 text-center text-ink shadow-[10px_10px_0_var(--color-ink)]">
     <h2 class="font-display text-4xl">Can't join right now</h2>
-    <p data-why class="mt-2"></p>
+    <p data-why class="mt-2 font-medium"></p>
     <div class="mt-5 flex flex-wrap justify-center gap-3">
-      <button data-retry class="sticker sticker-press rounded-box bg-ink px-5 py-3 font-display text-lg text-paper">Retry</button>
-      <button data-off class="sticker sticker-press rounded-box bg-paper px-5 py-3 font-display text-lg">Practice offline</button>
-      <a href="#/" class="tag basis-full underline">Home</a></div>
-    <p class="mt-3 text-xs text-ink/60">Offline practice runs the real rules against local bots. Nothing counts.</p></div>`;
+      <button data-retry class="pop pop-press rounded-2xl bg-ink px-5 py-3 font-display text-xl text-card">Retry</button>
+      <button data-off class="pop pop-press rounded-2xl bg-safe px-5 py-3 font-display text-xl">Practice offline</button>
+      <a href="#/" class="pop-sm pop-press basis-full rounded-2xl bg-card px-4 py-2 font-display text-lg">Home</a></div>
+    <p class="mt-4 text-xs font-medium text-muted">Offline practice runs the real rules against local bots. Nothing counts.</p></div>`;
   el.querySelector("[data-why]")!.textContent = why;
   el.querySelector("[data-retry]")!.addEventListener("click", () => rerender());
   el.querySelector("[data-off]")!.addEventListener("click", () => {
