@@ -15,6 +15,13 @@ describe("director", () => {
     const all = [red, hunter, whale];
     expect(score(red, all)).toBeGreaterThan(score(whale, all));
   });
+  it("rates a chase above a bigger blob grazing alone", () => {
+    const hunter = blob({ id: "h", radius: 80 });
+    const prey = blob({ id: "p", x: 200, radius: 50 });
+    const whale = blob({ id: "w", x: 5000, radius: 250 });
+    const all = [hunter, prey, whale];
+    expect(score(hunter, all)).toBeGreaterThan(score(whale, all));
+  });
   it("holds a shot instead of twitching, and jumps to a pop", () => {
     const d = new Director();
     const a = blob({ id: "a", radius: 100 });

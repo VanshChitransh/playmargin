@@ -21,3 +21,4 @@ export * from "./scenario";
 export * from "./merkle";
 export * from "./settleargs";
 export * from "./name";
+export * from "./botnames";

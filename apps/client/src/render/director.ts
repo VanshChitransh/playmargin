@@ -1,8 +1,8 @@
 // Spectator "director": picks what a camera should look at when there is no player blob.
 // Priority: a pop that just happened, a red blob with a bigger hunter close by (a liquidation
-// about to happen), a cash-out in progress, else the biggest blob. A shot is held at least
+// about to happen), a cash-out in progress, a chase, else the biggest blob. A shot is held at least
 // HOLD_S so the camera does not twitch between candidates.
-import type { BlobView, GameEventMsg } from "@margin/core";
+import { R, type BlobView, type GameEventMsg } from "@margin/core";
 import type { Frame } from "../game/frame";
 
 const HOLD_S = 3;
@@ -52,8 +52,10 @@ export class Director {
 /** How watchable a blob is right now. */
 export function score(b: BlobView, all: BlobView[]): number {
   let s = b.radius;
-  if (b.ring === "red" && all.some((h) => h.id !== b.id && h.ring !== "red" && h.radius > b.radius && Math.hypot(h.x - b.x, h.y - b.y) < (h.radius + b.radius) * 3)) s += 1000;
+  if (b.ring === "red" && all.some((h) => h.id !== b.id && h.ring !== "red" && h.radius >= b.radius * R.EAT_RADIUS_RATIO && Math.hypot(h.x - b.x, h.y - b.y) < (h.radius + b.radius) * 3)) s += 1000;
   if (b.cashingOut) s += 600;
+  // A chase on screen: this blob can eat a neighbour that is close (the core eat rule, by radius).
+  if (all.some((v) => v.id !== b.id && b.radius >= v.radius * R.EAT_RADIUS_RATIO && Math.hypot(v.x - b.x, v.y - b.y) < (b.radius + v.radius) * 2.5)) s += 300;
   if (b.ring === "yellow") s += 100;
   return s;
 }
