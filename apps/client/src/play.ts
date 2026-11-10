@@ -16,6 +16,7 @@ import { Controls } from "./input/controls";
 import { playerName, setPlayerName } from "./player/name";
 import { ENDPOINT, MatchConnection, guestKey } from "./net/client";
 import { joinFailWords } from "./net/refusal";
+import { seat } from "./net/seat";
 import { ArenaRenderer } from "./render/arena";
 import { Director } from "./render/director";
 import { rerender, type Screen } from "./router";
@@ -55,15 +56,23 @@ export const setPaidSeat = (o: () => JoinOpts): void => void (paidSeat = o);
 class Refused extends Error {}
 /** Set by the refusal card's "Practice offline" button: the next connect goes straight to local bots. */
 let offlineOnPurpose = false;
+/** The last connect found a held seat it could not resume (the match ended or my blob died meanwhile). */
+let seatLost = false;
 
 async function connect(roomCode?: string, judge = false): Promise<Source> {
   const paid = paidSeat;
   paidSeat = null;
   // Reloaded or came back mid-match: take the held seat back before anything else.
   if (!paid) {
+    const target = judge ? "judge" : (roomCode ?? "play");
+    // A seat was held: if it cannot be taken back, the player must hear why they start over (QA-B-10).
+    seatLost = seat.get(target) !== null;
     const back = new MatchConnection();
     const late = new Promise<boolean>((r) => setTimeout(() => r(false), RESUME_TIMEOUT_MS));
-    if (await Promise.race([back.resume(judge ? "judge" : (roomCode ?? "play")), late])) return back;
+    if (await Promise.race([back.resume(target), late])) {
+      seatLost = false;
+      return back;
+    }
     back.leave(); // a resume that answers after the timeout must not keep a second seat alive
   }
   // A paid seat never falls back to offline practice: the ticket is real, so the error must show.
@@ -314,6 +323,7 @@ export const play: Screen = (root, params) => {
   }).then((s) => {
     connecting.remove();
     if (left) return s.leave?.();
+    if (seatLost) notice(root, "Your last match ended while you were away. Starting a new one.");
     src = s;
     hud.offline = s instanceof LocalMatch;
     // Offline practice must be impossible to miss: a yellow sticker instead of the grey footer.
@@ -467,4 +477,14 @@ function refusedCard(root: HTMLElement, why: string, retry = true): void {
     else location.hash = "#/play";
   });
   root.appendChild(el);
+}
+
+/** A short centred note that goes away by itself (no button: it only explains what just happened). */
+function notice(root: HTMLElement, text: string): void {
+  const el = document.createElement("div");
+  el.className = "pointer-events-none fixed inset-x-0 top-[13%] z-20 grid place-items-center px-4";
+  el.innerHTML = `<span class="pop rounded-2xl bg-warn px-5 py-3 text-center font-display text-xl text-ink"></span>`;
+  el.firstElementChild!.textContent = text;
+  root.appendChild(el);
+  setTimeout(() => el.remove(), 5000);
 }
