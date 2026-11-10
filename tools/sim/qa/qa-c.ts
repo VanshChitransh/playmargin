@@ -223,6 +223,20 @@ async function runOne(i: number): Promise<Record<string, unknown>> {
     case "lockout": seats = [await seat({ name: `QA X${i}`, brain: lockoutBrain })]; break;
     case "repay": seats = [await seat({ name: `QA P${i}`, brain: repayBrain() })]; break;
     case "bait": seats = [await seat({ name: `QA B${i}`, brain: baitBrain })]; break;
+    case "judgePassive": case "judgeGreedy": case "judgeRandom": {
+      // The real Judge Run room (one human, JUDGE_SEED, judge lineup, Drone-1).
+      const key = guestKey();
+      const room = await sdk.joinOrCreate("judge", { mode: "free", guestKey: key, name: `QA J${i}` });
+      const brain: Brain = scenario === "judgePassive" ? idle
+        : scenario === "judgeGreedy" ? (s, me, owe) => ({ ...newcomer()(s, me, owe), boost: true, repay: false })
+        : (s, me, owe) => { const t = (s.timeLeftS ?? 0) * 7 + i; return { dirX: Math.cos(t), dirY: Math.sin(t * 1.3), boost: t % 9 < 2, repay: false, cashout: false }; };
+      const st: Seat = { room, brain, owe: 0, key, name: "judge", samples: [], rationales: 0, sent: [] };
+      room.onMessage("me", (m: { owe: number }) => void (st.owe = m.owe));
+      room.onMessage("ev", () => {});
+      room.onMessage("commander", () => {});
+      seats = [st];
+      break;
+    }
     case "duel": await host(2, () => newcomer({ boost: true })); break;
     case "twelve": await host(12, (k) => newcomer({ boost: k % 2 === 0 })); break;
     case "lone": await host(4, (k) => (k === 0 ? newcomer() : newcomer({ cashAtLeft: 40 }))); break;
