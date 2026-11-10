@@ -72,3 +72,27 @@ describe("pickWatchRoom", () => {
     expect(pickWatchRoom([room("ended", "ENDED", 2)])).toBeNull();
   });
 });
+
+describe("api errors over HTTP", () => {
+  it("unknown /api paths and methods answer a JSON 404, not Express's HTML (QA-A-02)", async () => {
+    const { default: express } = await import("express");
+    const { mountApi } = await import("./api");
+    const app = express();
+    const db = openDb(":memory:");
+    mountApi(app, () => db);
+    const srv = app.listen(0);
+    await new Promise((r) => srv.once("listening", r));
+    const base = `http://127.0.0.1:${(srv.address() as { port: number }).port}`;
+    try {
+      for (const [method, path] of [["GET", "/api/nope"], ["POST", "/api/stats"], ["DELETE", "/api/credits"]] as const) {
+        const r = await fetch(base + path, { method });
+        expect(r.status).toBe(404);
+        expect(r.headers.get("content-type")).toMatch(/application\/json/);
+        expect(await r.json()).toEqual({ error: "not found" });
+      }
+      expect((await fetch(`${base}/api/stats`)).status).toBe(200);
+    } finally {
+      srv.close();
+    }
+  });
+});

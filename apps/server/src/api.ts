@@ -161,4 +161,6 @@ export function mountApi(app: Application, db: () => Db): void {
     });
   });
   app.get("/api/stats", (_req, res) => void res.json(stats(db())));
+  // Last: any other /api path or method answers JSON like every route above, never Express's HTML page.
+  app.use("/api", (_req, res) => void res.status(404).json({ error: "not found" }));
 }
