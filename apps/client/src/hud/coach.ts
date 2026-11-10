@@ -30,7 +30,7 @@ export interface Coach {
 }
 
 /** target(step) = the button the bubble points at; the bubble sits above that button's dock. */
-export function coachMarks(root: HTMLElement, touch: boolean, target: (s: "boost" | "repay") => HTMLElement): Coach {
+export function coachMarks(root: HTMLElement, target: (s: "boost" | "repay") => HTMLElement): Coach {
   if (seen()) return { update: () => {}, close: () => {} };
   const el = document.createElement("div");
   el.className = "pointer-events-none fixed inset-0 z-10 hidden";
@@ -50,8 +50,8 @@ export function coachMarks(root: HTMLElement, touch: boolean, target: (s: "boost
     step = s;
     const boost = s === "boost";
     const text = boost
-      ? `<b>${touch ? "Hold" : "Hold SPACE:"} BOOST</b>. Grow fast, on a loan.`
-      : `<b>${touch ? "Hold" : "Hold R:"} REPAY</b> pays it back.`;
+      ? `<b>Hold SPACE: BOOST</b>. Grow fast, on a loan.`
+      : `<b>Hold R: REPAY</b> pays it back.`;
     // Measured from the real layout: the bubble floats above the whole dock (never over a
     // control) and its tail sits over the button it names.
     const btn = target(s).getBoundingClientRect();

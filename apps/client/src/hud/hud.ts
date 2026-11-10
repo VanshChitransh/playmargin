@@ -35,7 +35,6 @@ export class Hud {
   private coach: Coach;
   /** #/watch: a spectator sees who is in the arena and when it starts, never player tips. */
   private spectator: boolean;
-  private touch = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
   held = false;
   /** Offline practice against local bots: never word it like a real lobby. */
   offline = false;
@@ -69,7 +68,7 @@ export class Hud {
       <span data-h=off class="hud-pill absolute left-3 top-[62px] mt-[max(0px,env(safe-area-inset-top))] hidden text-[11px]">offline practice</span>
       <p data-h=cmd style="display:none" class="hud-cmd absolute left-0 top-[58px] m-3 hidden max-w-[min(22rem,60vw)] max-sm:max-w-[calc(100vw-208px)] max-sm:text-[11px]"></p>
       <button data-h=mute class="hud-pill pointer-events-auto absolute left-0 top-0 m-2.5 mt-[max(10px,env(safe-area-inset-top))] cursor-pointer"></button>
-      <div data-h=tap class="pointer-events-none absolute left-1/2 top-[calc(50%+64px)] hidden -translate-x-1/2"><span class="hud-hint">${this.touch ? "HOLD REPAY" : "HOLD R"}</span></div>
+      <div data-h=tap class="pointer-events-none absolute left-1/2 top-[calc(50%+64px)] hidden -translate-x-1/2"><span class="hud-hint">HOLD R</span></div>
       <div data-h=call class="absolute inset-x-0 bottom-28 hidden text-center"><span class="hud-call">MARGIN CALL: hold REPAY to get out</span></div>
       <div data-h=pay class="pointer-events-none absolute hidden -translate-x-1/2 -translate-y-full"><span data-h=payt class="block whitespace-nowrap font-display text-5xl tabular-nums text-gold" style="-webkit-text-stroke:6px var(--color-ink);paint-order:stroke fill"></span></div>
       <div data-h=money class="hud-money pointer-events-none hidden">
@@ -95,7 +94,7 @@ export class Hud {
     els.repay.classList.add("relative"); // the badge is positioned against REPAY itself
     els.repay.appendChild(money);
     const noCoach = opts.coach === false || innerWidth < 640 || innerHeight < 500; // no room beside a small dock
-    this.coach = noCoach ? { update: () => {}, close: () => {} } : coachMarks(root, this.touch, (t) => els[t]);
+    this.coach = noCoach ? { update: () => {}, close: () => {} } : coachMarks(root, (t) => els[t]);
   }
 
   destroy(): void {
@@ -336,11 +335,10 @@ export class Hud {
   }
 
 
-  /** Warm-up teaching, no numbers: one line per rule, worded for the player's controls. */
+  /** Warm-up teaching, no numbers: one line per rule. MARGIN plays on a laptop only (phones get the
+   *  "plays on a laptop" card), so the words are always keys, even on a touch-screen laptop. */
   private hints(): string {
-    const lines = this.touch
-      ? ["Hold BOOST to grow (you borrow)", "Red? You can't eat. Hold REPAY", "Cash out from 0:45"]
-      : ["Hold SPACE to boost (you borrow)", "Red? You can't eat. Hold R to repay", "Cash out from 0:45"];
+    const lines = ["Hold SPACE to boost (you borrow)", "Red? You can't eat. Hold R to repay", "Cash out from 0:45"];
     return `<ul class="mx-auto flex max-w-sm flex-col items-center gap-1.5 text-sm">${lines
       .map((l) => `<li class="hud-hint-line">${l}</li>`)
       .join("")}<li class="text-xs font-semibold text-muted">Try BOOST now: it is free practice until GO.</li></ul>`;
