@@ -1,6 +1,7 @@
-// `npm run soak`: A4. Starts the real server (fresh temp DB), opens N private free rooms with one
-// guest each (11 labelled agents fill the rest), and measures server CPU per room tick while all
-// matches are LIVE, plus whether every match still lasted 90 real seconds under load.
+// `npm run soak`: A4. Starts the real server (fresh temp DB), opens N public free rooms with one
+// guest each (11 labelled agents fill the rest at the 3-2-1), and measures server CPU per room tick
+// while all matches are LIVE, plus whether every match still lasted 90 real seconds under load.
+// Public, not private: private rooms are friends only (no agents) and wait for the host's START.
 import { Client, type Room } from "@colyseus/sdk";
 import { execFileSync, spawn } from "node:child_process";
 import { mkdtempSync } from "node:fs";
@@ -22,7 +23,9 @@ function cpuS(pid: number): number {
 // Run from apps/server so tsx picks up the server tsconfig (Colyseus schema decorators).
 const server = spawn(process.execPath, ["--import", "tsx", "src/index.ts"], {
   cwd: join(import.meta.dirname, "../../apps/server"),
-  env: { ...process.env, PORT: String(PORT), JOIN_LIMIT_PER_MIN: "100000", DB_PATH: join(mkdtempSync(join(tmpdir(), "margin-soak-")), "soak.sqlite") },
+  // Every soak client comes from this one machine, so this server (and only this one) lifts the
+  // per-IP join and seat-reservation limits and the room cap. The defaults stay as they are.
+  env: { ...process.env, PORT: String(PORT), JOIN_LIMIT_PER_MIN: "100000", MATCHMAKE_LIMIT_PER_MIN: "100000", MAX_ROOMS: String(ROOMS + 10), DB_PATH: join(mkdtempSync(join(tmpdir(), "margin-soak-")), "soak.sqlite") },
   stdio: ["ignore", "pipe", "inherit"],
 });
 // The server logs one JSON object per line; it is ready at {"event":"up"}. Give up after 60 s.
@@ -57,13 +60,13 @@ async function until(ok: () => boolean, s: number, what: string): Promise<void> 
 }
 
 const sdk = new Client(`ws://localhost:${PORT}`);
-const code = (n: number): string => [0, 1, 2, 3].map((k) => String.fromCharCode(65 + (Math.floor(n / 26 ** k) % 26))).join("");
 const live = new Map<number, number>();
 const ended = new Map<number, number>();
 const rooms: Room[] = [];
 for (let n = 0; n < ROOMS; n++) {
+  // create (never joinOrCreate): one fresh public room per guest, so N rooms of 12, not 12 guests in one.
   const r = await sdk
-    .joinOrCreate("private", { mode: "free", roomCode: code(n), guestKey: `ed25519:soak${PORT}x${n}` })
+    .create("match", { mode: "free", guestKey: `ed25519:soak${PORT}x${n}` })
     .catch((e: unknown) => abort(`room ${n} refused the join: ${e instanceof Error ? e.message : String(e)}`));
   r.onMessage("me", () => {});
   r.onMessage("ev", (ev: { type: string; phase?: string }) => {
@@ -73,9 +76,13 @@ for (let n = 0; n < ROOMS; n++) {
   });
   rooms.push(r);
 }
-console.log(`${ROOMS} rooms joined, 12 blobs each (1 guest + 11 agents)`);
+console.log(`${ROOMS} rooms joined`);
 
 await until(() => live.size === ROOMS, 60, `all ${ROOMS} rooms to go LIVE (${live.size} did)`);
+// Checked, not assumed: every room must really be one guest plus 11 agents.
+const sizes = rooms.map((r) => (r.state as { blobs?: { size: number } }).blobs?.size ?? 0);
+if (sizes.some((n) => n !== 12)) abort(`rooms not at 12 blobs: ${sizes.join(",")}`);
+console.log(`all ${ROOMS} LIVE, 12 blobs each (1 guest + 11 agents), checked`);
 const cpu0 = cpuS(server.pid!);
 const t0 = Date.now();
 await until(() => ended.size === ROOMS, 150, `all ${ROOMS} matches to end (${ended.size} did)`);
