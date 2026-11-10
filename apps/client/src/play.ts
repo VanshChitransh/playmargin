@@ -8,6 +8,7 @@ import { Receipt, mergeLog, receiptFromLog, type ClutchSave } from "./game/recei
 import { Hud } from "./hud/hud";
 import { elapsedS } from "./hud/logic";
 import { shareCertificate, verifyUrl } from "./share/certificate";
+import { mountSocialShare } from "./social/mount";
 import { shareLink } from "./share/link";
 import type { Outcome } from "./game/receipt";
 import { isRoomCode, shareRoom } from "./net/room-code";
@@ -239,6 +240,9 @@ export const play: Screen = (root, params) => {
       if (left) return;
       if (r) mergeLog(o, r);
       overlay = showResults(root, o, (a) => (a === "again" ? again() : a === "verify" ? void toVerify() : a === "share" ? void shareResult(o, src!.matchId) : home()), wasPaid);
+      // near.social post block (S2): a no-op on testnet or signed out, and until overlays has the slot.
+      const slot = overlay.querySelector<HTMLElement>("[data-social]");
+      if (slot && src) mountSocialShare(slot, { survived: o.kind !== "popped", rank: o.rank, of: o.of, kept: o.end.toFixed(2), verifyUrl: verifyUrl(src.matchId) });
     });
   };
 
