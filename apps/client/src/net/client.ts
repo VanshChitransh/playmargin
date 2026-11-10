@@ -27,6 +27,8 @@ interface RoomState {
   food: Each<{ x: number; y: number; radius: number }>;
   spikes: Each<{ x: number; y: number; big: boolean; live: boolean; radius?: number }>;
   leaderboard: Each<string>;
+  privateRoom?: boolean;
+  host?: string;
 }
 
 export class MatchConnection {
@@ -47,6 +49,11 @@ export class MatchConnection {
     // Server rooms: "judge" = the seeded Judge Run, "private" = filtered by roomCode, else "match".
     const name = judge ? "judge" : opts.roomCode ? "private" : "match";
     this.wire(await new Client(ENDPOINT).joinOrCreate(name, opts));
+  }
+
+  /** Private room host: start the match now (the server ignores it from anyone else). */
+  startNow(): void {
+    this.room?.send("startNow");
   }
 
   /**
@@ -163,7 +170,8 @@ export class MatchConnection {
       zone: { cx: s.zoneX, cy: s.zoneY, r: s.zoneR || arena.w * 2 },
       leaderboard,
     };
-    return { me, arena, match, blobs, food, spikes, rateBps: this.rateBps };
+    const lobby = s.privateRoom ? { host: s.host === me } : undefined;
+    return { me, arena, match, blobs, food, spikes, rateBps: this.rateBps, lobby };
   }
 }
 

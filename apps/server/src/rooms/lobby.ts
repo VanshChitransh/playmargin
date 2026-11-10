@@ -19,12 +19,20 @@ export function parseRoomKey(opts: unknown): RoomKey {
 
 export type WarmupNext = "wait" | "countdown" | "close";
 
+/** A private lobby nobody starts closes after this (nobody is charged before GO). */
+export const PRIVATE_WAIT_S = 600;
+
 /**
  * When warm-up ends. Free: after WARMUP_S, agents fill the rest. Paid: humans only, needs
  * PAID_MIN_HUMANS; waits up to PAID_WAIT_S for more unless someone taps start-now or the
  * room is full; closes with nobody charged if it never reaches the minimum.
  */
-export function warmupNext(s: { mode: Mode; humans: number; phaseTick: number; startNow: boolean }): WarmupNext {
+export function warmupNext(s: { mode: Mode; private?: boolean; humans: number; phaseTick: number; startNow: boolean }): WarmupNext {
+  // Private (PUBG custom room): no timer, the host starts once a friend is in, or it starts when full.
+  if (s.private) {
+    if (s.humans >= R.ROOM_SIZE || (s.startNow && s.humans >= R.PAID_MIN_HUMANS)) return "countdown";
+    return s.phaseTick < sToTicks(PRIVATE_WAIT_S) ? "wait" : "close";
+  }
   if (s.mode === "free") return s.phaseTick >= sToTicks(R.WARMUP_S) ? "countdown" : "wait";
   const enough = s.humans >= R.PAID_MIN_HUMANS;
   if (enough && (s.humans >= R.ROOM_SIZE || (s.startNow && s.phaseTick >= sToTicks(R.WARMUP_S)))) return "countdown";

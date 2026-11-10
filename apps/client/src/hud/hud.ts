@@ -35,6 +35,8 @@ export class Hud {
   held = false;
   /** Offline practice against local bots: never word it like a real lobby. */
   offline = false;
+  /** Private room host tapped START. */
+  onStart: () => void = () => {};
 
   constructor(root: HTMLElement, private els: ControlsEls, private onCashoutWindow: (open: boolean) => void, opts: { coach?: boolean } = {}) {
     this.el = document.createElement("div");
@@ -157,10 +159,11 @@ export class Hud {
     const m = f.match;
     const e = elapsedS(m);
     const label = m.phase === "LIVE" ? phaseName(e) : m.phase === "ENDED" ? "FINAL" : m.phase === "COUNTDOWN" ? "GET READY" : "WARM-UP";
-    const t = m.phase === "LIVE" || m.phase === "WARMUP" ? m.timeLeftS : m.phase === "COUNTDOWN" ? R.MATCH_S : 0;
-    this.set("clock", `${label}${t}`, () => {
-      this.q("phase").textContent = label;
-      this.q("clock").textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+    const t = m.phase === "LIVE" || (m.phase === "WARMUP" && !f.lobby) ? m.timeLeftS : m.phase === "COUNTDOWN" ? R.MATCH_S : 0;
+    const lobby = m.phase === "WARMUP" && !!f.lobby; // private room: no timer, the host starts it
+    this.set("clock", `${label}${t}${lobby}`, () => {
+      this.q("phase").textContent = lobby ? "LOBBY" : label;
+      this.q("clock").textContent = lobby ? "" : `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
     });
     if (m.phase !== "LIVE") return;
     // One-line banners at the moments the rules change (inspiration: Rocket League "30 SECONDS").
@@ -183,7 +186,22 @@ export class Hud {
   private center(f: Frame): void {
     const m = f.match;
     const c = this.q("center");
-    if (m.phase === "WARMUP") {
+    if (m.phase === "WARMUP" && f.lobby) {
+      // Private room (PUBG custom room): no timer, no agents; the host starts once a friend is in.
+      const n = f.blobs.filter((b) => b.kind === "human").length;
+      const ready = f.lobby.host && n >= 2;
+      this.set("center", `P${n}/${f.lobby.host}`, () => {
+        const line = !f.lobby!.host ? "Waiting for the host to start" : ready ? "Everyone in? Start when ready" : "Waiting for friends · send them the link";
+        c.innerHTML = `<div><div class="outlined font-display text-7xl tabular-nums text-paper">${n}/${R.ROOM_SIZE}</div>
+          <div class="mt-1 font-medium text-ink/70">${line}</div>
+          ${ready ? `<button data-h=start class="sticker sticker-press pointer-events-auto mt-3 cursor-pointer rounded-box bg-paper px-6 py-3 font-display text-2xl text-ink">START MATCH</button>` : ""}
+          ${this.hints()}</div>`;
+        c.querySelector("[data-h=start]")?.addEventListener("click", (e) => {
+          (e.currentTarget as HTMLButtonElement).disabled = true;
+          this.onStart();
+        });
+      });
+    } else if (m.phase === "WARMUP") {
       const n = f.blobs.filter((b) => b.kind !== "drone").length;
       this.set("center", `W${n}/${m.timeLeftS}`, () => {
         c.innerHTML = `<div><div class="outlined font-display text-7xl tabular-nums text-paper">${n}/${R.ROOM_SIZE}</div>

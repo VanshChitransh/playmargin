@@ -30,6 +30,7 @@ interface Source {
   send(cmd: InputCmd): void;
   onEvent(cb: (e: GameEventMsg) => void): () => void;
   leave?(): void;
+  startNow?(): void;
   onCommander?: (rationale: string | null) => void;
   onAborted?: (reason: string) => void;
 }
@@ -86,10 +87,10 @@ async function connect(roomCode?: string, judge = false): Promise<Source> {
 
 export const play: Screen = (root, params) => {
   const arena = new ArenaRenderer();
-  let src: Source | null = null;
   // After my blob pops or cashes out, keep watching the match: killer first, then the action.
   const director = new Director();
   arena.director = (f, tS) => director.shot(f, tS);
+  let src: Source | null = null;
   let left = false;
   let mounted = false;
   let receipt: Receipt | null = null;
@@ -100,6 +101,7 @@ export const play: Screen = (root, params) => {
 
   const controls = new Controls(root, (cmd) => src?.send(cmd));
   const hud = new Hud(root, controls.els, (open) => controls.setCashoutVisible(open));
+  hud.onStart = () => src?.startNow?.();
   hud.anchor = () => (lastFrame ? arena.screenOf(lastFrame.me) : null);
   controls.onHold = (on) => {
     arena.held = on;
@@ -311,9 +313,9 @@ export const play: Screen = (root, params) => {
     };
     s.onEvent((e) => {
       receipt?.event(e);
+      director.event(e, lastFrame, performance.now() / 1000);
       juice(e, s.me);
       if ((e.type === "pop" || e.type === "eat") && e.victim === s.me && !ended) {
-      director.event(e, lastFrame, performance.now() / 1000);
         const death = receipt!.outcome(lastFrame?.blobs ?? []).death!;
         overlay = showDeath(root, death, (a) => {
           if (a === "again") return again();

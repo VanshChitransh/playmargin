@@ -123,7 +123,12 @@ export class MatchRoom extends Room {
     this.log = new MatchRecord(db, this.roomId, this.key.mode, settlementFor(this.key.mode, db, this.users));
     this.state.mode = this.key.mode;
     this.onMessage("input", (client, msg: unknown) => this.inputs.push(client.sessionId, msg, Date.now()));
-    this.onMessage("startNow", () => (this.startNow = true));
+    // Private rooms: only the host starts, and only with a friend in (lobby.ts checks the count again).
+    this.onMessage("startNow", (client) => {
+      // Ignored while alone too, so an early tap can't auto-start the moment a friend joins.
+      if (this.key.roomCode && (client.sessionId !== this.state.host || this.state.humans < R.PAID_MIN_HUMANS)) return;
+      this.startNow = true;
+    });
     // Fixed timestep: timers fire late under load, so run as many ticks as wall time owes
     // (capped, so a long stall can't freeze the loop) and a match is always 90 real seconds.
     this.setSimulationInterval((dtMs) => {
@@ -200,6 +205,9 @@ export class MatchRoom extends Room {
     const all = [...this.world.blobs.values()];
     this.state.humans = all.filter((b) => b.kind === "human").length;
     this.state.agents = all.filter((b) => b.kind === "agent").length;
+    // Host = earliest human still here (Map keeps join order), so a leaving host hands it on.
+    this.state.host = this.key.roomCode ? (all.find((b) => b.kind === "human")?.id ?? "") : "";
+    this.state.privateRoom = !!this.key.roomCode;
     this.publish();
   }
 
@@ -270,7 +278,7 @@ export class MatchRoom extends Room {
     switch (this.phase) {
       case "WARMUP": {
         const humans = this.state.humans;
-        const next = warmupNext({ mode: this.key.mode, humans, phaseTick: this.phaseTick, startNow: this.startNow });
+        const next = warmupNext({ mode: this.key.mode, private: !!this.key.roomCode, humans, phaseTick: this.phaseTick, startNow: this.startNow });
         if (next === "close") void this.disconnect();
         if (next === "countdown") this.countdown();
         break;
@@ -295,11 +303,11 @@ export class MatchRoom extends Room {
     }
   }
 
-  /** Lock the room; free rooms fill the empty seats with labelled agents, paid rooms add liquidator drones. */
+  /** Lock the room; public free rooms fill the empty seats with labelled agents (private: friends only), paid rooms add liquidator drones. */
   private countdown(): void {
     void this.lock();
     const human = [...this.world.blobs.values()].find((b) => b.kind === "human");
-    const fill = this.judge && human ? judgeLineup(human).slice(1) : this.key.mode === "free" ? agentFill(this.state.humans) : droneFill(this.state.humans);
+    const fill = this.judge && human ? judgeLineup(human).slice(1) : this.key.mode === "free" ? (this.key.roomCode ? [] : agentFill(this.state.humans)) : droneFill(this.state.humans);
     for (const p of fill) addPlayer(this.world, p);
     this.world.phase = "COUNTDOWN";
     if (this.key.mode === "paid") this.openOnChain();
@@ -427,7 +435,7 @@ export class MatchRoom extends Room {
   override onBeforePatch(): void {
     const w = this.world;
     const left =
-      this.phase === "WARMUP" ? (this.key.mode === "paid" ? PAID_WAIT_TICKS : WARMUP_TICKS) - this.phaseTick
+      this.phase === "WARMUP" ? (this.key.roomCode ? 0 : (this.key.mode === "paid" ? PAID_WAIT_TICKS : WARMUP_TICKS) - this.phaseTick)
       : this.phase === "COUNTDOWN" ? Math.max(0, COUNTDOWN_TICKS - this.phaseTick)
       : 0;
     syncState(this.state, w, this.roomTick, this.started ? null : left / R.TICK_HZ);

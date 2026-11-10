@@ -49,6 +49,9 @@ export class MatchState extends Schema {
   /** Lobby counter; agents are always counted separately, never passed off as people. */
   @type("uint8") humans = 0;
   @type("uint8") agents = 0;
+  /** Private room lobby: no timer, the host (earliest human here) taps START. */
+  @type("boolean") privateRoom = false;
+  @type("string") host = "";
   @type("float32") zoneX = 0;
   @type("float32") zoneY = 0;
   @type("float32") zoneR = 0;

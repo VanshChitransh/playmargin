@@ -27,6 +27,8 @@ export interface Frame {
   blobs: BlobView[];
   food: FoodView[];
   spikes: SpikeView[];
+  /** Private room lobby (friends only, host taps START); absent in public and offline matches. */
+  lobby?: { host: boolean };
   /** My match rate (private "me" message); absent offline, where the tier stands in. */
   rateBps?: number;
 }
