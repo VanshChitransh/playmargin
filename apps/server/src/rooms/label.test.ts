@@ -17,3 +17,15 @@ describe("displayLabel", () => {
     expect(l.endsWith("\u{1F916}…")).toBe(true);
   });
 });
+
+describe("uniqueLabel", () => {
+  it("numbers a duplicate name and keeps it within 15 code points (QA-C-03)", async () => {
+    const { uniqueLabel } = await import("./label");
+    expect(uniqueLabel("Gus", [])).toBe("Gus");
+    expect(uniqueLabel("Gus", ["Gus"])).toBe("Gus 2");
+    expect(uniqueLabel("Gus", ["Gus", "Gus 2"])).toBe("Gus 3");
+    const long = uniqueLabel("playingmargin.testnet", ["playingmargin.…"]);
+    expect(long).toBe("playingmargin 2");
+    expect([...long].length).toBeLessThanOrEqual(LABEL_MAX);
+  });
+});

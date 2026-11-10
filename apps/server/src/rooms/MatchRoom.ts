@@ -28,7 +28,7 @@ import {
 } from "@margin/core";
 import { Commander, agentView, createBrain, nearAiCall } from "../agents";
 import { sharedDb, userForAccount } from "../db";
-import { displayLabel } from "./label";
+import { uniqueLabel } from "./label";
 import { socialName } from "../social/profile";
 import { settlementFor, sharedChain } from "../settlement";
 import { admitFree, chargeEntry } from "./freeMatch";
@@ -197,7 +197,9 @@ export class MatchRoom extends Room {
     // Paid seats show their near.social name or the real account (both verified); free players pick a
     // name (cleaned: shown to all and to the agents' LLM).
     const name = typeof auth === "object" ? (auth.name ?? auth.accountId) : cleanName((opts as { name?: unknown } | null)?.name);
-    const p: PlayerSeed = { id, kind: "human", label: displayLabel(name ?? `Player ${++this.joined}`), accountId };
+    // Unique among the humans here: two friends both called "Gus" show as "Gus" and "Gus 2".
+    const taken = [...this.world.blobs.values()].filter((b) => b.kind === "human").map((b) => b.label);
+    const p: PlayerSeed = { id, kind: "human", label: uniqueLabel(name ?? `Player ${++this.joined}`, taken), accountId };
     if (this.started) {
       // Late join (free, first 15 s): pay now, then core charges the pot and shields 10 s.
       if (typeof auth !== "string" || !chargeEntry(sharedDb(), auth, this.roomId)) {
