@@ -5,6 +5,7 @@
 import type { Db } from "../db";
 import type { Chain } from "../settlement/chain";
 import { merkle } from "@margin/core";
+import { log } from "../obs";
 
 export const HOUR_MS = 3_600_000;
 export const ANCHOR_ROOM = "free";
@@ -42,8 +43,14 @@ export async function anchorPending(db: Db, chain: Chain | null, nowMs = Date.no
   const unsent = db.prepare("SELECT hour, root FROM anchors WHERE tx_hash IS NULL ORDER BY hour").all() as Array<{ hour: number; root: string }>;
   for (const a of unsent) {
     const onchain = await chain.view<{ seq: number; head: string }>("anchor_of", { room_id: ANCHOR_ROOM });
+    if (onchain && onchain.seq === a.hour && onchain.head !== a.root) {
+      // The chain holds a DIFFERENT root for this hour (QA-D-01): never mark it done, so the alarm
+      // repeats every pass until a human looks. Proofs for this hour would not verify against NEAR.
+      log.error("anchor_conflict", { hour: a.hour, onchainHead: onchain.head, ourRoot: a.root });
+      continue;
+    }
     if (onchain && onchain.seq >= a.hour) {
-      // Already on chain (a lost reply) or overtaken by a later hour: record and move on.
+      // Already on chain with our root (a lost reply) or overtaken by a later hour: record and move on.
       db.prepare("UPDATE anchors SET tx_hash = ? WHERE hour = ?").run(onchain.seq === a.hour ? "onchain" : "skipped", a.hour);
       continue;
     }
