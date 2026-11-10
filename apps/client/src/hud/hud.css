@@ -131,16 +131,20 @@ span.hud-pill { height: auto; padding: 4px 9px; color: var(--color-gold-dark); }
   [data-h="myrank"] { height: 32px; }
 }
 
-/* My loan, money colour, tilted on top of REPAY like a price tag. */
-.hud-money { position: absolute; left: 50%; top: -18px; transform: translateX(-50%); z-index: 1; }
-.hud-owe {
-  display: inline-block; transform: rotate(-4deg); padding: 5px 9px; background: var(--color-gold);
+/* My loan, money colour, tilted on top of REPAY like a price tag: what I owe, and under it what the
+   loan costs per second. One tag, centred on REPAY, so nothing hangs off the dock. */
+.hud-money {
+  position: absolute; left: 50%; top: -30px; z-index: 1; flex-direction: column; align-items: center; gap: 2px;
+  transform: translateX(-50%) rotate(-4deg); padding: 4px 9px 5px; background: var(--color-gold);
   border: 3px solid var(--color-ink); border-radius: 10px; box-shadow: 0 3px 0 var(--color-ink);
-  font: 700 14px/1 Rubik, sans-serif; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--color-ink);
+  color: var(--color-ink); white-space: nowrap; font-variant-numeric: tabular-nums;
 }
-.hud-drain { position: absolute; right: 100%; top: 2px; margin-right: 6px;
-  padding: 3px 7px; background: var(--color-card); border: 2.5px solid var(--color-ink); border-radius: 8px;
-  font: 700 12px/1 "JetBrains Mono", monospace; color: #B3262B; white-space: nowrap;
+.hud-owe { font: 700 15px/1 Rubik, sans-serif; }
+.hud-drain { font: 700 12px/1 "JetBrains Mono", monospace; }
+@media (max-width: 639px) {
+  .hud-money { top: -40px; padding: 3px 7px 4px; border-width: 2.5px; } /* above the small REPAY label */
+  .hud-owe { font-size: 13px; }
+  .hud-drain { font-size: 11px; }
 }
 
 /* Margin call and the first-red hint: danger red, but always with words and an ink outline. */
@@ -170,4 +174,8 @@ span.hud-pill { height: auto; padding: 4px 9px; color: var(--color-gold-dark); }
 .hud-lobby-top { bottom: calc(50% + var(--clear)); }
 .hud-lobby-hints { top: calc(50% + var(--clear)); }
 @media (max-width: 639px) { .hud-lobby-top, .hud-lobby-hints { --clear: 72px; } }
+.hud-cmd > span { display: block; }
+@media (max-width: 639px) {
+  .hud-cmd > span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+}
 }

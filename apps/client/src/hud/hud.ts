@@ -33,6 +33,8 @@ export class Hud {
   private wasDry = false;
 
   private coach: Coach;
+  /** #/watch: a spectator sees who is in the arena and when it starts, never player tips. */
+  private spectator: boolean;
   private touch = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
   held = false;
   /** Offline practice against local bots: never word it like a real lobby. */
@@ -40,7 +42,8 @@ export class Hud {
   /** Private room host tapped START. */
   onStart: () => void = () => {};
 
-  constructor(root: HTMLElement, private els: ControlsEls, private onCashoutWindow: (open: boolean) => void, opts: { coach?: boolean } = {}) {
+  constructor(root: HTMLElement, private els: ControlsEls, private onCashoutWindow: (open: boolean) => void, opts: { coach?: boolean; spectator?: boolean } = {}) {
+    this.spectator = opts.spectator === true;
     this.el = document.createElement("div");
     // invisible until the first frame: no empty clock, leaderboard or pills while connecting
     this.el.className = "hud pointer-events-none invisible fixed inset-0 select-none font-sans text-ink";
@@ -64,12 +67,12 @@ export class Hud {
       <div data-h=zoneframe class="zone-frame hidden"></div>
       <div data-h=zonecall class="absolute inset-x-0 bottom-40 hidden text-center"><span class="hud-call">OUT OF THE ZONE: get back in</span></div>
       <span data-h=off class="hud-pill absolute left-3 top-[62px] mt-[max(0px,env(safe-area-inset-top))] hidden text-[11px]">offline practice</span>
-      <p data-h=cmd style="display:none" class="hud-cmd absolute left-0 top-[58px] m-3 hidden max-w-[min(22rem,60vw)] max-sm:line-clamp-3 max-sm:max-w-[calc(100vw-180px)] max-sm:text-[11px]"></p>
+      <p data-h=cmd style="display:none" class="hud-cmd absolute left-0 top-[58px] m-3 hidden max-w-[min(22rem,60vw)] max-sm:max-w-[calc(100vw-208px)] max-sm:text-[11px]"></p>
       <button data-h=mute class="hud-pill pointer-events-auto absolute left-0 top-0 m-2.5 mt-[max(10px,env(safe-area-inset-top))] cursor-pointer"></button>
       <div data-h=tap class="pointer-events-none absolute left-1/2 top-[calc(50%+64px)] hidden -translate-x-1/2"><span class="hud-hint">${this.touch ? "HOLD REPAY" : "HOLD R"}</span></div>
       <div data-h=call class="absolute inset-x-0 bottom-28 hidden text-center"><span class="hud-call">MARGIN CALL: hold REPAY to get out</span></div>
       <div data-h=pay class="pointer-events-none absolute hidden -translate-x-1/2 -translate-y-full"><span data-h=payt class="block whitespace-nowrap font-display text-5xl tabular-nums text-gold" style="-webkit-text-stroke:6px var(--color-ink);paint-order:stroke fill"></span></div>
-      <div data-h=money class="hud-money pointer-events-none hidden items-center gap-1.5">
+      <div data-h=money class="hud-money pointer-events-none hidden">
         <span data-h=owe class="hud-owe"></span>
         <span data-h=drain class="hud-drain hidden"></span>
       </div>`;
@@ -215,6 +218,14 @@ export class Hud {
           this.onStart();
         });
       });
+    } else if (m.phase === "WARMUP" && this.spectator) {
+      // Agents join at the 3-2-1, so an empty warm-up is "next match", not "0/12 players".
+      const n = f.blobs.filter((b) => b.kind !== "drone").length;
+      this.set("center", `S${n}/${m.timeLeftS}`, () => {
+        const who = n ? `${n} ${n === 1 ? "player" : "players"} in the arena · ` : "";
+        c.innerHTML = `<div class="hud-lobby-top"><div class="outlined font-display text-6xl text-paper">WATCHING</div>
+          <div class="mt-1 font-semibold text-ink">${who}${n ? "starts" : "Next match starts"} in <span class="num">${m.timeLeftS}</span> s</div></div>`;
+      });
     } else if (m.phase === "WARMUP") {
       const n = f.blobs.filter((b) => b.kind !== "drone").length;
       this.set("center", `W${n}/${m.timeLeftS}`, () => {
@@ -286,6 +297,7 @@ export class Hud {
     });
     lb.querySelectorAll<HTMLElement>("li").forEach((li) => keep.has(li.dataset.id!) || li.remove());
     lb.style.height = `${Math.max(1, top.length) * ROW_PX + 8}px`; // sized to its rows, no empty box
+    lb.closest<HTMLElement>(".hud-lb")!.classList.toggle("hidden", top.length === 0); // nobody in yet: no empty card
     this.set("lbtop", String(rows), () => (this.q("lbtop").textContent = `top ${rows}`));
     const myRank = ranked.findIndex((b) => b.id === f.me);
     const mine = this.q("myrank");
@@ -463,9 +475,11 @@ export class Hud {
   /** The agents' commander plan, shown so spectators see what the AI is up to. Null hides it. */
   commander(text: string | null): void {
     const c = this.q("cmd");
-    c.textContent = text ? `Commander: ${text}` : "";
+    // The clamp sits on an inner span: clamped on the padded box, half a 4th line peeked out below.
+    const t = c.querySelector("span") ?? c.appendChild(document.createElement("span"));
+    t.textContent = text ? `Commander: ${text}` : "";
     c.classList.toggle("hidden", !text);
-    c.style.display = text ? "" : "none"; // line-clamp sets display on phones and would beat hidden
+    c.style.display = text ? "" : "none"; // belt and braces: no display rule can beat this
   }
 
   /** Re-run a CSS animation on el with new text. */

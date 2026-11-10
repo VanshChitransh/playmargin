@@ -44,7 +44,7 @@ export const watch: Screen = (root) => {
   const director = new Director();
   arena.director = (f, tS) => director.shot(f, tS);
   const dummy = (): HTMLButtonElement => document.createElement("button");
-  const hud = clean ? null : new Hud(root, { boost: dummy(), repay: dummy(), cashout: dummy() }, () => {}, { coach: false });
+  const hud = clean ? null : new Hud(root, { boost: dummy(), repay: dummy(), cashout: dummy() }, () => {}, { coach: false, spectator: true });
   const label = document.createElement("div");
   label.className = "sticker pointer-events-none fixed bottom-3 left-3 rounded-field bg-card px-3 py-1 text-sm font-bold text-ink";
   label.style.boxShadow = "3px 3px 0 var(--color-ink)";
