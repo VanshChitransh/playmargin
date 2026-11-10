@@ -60,6 +60,9 @@
 .speed-lines span { position: absolute; width: 26vmax; height: 2px; background: linear-gradient(90deg, transparent, var(--color-ink)); animation: streak 0.3s linear infinite; }
 @keyframes streak { from { margin-left: -4vmax; } to { margin-left: 4vmax; } }
 
+/* Inside the components layer so Tailwind utilities (hidden, text sizes) on the same element win:
+   unlayered, display:inline-flex here beat "hidden" and the offline pill showed in live rooms. */
+@layer components {
 /* Arcade Paper HUD (REVAMP-PLAN v1): white sticker panels, 4 px ink outline, hard drop shadow.
    Colour carries meaning only: green safe, yellow warning, red danger, gold money, cyan agents. */
 .hud-pill {
@@ -157,4 +160,5 @@ span.hud-pill { height: auto; padding: 4px 9px; color: var(--color-gold-dark); }
   padding: 5px 9px; background: var(--color-card); border: 2.5px solid var(--color-ink); border-radius: 10px;
   box-shadow: 0 3px 0 var(--color-ink); font: 600 12px/1.3 Rubik, sans-serif; color: var(--color-ink);
   border-left: 8px solid var(--color-agent);
+}
 }
