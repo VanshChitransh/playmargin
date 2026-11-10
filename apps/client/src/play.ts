@@ -1,7 +1,7 @@
 // #/play: joins a live free match, or, if no server answers in 2.5 s (or ?local is set),
 // runs offline practice on the real rules with local bots. Either way the same renderer,
 // HUD, receipt and end screens run on top. Open /?fps#/play to see the frame rate.
-import { R, type GameEventMsg, type InputCmd, type JoinOpts, type LogEntry } from "@margin/core";
+import { R, nameProblem, type GameEventMsg, type InputCmd, type JoinOpts, type LogEntry } from "@margin/core";
 import type { Frame } from "./game/frame";
 import { LocalMatch } from "./game/local";
 import { Receipt, mergeLog, receiptFromLog, type ClutchSave } from "./game/receipt";
@@ -441,6 +441,7 @@ function askName(root: HTMLElement): Promise<void> {
     <h2 class="font-display text-4xl">Your name</h2>
     <p class="mt-1 text-sm font-medium text-muted">Your friends see it in the arena and on the leaderboard.</p>
     <input name=n maxlength=15 autocomplete=nickname placeholder="Player" class="pop-sm mt-4 w-full rounded-xl bg-card px-3 py-2 text-center font-display text-2xl" />
+    <p data-why role="status" class="mt-2 hidden text-sm font-bold text-[#B42328]"></p>
     <button class="pop pop-press mt-5 w-full rounded-2xl bg-safe px-5 py-3 font-display text-2xl">Join room</button></div>`;
   root.appendChild(el);
   const input = el.querySelector<HTMLInputElement>("input")!;
@@ -448,6 +449,15 @@ function askName(root: HTMLElement): Promise<void> {
   return new Promise((done) =>
     el.addEventListener("submit", (e) => {
       e.preventDefault();
+      // A typed name the rules change or refuse: show why once, with the cleaned name in the box.
+      const problem = input.value.trim() ? nameProblem(input.value) : null;
+      const why = el.querySelector<HTMLElement>("[data-why]")!;
+      if (problem && why.textContent !== problem) {
+        input.value = setPlayerName(input.value) ?? "";
+        why.textContent = problem;
+        why.classList.remove("hidden");
+        return;
+      }
       setPlayerName(input.value);
       el.remove();
       done();

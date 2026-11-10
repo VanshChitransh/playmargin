@@ -9,6 +9,7 @@ import type { Screen } from "../router";
 import { newRoomCode } from "../net/room-code";
 import { ENDPOINT } from "../net/client";
 import { showStake } from "../stake";
+import { nameProblem } from "@margin/core";
 import { playerName, setPlayerName, signedInAccount } from "../player/name";
 
 export const landing: Screen = (root) => {
@@ -43,6 +44,7 @@ export const landing: Screen = (root) => {
         <div class="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm font-semibold text-muted">
           <label class="flex items-center gap-2"><span class="shrink-0">Your name</span>
             <input data-name maxlength=15 autocomplete=nickname class="pop-sm w-40 rounded-lg bg-card px-2 py-1 font-display text-lg text-ink placeholder:text-ink/40" /></label>
+          <p data-name-why role="status" class="hidden basis-full text-sm font-bold text-[#B42328]"></p>
           <span class="flex items-center gap-2"><span class="size-2.5 rounded-full border-2 border-ink bg-safe"></span>No wallet. No sign-up.</span>
           <span class="pointer-coarse:hidden">Mouse steers, hold <kbd class="pop-sm rounded-md bg-card px-1.5 text-xs font-bold">Space</kbd> = BOOST</span>
         </div>
@@ -92,7 +94,15 @@ export const landing: Screen = (root) => {
   const name = root.querySelector<HTMLInputElement>("[data-name]")!;
   name.value = playerName() ?? "";
   name.placeholder = signedInAccount() ?? "Player";
-  name.addEventListener("change", () => void (name.value = setPlayerName(name.value) ?? ""));
+  // Never blank a name silently: say why the rules changed or refused it (QA-B-09).
+  const why = root.querySelector<HTMLElement>("[data-name-why]")!;
+  name.addEventListener("change", () => {
+    // Clearing the box is fine (you play as Player N), so only a typed name gets a reason.
+    const problem = name.value.trim() ? nameProblem(name.value) : null;
+    name.value = setPlayerName(name.value) ?? "";
+    why.textContent = problem ?? "";
+    why.classList.toggle("hidden", !problem);
+  });
   root.querySelector("[data-challenge]")!.addEventListener("click", () => (location.hash = `#/r/${newRoomCode()}`));
   const box = root.querySelector<HTMLElement>("[data-hero]")!;
   const arena = new ArenaRenderer();
