@@ -111,6 +111,7 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
           ${btn("share", `${o.death && !o.death.eaten ? "Get your Certificate" : "Share"}${icon("M7 17 17 7M8 7h9v9")}`, CARD, BIG)}
         </div>
         <div class="mt-6 flex gap-3">${chip("verify", "Verify this match")}${chip("home", "Home")}</div>
+        <div data-social class="mt-6 max-w-[360px] rounded-box bg-card p-3 text-ink empty:hidden"></div>
       </section>
       <section class="flex-1 px-4 py-8 sm:px-10 lg:py-12 lg:pl-6">
         ${stats}
