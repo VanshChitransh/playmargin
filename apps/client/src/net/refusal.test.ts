@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { refusalWords } from "./refusal";
+import { joinFailWords, refusalWords } from "./refusal";
 
 describe("join refusals in game words", () => {
   it("stays quiet when the server just did not answer", () => {
@@ -17,5 +17,10 @@ describe("join refusals in game words", () => {
   });
   it("passes any other server reason through", () => {
     expect(refusalWords("account already in this room")).toBe("The server said: account already in this room");
+  });
+  it("a join that only timed out still gets words, so the client never falls back silently (QA-B-14)", () => {
+    expect(joinFailWords("join timeout")).toMatch(/can't reach the arena/);
+    expect(joinFailWords("Failed to fetch")).toMatch(/practice offline/);
+    expect(joinFailWords("not enough credits")).toMatch(/credits/);
   });
 });

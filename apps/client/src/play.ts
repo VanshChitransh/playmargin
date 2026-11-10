@@ -15,7 +15,7 @@ import { isRoomCode, shareRoom } from "./net/room-code";
 import { Controls } from "./input/controls";
 import { playerName, setPlayerName } from "./player/name";
 import { ENDPOINT, MatchConnection, guestKey } from "./net/client";
-import { refusalWords } from "./net/refusal";
+import { joinFailWords } from "./net/refusal";
 import { ArenaRenderer } from "./render/arena";
 import { Director } from "./render/director";
 import { rerender, type Screen } from "./router";
@@ -37,7 +37,11 @@ interface Source {
   onAborted?: (reason: string) => void;
 }
 
-const JOIN_TIMEOUT_MS = 2500;
+/** How long a join may take before we say the arena is unreachable. Generous on purpose: a slow
+ *  phone link must still reach the real match, never be dropped into offline bots (QA-B-14). */
+const JOIN_TIMEOUT_MS = 10_000;
+/** A held seat answers fast or is gone; a late answer is closed so no second seat stays alive. */
+const RESUME_TIMEOUT_MS = 4000;
 /** No server state for this long (a dead room, a hung socket, a drop that never reconnects): stop
  *  pretending and show the can't-join card. The server sends state every tick, so 5 s is a real stall. */
 const STALL_MS = 5000;
@@ -58,7 +62,7 @@ async function connect(roomCode?: string, judge = false): Promise<Source> {
   // Reloaded or came back mid-match: take the held seat back before anything else.
   if (!paid) {
     const back = new MatchConnection();
-    const late = new Promise<boolean>((r) => setTimeout(() => r(false), JOIN_TIMEOUT_MS));
+    const late = new Promise<boolean>((r) => setTimeout(() => r(false), RESUME_TIMEOUT_MS));
     if (await Promise.race([back.resume(judge ? "judge" : (roomCode ?? "play")), late])) return back;
     back.leave(); // a resume that answers after the timeout must not keep a second seat alive
   }
@@ -78,10 +82,9 @@ async function connect(roomCode?: string, judge = false): Promise<Source> {
       return conn;
     } catch (e) {
       conn.leave();
-      // The server said no (not just silence): show why, never dress practice up as a real lobby.
-      const why = refusalWords((e as Error).message ?? "");
-      if (why) throw new Refused(why);
-      console.warn("server unreachable, offline practice", e);
+      // Never fall back silently: a refusal says why, silence says the arena is unreachable, and
+      // offline practice is only ever the player's own choice on that card.
+      throw new Refused(joinFailWords((e as Error).message ?? ""));
     }
   }
   return new LocalMatch({ seed: (Date.now() >>> 0) % 1e9, withMe: true, bots: 11, warmupS: 8 });
@@ -127,8 +130,12 @@ export const play: Screen = (root, params) => {
   const status = document.createElement("div");
   // Phones: the clock pill carries an "offline" tag instead, so this line never crowds the bottom.
   status.className = "tag pointer-events-none fixed bottom-3 left-3 max-w-[55vw] text-muted max-sm:hidden";
-  status.textContent = "Connecting";
   root.appendChild(status);
+  // Joining can take a few seconds on a slow link: say so in the middle of the screen.
+  const connecting = document.createElement("div");
+  connecting.className = "pointer-events-none fixed inset-x-0 top-[38%] z-10 grid place-items-center";
+  connecting.innerHTML = `<span class="pop rounded-2xl bg-card px-5 py-3 font-display text-2xl text-ink">Connecting to the arena...</span>`;
+  root.appendChild(connecting);
 
   /** Event to effect: every money moment gets a visible number or burst where it happened. */
   arena.onPickup = () => sfx("blip", 1 + (Math.random() * 2 - 1) * JUICE.PICKUP_PITCH_JITTER);
@@ -287,7 +294,8 @@ export const play: Screen = (root, params) => {
   // The code comes from the URL: only a well-formed one is used, and it is only ever set as text.
   const code = params.code?.toUpperCase();
   if (code !== undefined && !isRoomCode(code)) {
-    refusedCard(root, "That room link is broken. Ask your friend to send it again.");
+    connecting.remove();
+    refusedCard(root, "That room link is broken. Ask your friend to send it again.", false);
     return () => {
       left = true;
       controls.destroy();
@@ -299,13 +307,17 @@ export const play: Screen = (root, params) => {
   // A friend's room link is often someone's first visit: ask for a name once (Mini Militia style).
   const named = code && !playerName() ? askName(root) : Promise.resolve();
   void named.then(() => connect(code, params.judge === "1")).catch((e: Error) => {
+    connecting.remove();
     if (e instanceof Refused) refusedCard(root, e.message);
     else status.textContent = `Could not join the paid match: ${e.message}. Your ticket stays on your account for the next one.`;
     return new Promise<never>(() => {});
   }).then((s) => {
+    connecting.remove();
     if (left) return s.leave?.();
     src = s;
     hud.offline = s instanceof LocalMatch;
+    // Offline practice must be impossible to miss: a yellow sticker instead of the grey footer.
+    if (s instanceof LocalMatch) status.className = "pop-sm pointer-events-none fixed bottom-3 left-3 z-10 max-w-[70vw] rounded-xl bg-warn px-3 py-1.5 text-sm font-bold text-ink";
     status.textContent =
       s instanceof LocalMatch
         ? "Offline practice: real rules, local bots, nothing counts"
@@ -358,6 +370,7 @@ export const play: Screen = (root, params) => {
     hud.destroy();
     overlay?.remove();
     status.remove();
+    connecting.remove();
     if (mounted) arena.destroy();
   };
 };
@@ -432,7 +445,8 @@ function askName(root: HTMLElement): Promise<void> {
   );
 }
 
-function refusedCard(root: HTMLElement, why: string): void {
+/** retry false: a broken link can never work, so no Retry, and offline practice leaves the link. */
+function refusedCard(root: HTMLElement, why: string, retry = true): void {
   const el = document.createElement("div");
   el.className = "fixed inset-0 z-20 grid place-items-center bg-ink/55 p-4 backdrop-blur-[3px]";
   el.innerHTML = `<div class="pop max-w-sm rounded-[28px] bg-paper p-6 text-center text-ink shadow-[10px_10px_0_var(--color-ink)]">
@@ -444,10 +458,13 @@ function refusedCard(root: HTMLElement, why: string): void {
       <a href="#/" class="pop-sm pop-press basis-full rounded-2xl bg-card px-4 py-2 font-display text-lg">Home</a></div>
     <p class="mt-4 text-xs font-medium text-muted">Offline practice runs the real rules against local bots. Nothing counts.</p></div>`;
   el.querySelector("[data-why]")!.textContent = why;
-  el.querySelector("[data-retry]")!.addEventListener("click", () => rerender());
+  const again = el.querySelector<HTMLElement>("[data-retry]")!;
+  if (retry) again.addEventListener("click", () => rerender());
+  else again.remove();
   el.querySelector("[data-off]")!.addEventListener("click", () => {
     offlineOnPurpose = true;
-    rerender();
+    if (retry) rerender();
+    else location.hash = "#/play";
   });
   root.appendChild(el);
 }

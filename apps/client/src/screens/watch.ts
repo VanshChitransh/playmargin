@@ -21,7 +21,8 @@ interface Feed {
   onCommander?: (r: string | null) => void;
 }
 
-const JOIN_TIMEOUT_MS = 2500;
+/** Generous, like play.ts: a slow link should still reach the live room (QA-B-14). */
+const JOIN_TIMEOUT_MS = 10_000;
 
 async function liveFeed(): Promise<Feed | null> {
   const conn = new MatchConnection();
@@ -70,7 +71,9 @@ export const watch: Screen = (root) => {
     off();
     feed = f;
     endedAt = 0;
-    label.textContent = live ? "Live match, spectating" : "Server unreachable: local bots on the real rules";
+    label.textContent = live ? "Live match, spectating" : "Server unreachable: local bots on the real rules, not a live match";
+    label.classList.toggle("bg-warn", !live);
+    label.classList.toggle("bg-card", live);
     f.onCommander = (r) => hud?.commander(r);
     off = f.onEvent((e) => {
       director.event(e, last, performance.now() / 1000);

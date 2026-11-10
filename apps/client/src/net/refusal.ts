@@ -13,3 +13,8 @@ export function refusalWords(message: string): string {
   if (/end of json|json input|\b503\b|service unavailable/i.test(message)) return "The server is restarting for an update. Try again in a few seconds.";
   return `The server said: ${message}`;
 }
+
+/** Words for any failed join: the refusal reason, or for silence a plain "unreachable" (never empty). */
+export function joinFailWords(message: string): string {
+  return refusalWords(message) || "We can't reach the arena right now. Check your connection and retry, or practice offline (nothing counts).";
+}
