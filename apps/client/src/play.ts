@@ -351,7 +351,7 @@ function roomChip(root: HTMLElement, code: string): void {
   const label = (t: string): void => void b.replaceChildren("Room ", num, ` · ${t}`);
   label("Invite a friend");
   b.addEventListener("click", () =>
-    void shareRoom(code).then((r) => label(r === "copied" ? "Link copied" : r === "shared" ? "Sent" : "Copy failed")),
+    void shareRoom(code).then((r) => label(r === "copied" ? "Link copied" : r === "shared" ? "Sent" : r === "cancelled" ? "Invite a friend" : "Copy failed")),
   );
   root.appendChild(b);
 }

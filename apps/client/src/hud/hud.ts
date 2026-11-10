@@ -194,7 +194,7 @@ export class Hud {
         const line = !f.lobby!.host ? "Waiting for the host to start" : ready ? "Everyone in? Start when ready" : "Waiting for friends · send them the link";
         c.innerHTML = `<div><div class="outlined font-display text-7xl tabular-nums text-paper">${n}/${R.ROOM_SIZE}</div>
           <div class="mt-1 font-medium text-ink/70">${line}</div>
-          ${ready ? `<button data-h=start class="sticker sticker-press pointer-events-auto mt-3 cursor-pointer rounded-box bg-paper px-6 py-3 font-display text-2xl text-ink">START MATCH</button>` : ""}
+          ${f.lobby!.host ? `<button data-h=start ${ready ? "" : "disabled"} class="sticker pointer-events-auto mt-3 rounded-box px-6 py-3 font-display text-2xl ${ready ? "sticker-press cursor-pointer bg-paper text-ink" : "cursor-not-allowed bg-navy/60 text-paper/60"}">${ready ? "START MATCH" : "START: needs 1 friend"}</button>` : ""}
           ${this.hints()}</div>`;
         c.querySelector("[data-h=start]")?.addEventListener("click", (e) => {
           (e.currentTarget as HTMLButtonElement).disabled = true;
