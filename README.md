@@ -20,8 +20,9 @@ source. Part 2 is for AI screeners and developers: every claim is a command you 
 ### Play in 10 seconds
 
 Open the live URL and press **Practice free**. No wallet, no sign-up. On a laptop: steer with the
-mouse, **hold Space** to BOOST (borrow), **hold R** to REPAY, **E** to cash out. On a phone: joystick plus
-two buttons. A match lasts 90 seconds. Screenshots: [`docs/screenshots/`](docs/screenshots/).
+mouse, **hold Space** to BOOST (borrow), **hold R** to REPAY, **E** to cash out. MARGIN is laptop only
+for now: a phone or tablet shows a card with the link to open on a laptop (the app is planned, see
+[`docs/future_feature.md`](docs/future_feature.md)). A match lasts 90 seconds. Screenshots: [`docs/screenshots/`](docs/screenshots/).
 
 ### The problem
 
@@ -159,8 +160,7 @@ hash chain: 238 events, head 90eb15d274d6dcf4...
 ```
 
 `npm install` takes about a minute. npm 11 may warn that some install scripts were skipped, and
-`npm audit` lists 27 findings: **0 high or critical**, 20 low and 7 moderate. They sit in build tooling
-(`vite-plugin-pwa` and `workbox-build`: glob, minimatch, deepmerge), in Colyseus modules MARGIN does
+`npm audit` lists 21 findings: **0 high or critical**, 18 low and 3 moderate. They sit in Colyseus modules MARGIN does
 not use (`@colyseus/auth` and `@colyseus/playground`: grant, uuid, elliptic), and in near-js's secp256k1
 path (MARGIN keys are ed25519). Every fix npm offers is a major version change, so none is applied.
 Everything below still runs.

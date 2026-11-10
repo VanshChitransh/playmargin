@@ -23,12 +23,8 @@
     "daisyui": "^5.7.50",
     "near-api-js": "^5.1.1",
     "near-kit": "^0.20.2",
-    "nipplejs": "^1.0.4",
     "pixi.js": "^8.14.3",
     "tailwindcss": "^4.3.5",
     "uqr": "^0.1.2"
-  },
-  "devDependencies": {
-    "vite-plugin-pwa": "^2.0.0"
   }
 }

@@ -1,10 +1,10 @@
 // Player input as Commands (never positions). Desktop: mouse steers, Space = BOOST,
-// R = REPAY, E = cash out. Phone: nipplejs joystick on the left, buttons on the right.
+// R = REPAY, E = cash out, the on-screen buttons also work with a mouse. Laptop only for now:
+// phones get a "plays on a laptop" card instead (device.ts, docs/future_feature.md).
 // Sends at most 30/s. BOOST and REPAY are HELD state: true in every command while the key or
 // button is down (hold-to-nitro, hold-to-repay). Cash-out stays an edge tap. Any blur or tab switch sends a zero
 // command at once so nothing stays held (EDGE-CASES: stuck BOOST, plus the 250 ms server expiry).
 import { play as sfx } from "../audio";
-import nipplejs from "nipplejs";
 import type { InputCmd } from "@margin/core";
 import { dirFromPointer } from "./dir";
 
@@ -21,7 +21,6 @@ export interface ControlsEls {
 
 export class Controls {
   // Touch laptops get both control sets; keyboard and mouse are always attached.
-  readonly touch = matchMedia("(pointer: coarse)").matches || navigator.maxTouchPoints > 0;
   readonly els: ControlsEls;
   private dir = { x: 0, y: 0 };
   private cashTap = false;
@@ -36,13 +35,12 @@ export class Controls {
   private off: Array<() => void> = [];
 
   constructor(root: HTMLElement, private send: (cmd: InputCmd) => void) {
-    // Laptop judges see the keys on the buttons themselves; phones don't need them.
+    // The keys are printed on the buttons themselves.
     const key = (k: string): string =>
-      this.touch ? "" : `<kbd class="mt-1 rounded-md border-2 border-b-4 border-ink bg-card px-1.5 py-0.5 font-sans text-[10px] font-bold leading-none tracking-wider">${k}</kbd>`;
+      `<kbd class="mt-1 rounded-md border-2 border-b-4 border-ink bg-card px-1.5 py-0.5 font-sans text-[10px] font-bold leading-none tracking-wider">${k}</kbd>`;
     const layer = document.createElement("div");
     layer.className = "pointer-events-none fixed inset-0 select-none";
     layer.innerHTML = `
-      <div data-zone class="pointer-events-auto absolute inset-y-0 left-0 w-1/2 ${this.touch ? "" : "hidden"}"></div>
       <div class="absolute right-[max(8px,env(safe-area-inset-right))] bottom-[max(8px,env(safe-area-inset-bottom))] flex flex-col items-end gap-3">
         <button data-tap="cashout" class="pointer-events-auto btn pop pop-press hidden h-14 flex-col gap-0 rounded-2xl bg-safe px-5 font-display text-xl text-ink hover:bg-safe">CASH OUT${key("E")}</button>
         <div class="pop flex items-end gap-3 rounded-[24px] bg-paper p-2 sm:gap-3 sm:rounded-[28px] sm:p-2.5 sm:pl-4 [@media(max-height:500px)]:p-2">
@@ -64,7 +62,6 @@ export class Controls {
     }
     for (const t of ["boost", "repay"] as const)
       for (const type of ["pointerup", "pointercancel", "lostpointercapture"] as const) this.listen(this.els[t], type, () => this.hold(t, false));
-    if (this.touch) this.joystick(layer.querySelector<HTMLElement>("[data-zone]")!);
     this.desktop();
     this.listen(window, "blur", () => this.release());
     this.listen(document, "visibilitychange", () => document.hidden && this.release());
@@ -100,21 +97,6 @@ export class Controls {
       const h = HOLD_KEYS[e.code];
       if (h) this.hold(h, false);
     });
-  }
-
-  private joystick(zone: HTMLElement): void {
-    // A faint base shows where to put a thumb; it goes away on the first touch (nipplejs then
-    // draws the real stick wherever the thumb lands).
-    const hint = document.createElement("div");
-    hint.className = "pointer-events-none absolute bottom-[18%] left-[18%] grid size-28 place-items-center rounded-full border-4 border-ink/25 bg-ink/5";
-    hint.innerHTML = `<div class="size-12 rounded-full border-4 border-ink/30 bg-paper/60"></div><span class="tag absolute -bottom-7 text-ink/50">Drag to steer</span>`;
-    zone.appendChild(hint);
-    zone.addEventListener("pointerdown", () => hint.remove(), { once: true });
-    const stick = nipplejs.create({ zone, mode: "dynamic", color: "#0D1424", size: 110 });
-    // nipplejs y points up; screen and world y point down.
-    stick.on("move", (e) => (this.dir = { x: e.data.vector.x, y: -e.data.vector.y }));
-    stick.on("end", () => (this.dir = { x: 0, y: 0 }));
-    this.off.push(() => stick.destroy());
   }
 
   /** A held input on or off; the change goes out at once, then every 33 ms while held. */

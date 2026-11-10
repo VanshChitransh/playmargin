@@ -87,8 +87,14 @@ export class MatchConnection {
     this.room = room;
     this.lastStateAt = performance.now(); // the clock for "no state yet" starts at the seat
     if (at !== null) seat.set(room.reconnectionToken, at);
+    let markedLive = false;
     this.room.onStateChange((raw) => {
       const s = raw as RoomState;
+      // From GO on, a lost seat means a blob left in the arena: remember that for the resume note.
+      if (at !== null && !markedLive && s.phase === "LIVE") {
+        markedLive = true;
+        seat.set(room.reconnectionToken, at, true);
+      }
       this.lastStateAt = performance.now();
       this.buffer.push({ at: this.stamp(s.tick), frame: this.toFrame(s) });
     });

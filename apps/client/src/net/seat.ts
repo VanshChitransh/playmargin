@@ -7,11 +7,23 @@ export type SeatTarget = string;
 interface Stored {
   t: string;
   at: SeatTarget;
+  /** The match had started (after GO): losing this seat means a blob was left behind. */
+  live?: boolean;
 }
 
 /** The stored form of a seat token for a target. */
-export function encodeSeat(t: string, at: SeatTarget): string {
-  return JSON.stringify({ t, at } satisfies Stored);
+export function encodeSeat(t: string, at: SeatTarget, live = false): string {
+  return JSON.stringify({ t, at, live } satisfies Stored);
+}
+
+/** True when the stored seat for this target was in a match that had started. */
+export function seatWasLive(raw: string | null, target: SeatTarget): boolean {
+  if (!raw || seatToken(raw, target) === null) return false;
+  try {
+    return (JSON.parse(raw) as Partial<Stored>).live === true;
+  } catch {
+    return false;
+  }
 }
 
 /** The token to resume for this target, or null. Old plain string tokens count as "play". */
@@ -38,9 +50,17 @@ export const seat = {
       return null;
     }
   },
-  set(t: string, at: SeatTarget): void {
+  /** Was the held seat for this target in a started match (QA-B-10: only then warn about a lost blob). */
+  wasLive(target: SeatTarget): boolean {
     try {
-      sessionStorage.setItem(KEY, encodeSeat(t, at));
+      return seatWasLive(sessionStorage.getItem(KEY), target);
+    } catch {
+      return false;
+    }
+  },
+  set(t: string, at: SeatTarget, live = false): void {
+    try {
+      sessionStorage.setItem(KEY, encodeSeat(t, at, live));
     } catch {
       /* private mode */
     }

@@ -90,7 +90,7 @@ Installed from npm and crates.io, not vendored. Licences as declared by each pac
 | pixi.js | 8.22.0 | MIT |
 | express, express-basic-auth | 5.3.0, 1.2.1 | MIT |
 | tailwindcss, @tailwindcss/vite, daisyui | 4.3.5, 4.3.5, 5.7.50 | MIT |
-| nipplejs, uqr, buffer | 1.0.4, 0.1.2, 6.0.3 | MIT |
+| uqr, buffer | 0.1.2, 6.0.3 | MIT |
 
 MARGIN itself is MIT (see `LICENSE`). Brand art (logo, mascot, banner) in `apps/client/public/brand`
 is our own.

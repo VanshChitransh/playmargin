@@ -9,7 +9,7 @@ moves, and what each party can and cannot do. Every claim points at code you can
 ```mermaid
 flowchart LR
   subgraph Browser
-    C[Client PWA<br/>apps/client<br/>PixiJS + Colyseus SDK]
+    C[Client, web on a laptop<br/>apps/client<br/>PixiJS + Colyseus SDK]
     K[Quick-play session key<br/>enter_arena only]
   end
   subgraph Droplet["Droplet (ops/)"]
@@ -233,7 +233,10 @@ rule.
 Commands, never positions: a steer direction plus BOOST and REPAY as held state (true in every
 message while Space, R or the button is down) and cash-out as a tap, at most 30 per second. The
 server expires a held input after 250 ms. A window blur or a hidden tab sends an
-all-zero command at once, so nothing stays held.
+all-zero command at once, so nothing stays held. Mouse and keyboard only: a finger-only device
+(pointer coarse, no fine pointer, [`device.ts`](../apps/client/src/device.ts)) gets a "MARGIN plays
+on a laptop" card on game routes instead of the arena ([`laptop.ts`](../apps/client/src/screens/laptop.ts)).
+The PWA is retired; [`public/sw.js`](../apps/client/public/sw.js) removes old installs.
 
 ### Netcode (`apps/client/src/net/`)
 - [`client.ts`](../apps/client/src/net/client.ts): the Colyseus connection. A dropped socket keeps

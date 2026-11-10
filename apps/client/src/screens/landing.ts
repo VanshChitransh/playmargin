@@ -2,6 +2,8 @@
 // match on the real rules runs in a paper frame, so a judge sees BOOST, red rings and pops before reading a word
 // (inspiration.md section 3: live mini arena + one CTA, crypto invisible above the fold).
 import type { Screen } from "../router";
+import { laptopCapable } from "../device";
+import { laptopCardHtml, wireLaptopCard } from "./laptop";
 import { newRoomCode } from "../net/room-code";
 import { ENDPOINT } from "../net/endpoint";
 import { showStake } from "../stake";
@@ -28,21 +30,21 @@ export const landing: Screen = (root) => {
           <span class="mt-3 block text-3xl text-muted xl:text-[2.75rem]">(then get <em class="pop-sm ml-1 inline-block -rotate-2 rounded-xl bg-liq px-3 pb-1.5 not-italic text-card">liquidated.</em>)</span>
         </h1>
         <p class="mt-5 max-w-xl text-lg font-medium text-muted xl:text-[1.3rem] xl:leading-relaxed">A 90-second arena where <b class="font-bold text-ink">BOOST is a loan.</b> Borrow to grow, hunt the ones who went red, cash out before the vault pops you.</p>
-        <div class="mt-5 flex flex-wrap items-center gap-4">
+        <div data-ctas class="mt-5 flex flex-wrap items-center gap-4">
           <a href="#/play" class="pop pop-press flex h-16 items-center gap-3 rounded-2xl bg-safe px-7 font-display text-2xl xl:h-[4.75rem] xl:text-3xl">&#9654; Practice free</a>
           <a href="#/cash" class="pop pop-press flex h-16 items-center rounded-2xl bg-ink px-6 font-display text-2xl text-card xl:h-[4.75rem]">Play for&nbsp;<span data-stake>$1</span></a>
         </div>
-        <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div data-play-only class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
           <button data-challenge class="pop pop-press flex h-14 shrink-0 items-center gap-2.5 rounded-2xl bg-warn px-5 font-display text-xl xl:text-[1.375rem]">
             <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>Challenge a friend</button>
           <p class="text-sm font-semibold leading-snug text-muted"><b class="block text-base text-ink">Private room link</b>Send it, they join your match.</p>
         </div>
-        <div class="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm font-semibold text-muted">
+        <div data-play-only class="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm font-semibold text-muted">
           <label class="flex items-center gap-2"><span class="shrink-0">Your name</span>
             <input data-name maxlength=15 autocomplete=nickname class="pop-sm w-40 rounded-lg bg-card px-2 py-1 font-display text-lg text-ink placeholder:text-ink/40" /></label>
           <p data-name-why role="status" class="hidden basis-full text-sm font-bold text-[#B42328]"></p>
           <span class="flex items-center gap-2"><span class="size-2.5 rounded-full border-2 border-ink bg-safe"></span>No wallet. No sign-up.</span>
-          <span class="pointer-coarse:hidden">Mouse steers, hold <kbd class="pop-sm rounded-md bg-card px-1.5 text-xs font-bold">Space</kbd> = BOOST</span>
+          <span>Mouse steers, hold <kbd class="pop-sm rounded-md bg-card px-1.5 text-xs font-bold">Space</kbd> = BOOST</span>
         </div>
       </section>
       <section class="relative min-w-0 lg:pl-6">
@@ -50,15 +52,27 @@ export const landing: Screen = (root) => {
         <div class="pop overflow-hidden rounded-[1.6rem] bg-card shadow-[12px_12px_0_var(--color-ink)] lg:rotate-[1.5deg]">
           <div class="flex h-11 items-center gap-2.5 border-b-4 border-ink bg-cream px-4">
             <i class="size-3.5 rounded-full border-[2.5px] border-ink bg-card"></i><i class="size-3.5 rounded-full border-[2.5px] border-ink bg-card"></i><i class="size-3.5 rounded-full border-[2.5px] border-ink bg-card"></i>
-            <span class="ml-auto flex items-center gap-2 text-sm font-bold"><span class="size-3 rounded-full border-2 border-ink bg-liq"></span>LIVE</span>
+            <span data-live class="ml-auto flex items-center gap-2 text-sm font-bold"><span class="size-3 rounded-full border-2 border-ink bg-liq"></span>LIVE</span>
           </div>
           <div data-hero class="relative aspect-[4/3] w-full overflow-hidden bg-[#eef6ff]"></div>
         </div>
-        <span class="pop-sm absolute -right-1 -bottom-6 z-10 -rotate-3 rounded-full bg-warn px-4 py-2 text-sm font-bold xl:-right-4 xl:text-base">Live: bots playing on the real rules</span>
+        <span data-hero-caption class="pop-sm absolute -right-1 -bottom-6 z-10 -rotate-3 rounded-full bg-warn px-4 py-2 text-sm font-bold xl:-right-4 xl:text-base">Live: bots playing on the real rules</span>
       </section>
     </main>
     <div data-proof class="mx-auto mb-8 hidden w-full max-w-[88rem] grid-cols-1 gap-4 px-4 sm:grid-cols-3 xl:px-16"></div>
   </div>`;
+  // Phones and tablets: no play buttons and no live arena (the renderer is what broke on a real
+  // phone). One card says MARGIN plays on a laptop, the hero is a still of real gameplay.
+  const canPlay = laptopCapable();
+  if (!canPlay) {
+    const ctas = root.querySelector<HTMLElement>("[data-ctas]")!;
+    ctas.outerHTML = `<div data-laptop class="mt-5">${laptopCardHtml()}</div>`;
+    wireLaptopCard(root.querySelector<HTMLElement>("[data-laptop]")!);
+    root.querySelectorAll("[data-play-only]").forEach((e) => e.remove());
+    root.querySelector<HTMLElement>("[data-hero]")!.innerHTML = `<img src="/brand/hero-still.jpg" alt="A real MARGIN match: blobs, food and spikes on the paper grid" class="size-full object-cover" />`;
+    root.querySelector<HTMLElement>("[data-hero-caption]")!.textContent = "Real gameplay, on a laptop";
+    root.querySelector("[data-live]")?.remove(); // a still image is not live
+  }
   void showStake(root);
 
   // A private room is just a fresh code: the first one in creates it, the friend's link joins it.
@@ -86,6 +100,8 @@ export const landing: Screen = (root) => {
       el.classList.replace("hidden", "grid");
     })
     .catch(() => {});
+  // A phone has no name field, no friend button and no live arena to wire.
+  if (!canPlay) return;
   // Mini Militia style: the name is set here once and used in practice, public and private rooms.
   const name = root.querySelector<HTMLInputElement>("[data-name]")!;
   name.value = playerName() ?? "";

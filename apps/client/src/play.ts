@@ -68,7 +68,7 @@ async function connect(roomCode?: string, judge = false): Promise<Source> {
   if (!paid) {
     const target = judge ? "judge" : (roomCode ?? "play");
     // A seat was held: if it cannot be taken back, the player must hear why they start over (QA-B-10).
-    seatLost = seat.get(target) !== null;
+    seatLost = seat.wasLive(target); // a seat held only in warm-up left no blob behind
     const back = new MatchConnection();
     const late = new Promise<boolean>((r) => setTimeout(() => r(false), RESUME_TIMEOUT_MS));
     if (await Promise.race([back.resume(target), late])) {
@@ -151,6 +151,21 @@ export const play: Screen = (root, params) => {
   // Phones: the clock pill carries an "offline" tag instead, so this line never crowds the bottom.
   status.className = "tag pointer-events-none fixed bottom-3 left-3 max-w-[55vw] text-muted max-sm:hidden";
   root.appendChild(status);
+  // A small laptop window still plays (like agar, nothing is blocked); below about 800x520 a note
+  // suggests a bigger window, and it can be dismissed.
+  const small = document.createElement("button");
+  small.className = "pop-sm pop-press fixed top-[60px] left-3 z-10 hidden rounded-xl bg-card px-2.5 py-1 text-xs font-bold text-ink";
+  small.textContent = "Bigger window, full arena  ✕";
+  small.title = "Make the window bigger for the full arena (click to hide)";
+  let smallOff = false;
+  const fit = (): void => void small.classList.toggle("hidden", smallOff || (innerWidth >= 800 && innerHeight >= 520));
+  small.addEventListener("click", () => {
+    smallOff = true;
+    fit();
+  });
+  addEventListener("resize", fit);
+  fit();
+  root.appendChild(small);
   // Joining can take a few seconds on a slow link: say so in the middle of the screen.
   const connecting = document.createElement("div");
   connecting.className = "pointer-events-none fixed inset-x-0 top-[38%] z-10 grid place-items-center";
@@ -347,14 +362,11 @@ export const play: Screen = (root, params) => {
         : params.judge === "1"
           ? "Judge Run: a 90 s scenario on a published seed, normal money rules. Here the agents only hunt red blobs, so the lesson is your own loan: hold BOOST, go red, and Drone-1 liquidates you. Will you?"
           : "";
-    // The Judge Run changes how agents behave, so it is disclosed on phones too (short form there).
+    // The Judge Run changes how agents behave, so it is disclosed in a card, not the grey footer.
     if (params.judge === "1" && !(s instanceof LocalMatch)) {
-      status.classList.remove("max-sm:hidden");
-      status.innerHTML = `<span class="max-sm:hidden"></span><span class="sm:hidden">Judge Run: agents only hunt red blobs here, so the lesson is your loan. <span class="whitespace-nowrap">Drone-1</span> liquidates anyone who goes red.</span>`;
       // Constant text, so innerHTML is safe; "Drone-1" never splits at its hyphen.
-      status.firstElementChild!.innerHTML = `Judge Run: a 90 s scenario on a published seed, normal money rules. Here the agents only hunt red blobs, so the lesson is your own loan: hold BOOST, go red, and <span class="whitespace-nowrap">Drone-1</span> liquidates you. Will you?`;
-      // A card, not the grey footer: a disclosure has to be read. Phones: left of the dock, never under it.
-      status.className = "pop-sm pointer-events-none fixed bottom-3 left-3 z-10 max-w-[min(44rem,60vw)] rounded-xl bg-card px-3 py-2 text-sm font-semibold leading-snug text-ink max-sm:max-w-[calc(100vw-216px)] max-sm:text-xs";
+      status.innerHTML = `Judge Run: a 90 s scenario on a published seed, normal money rules. Here the agents only hunt red blobs, so the lesson is your own loan: hold BOOST, go red, and <span class="whitespace-nowrap">Drone-1</span> liquidates you. Will you?`;
+      status.className = "pop-sm pointer-events-none fixed bottom-3 left-3 z-10 max-w-[min(44rem,calc(100vw-340px))] rounded-xl bg-card px-3 py-2 text-sm font-semibold leading-snug text-ink";
     }
     if (code && !(s instanceof LocalMatch)) roomChip(root, code);
     receipt = new Receipt(s.me);
@@ -403,6 +415,8 @@ export const play: Screen = (root, params) => {
     overlay?.remove();
     status.remove();
     connecting.remove();
+    small.remove();
+    removeEventListener("resize", fit);
     if (mounted) arena.destroy();
   };
 };
