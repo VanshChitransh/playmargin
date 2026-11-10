@@ -46,7 +46,7 @@ export class Hud {
     this.el.className = "hud pointer-events-none invisible fixed inset-0 select-none font-sans text-ink";
     this.el.innerHTML = `
       <div class="absolute top-0 inset-x-0 flex flex-col items-center pt-[max(10px,env(safe-area-inset-top))]">
-        <div class="hud-timer self-start max-sm:ml-[60px] sm:self-center">
+        <div class="hud-timer self-start max-sm:ml-[56px] sm:self-center">
           <span data-h=phase class="hud-phase"></span>
           <span data-h=clock class="hud-clock"></span>
         </div>
@@ -200,10 +200,10 @@ export class Hud {
       const ready = f.lobby.host && n >= 2;
       this.set("center", `P${n}/${f.lobby.host}`, () => {
         const line = !f.lobby!.host ? "Waiting for the host to start" : ready ? "Everyone in? Start when ready" : "Waiting for friends · send them the link";
-        c.innerHTML = `<div><div class="outlined font-display text-7xl tabular-nums text-paper">${n}/${R.ROOM_SIZE}</div>
+        c.innerHTML = `<div class="hud-lobby-top"><div class="outlined font-display text-7xl tabular-nums text-paper">${n}/${R.ROOM_SIZE}</div>
           <div class="mt-1 font-semibold text-ink">${line}</div>
           ${f.lobby!.host ? `<button data-h=start ${ready ? "" : "disabled"} class="pop pointer-events-auto mt-3 rounded-box px-6 py-3 font-display text-2xl ${ready ? "pop-press cursor-pointer bg-safe text-ink" : "cursor-not-allowed bg-cream text-muted"}">${ready ? "START MATCH" : "START: needs 1 friend"}</button>` : ""}
-          ${this.hints()}</div>`;
+          </div><div class="hud-lobby-hints">${this.hints()}</div>`;
         c.querySelector("[data-h=start]")?.addEventListener("click", (e) => {
           (e.currentTarget as HTMLButtonElement).disabled = true;
           this.onStart();
@@ -212,9 +212,9 @@ export class Hud {
     } else if (m.phase === "WARMUP") {
       const n = f.blobs.filter((b) => b.kind !== "drone").length;
       this.set("center", `W${n}/${m.timeLeftS}`, () => {
-        c.innerHTML = `<div><div class="outlined font-display text-7xl tabular-nums text-paper">${n}/${R.ROOM_SIZE}</div>
+        c.innerHTML = `<div class="hud-lobby-top"><div class="outlined font-display text-7xl tabular-nums text-paper">${n}/${R.ROOM_SIZE}</div>
           <div class="mt-1 font-semibold text-ink">${this.offline ? "Offline practice" : "Finding players"} · starts in <span class="num">${m.timeLeftS}</span></div>
-          ${this.hints()}</div>`;
+          </div><div class="hud-lobby-hints">${this.hints()}</div>`;
       });
     } else if (m.phase === "COUNTDOWN") {
       this.set("center", `C${m.timeLeftS}`, () => {
@@ -323,7 +323,7 @@ export class Hud {
     const lines = this.touch
       ? ["Hold BOOST to grow (you borrow)", "Red? You can't eat. Hold REPAY", "Cash out from 0:45"]
       : ["Hold SPACE to boost (you borrow)", "Red? You can't eat. Hold R to repay", "Cash out from 0:45"];
-    return `<ul class="mx-auto mt-3 flex max-w-sm flex-col items-center gap-1.5 text-sm">${lines
+    return `<ul class="mx-auto flex max-w-sm flex-col items-center gap-1.5 text-sm">${lines
       .map((l) => `<li class="hud-hint-line">${l}</li>`)
       .join("")}<li class="text-xs font-semibold text-muted">Try BOOST now: it is free practice until GO.</li></ul>`;
   }
