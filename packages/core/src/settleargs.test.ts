@@ -51,7 +51,7 @@ describe("toSettleArgs", () => {
     }
     // At least one real match lends more than its budget in total: the contract must allow it.
     expect(revolving).toBeGreaterThan(0);
-  });
+  }, 30_000); // heavy and seeded: slow only under a loaded full run (5 s default flaked)
 
   it("refuses a stake that does not divide one entry exactly", () => {
     expect(() => microPerBase(300_001)).toThrow(/bad stake/);

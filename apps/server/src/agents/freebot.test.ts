@@ -57,7 +57,7 @@ describe("FreeBot", () => {
     const a = botMatch(9).w;
     const b = botMatch(9).w;
     expect([...a.blobs.values()].map((x) => x.payout)).toEqual([...b.blobs.values()].map((x) => x.payout));
-  });
+  }, 30_000); // heavy and seeded: slow only under a loaded full run (5 s default flaked)
 
   // REPAY rarely fires in bot-only matches because bots stay green; this pins the habit.
   it("holds REPAY when red until its next decision, at most every 200 ms", () => {

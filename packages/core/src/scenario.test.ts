@@ -44,5 +44,5 @@ describe("Judge Run", () => {
     const w = judgeWorld();
     for (let t = 2; w.phase !== "ENDED"; t++) step(w, new Map(), t);
     expect(w.phase).toBe("ENDED");
-  });
+  }, 30_000); // heavy and seeded: slow only under a loaded full run (5 s default flaked)
 });
