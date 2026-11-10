@@ -40,8 +40,8 @@ export const how: Screen = (root) => {
           <a href="#/cash" class="${BTN.ink} px-7 py-4 text-2xl">Play for <span data-stake>$1</span></a>
         </div>
         <nav class="flex flex-wrap gap-3">
-          <a href="https://github.com/VanshChitransh/playmargin" target="_blank" rel="noopener" class="${BTN.small}">Code</a>
-          <a href="https://x.com/playmargin" target="_blank" rel="noopener" class="${BTN.small}">X</a>
+          <a href="https://github.com/VanshChitransh/playmargin" target="_blank" rel="noopener" aria-label="MARGIN source code on GitHub (opens in a new tab)" class="${BTN.small}">Code on GitHub</a>
+          <a href="https://x.com/playmargin" target="_blank" rel="noopener" aria-label="MARGIN on X, @playmargin (opens in a new tab)" class="${BTN.small}">@playmargin on X</a>
         </nav>
       </div>
     </section>
