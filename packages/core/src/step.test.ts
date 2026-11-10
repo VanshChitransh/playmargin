@@ -120,6 +120,19 @@ describe("step", () => {
       expect(leak(w)).toBe(0);
     });
 
+    it("the bonus is capped at half the survivor's bell equity, the rest goes to the vault (Vansh, 10 Nov)", () => {
+      const b = makeBlob({ id: "h0", mass: u(50), x: 100 });
+      const w = makeWorld([b]);
+      w.food.push({ id: 99, x: 1900, y: 1900, mass: u(40) });
+      w.pot += u(40);
+      step(w, new Map(), MATCH_TICKS);
+      const end = w.pendingLog.at(-1);
+      expect(b.payout).toBe(u(50) + u(25));
+      expect(end?.type === "MATCH_END" && end.data.toVault).toBe(u(15));
+      expect(w.vault.interest).toBe(u(15));
+      expect(leak(w)).toBe(0);
+    });
+
     it("one survivor takes all of it, the vault nothing", () => {
       const { w, bs, end } = bell(["alive", "popped"]);
       expect(end?.toVault).toBe(0);
@@ -136,6 +149,16 @@ describe("step", () => {
     step(w, new Map(), sToTicks(29));
     expect(human.state).toBe("alive");
     step(w, new Map(), sToTicks(30));
+    expect(human.state).toBe("popped");
+  });
+
+  it("a late joiner gets the agents' 30 s no-eat window from their own join", () => {
+    const agent = makeBlob({ id: "ag", kind: "agent", mass: u(200) });
+    const human = makeBlob({ id: "hu", mass: u(80), x: 510, joinedAt: sToTicks(10) });
+    const w = makeWorld([agent, human]);
+    step(w, new Map(), sToTicks(35)); // 35 s after GO, only 25 s after the join
+    expect(human.state).toBe("alive");
+    step(w, new Map(), sToTicks(40));
     expect(human.state).toBe("popped");
   });
 

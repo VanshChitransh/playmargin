@@ -39,7 +39,7 @@ describe("Drone", () => {
   it("flanks: a second drone aims beside the target, not at the rival's back", () => {
     const blob = (id: string, kind: Blob["kind"], x: number, y: number, mass: number, debt: number): Blob => ({
       id, kind, label: id, accountId: null, x, y, dirX: 0, dirY: 0, vx: 0, vy: 0, boostHeld: false, boostMinUntil: 0, burst: 0, burstReadyAt: 0, sputterUntil: 0, pendingRepay: 0, repayPerTick: 0, repayHeld: false, mass, debt, boostFees: 0, payout: 0, pendingBorrow: 0,
-      boostUntil: 0, repayMinUntil: 0, shieldUntil: 0, spikeImmuneUntil: 0, redSince: 0,
+      boostUntil: 0, repayMinUntil: 0, shieldUntil: 0, joinedAt: 0, spikeImmuneUntil: 0, redSince: 0,
       lastThreatAt: 0, cashout: null, state: "alive", lastInput: null, lastInputAt: 0,
     });
     const red = blob("r", "human", 500, 500, 142_500_000, 120_000_000);

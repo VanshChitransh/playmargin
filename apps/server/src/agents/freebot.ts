@@ -3,7 +3,7 @@
 // threats push by edge distance, food pulls, spikes push. On top, the MARGIN money habits a
 // careful human would have: BOOST to chase, REPAY when not green, cash out when ahead.
 import {
-  equity, fuel, leverageBps, outweighs, R, radius, rand, randRange, ring, seedRng, sToTicks, type AgentView, type Blob, type Brain, type InputCmd,
+  equity, fuel, humanSafeUntil, leverageBps, outweighs, R, radius, rand, randRange, ring, seedRng, sToTicks, type AgentView, type Blob, type Brain, type InputCmd,
 } from "@margin/core";
 
 /** How this bot plays; the commander (A6) may nudge these later. Values in 0..1. */
@@ -141,8 +141,8 @@ export class FreeBot implements Brain {
       }
       if (iAmRed) push(o, -theirSize / mySize - 1, edge); // any touch pops a red blob
       else if (tick < o.shieldUntil) continue; // shielded: can't be eaten or popped, ignore
-      else if (o.kind === "human" && !this.huntHumans && !outweighs(o, me)) {
-        push(o, -0.5, edge); // not hunting: keep a gap instead of bumping into them
+      else if (o.kind === "human" && (!this.huntHumans || (me.kind === "agent" && tick < humanSafeUntil(this.liveSince ?? tick, o.joinedAt))) && !outweighs(o, me)) {
+        push(o, -0.5, edge); // not hunting, or the human is still in their first 30 s (late joins too): keep a gap
         continue;
       }
       else if (ring(o) === "red") {

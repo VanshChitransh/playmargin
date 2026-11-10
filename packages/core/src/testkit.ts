@@ -9,7 +9,7 @@ export function makeBlob(over: Partial<Blob> = {}): Blob {
   return {
     id: "a", kind: "human", label: "a", accountId: null, x: 500, y: 500, dirX: 0, dirY: 0, vx: 0, vy: 0, boostHeld: false, boostMinUntil: 0, burst: 0, burstReadyAt: 0, sputterUntil: 0, pendingRepay: 0, repayPerTick: 0, repayHeld: false,
     mass: 80 * MICRO, debt: 0, boostFees: 0, payout: 0, pendingBorrow: 0,
-    boostUntil: 0, repayMinUntil: 0, shieldUntil: 0, spikeImmuneUntil: 0, redSince: null,
+    boostUntil: 0, repayMinUntil: 0, shieldUntil: 0, joinedAt: 0, spikeImmuneUntil: 0, redSince: null,
     lastThreatAt: -1e9, cashout: null, state: "alive", lastInput: null, lastInputAt: -1e9,
     ...over,
   };

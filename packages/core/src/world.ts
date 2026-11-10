@@ -30,7 +30,7 @@ function newBlob(p: PlayerSeed, x: number, y: number, mass: Micro): Blob {
   return {
     id: p.id, kind: p.kind, label: p.label, accountId: p.accountId, x, y, dirX: 0, dirY: 0, vx: 0, vy: 0, boostHeld: false, boostMinUntil: 0, burst: 0, burstReadyAt: 0, sputterUntil: 0, pendingRepay: 0, repayPerTick: 0, repayHeld: false,
     mass, debt: 0, boostFees: 0, payout: 0, pendingBorrow: 0, boostUntil: 0,
-    repayMinUntil: 0, shieldUntil: 0, spikeImmuneUntil: 0, redSince: null, lastThreatAt: -1e9,
+    repayMinUntil: 0, shieldUntil: 0, joinedAt: 0, spikeImmuneUntil: 0, redSince: null, lastThreatAt: -1e9,
     cashout: null, state: "alive", lastInput: null, lastInputAt: -1e9,
   };
 }
@@ -87,6 +87,7 @@ export function addPlayer(w: World, p: PlayerSeed, tick = w.tick): Blob {
   if (w.blobs.has(p.id)) throw new Error(`duplicate player ${p.id}`);
   const [x, y] = clearSpawn(w, startMass(w.mode));
   const b = newBlob(p, x, y, p.kind === "drone" ? 0 : startMass(w.mode));
+  b.joinedAt = tick;
   w.blobs.set(p.id, b);
   w.pendingLog.push({ type: "JOIN", tick, data: { player: p } });
   if (w.phase === "LIVE") {

@@ -5,6 +5,7 @@
 // the settler-signed head anchored on NEAR, so always pair it with verifyChain (settleVerified).
 import { BORROW_FEE_BPS, BORROW_FEE_VAULT_BPS, BOUNTY_BPS, INTEREST_FOOD_BPS, INTEREST_VAULT_BPS, LEVERAGE_CAP_BPS, LIQ_FEE_BPS, R, sToTicks } from "./constants";
 import type { LogEntry } from "./events";
+import { bellShare, humanSafeUntil } from "./economy";
 import { verifyChain } from "./log";
 import type { BlobKind, Micro, SettleResult } from "./types";
 import { assertMicro, mulBps, mulDivUp } from "./units";
@@ -18,6 +19,10 @@ interface Acct {
   closedAt: number | null;
   /** Left by cash-out (not popped or eaten): with closedAt == the end tick, a bell survivor. */
   cashed: boolean;
+  /** First CASHOUT amount: equity when it left (a bell survivor's bell equity). */
+  equityOut: Micro;
+  /** CHARGE tick: GO, or the late join. */
+  chargedAt: number;
 }
 
 const fail = (seq: number, why: string): never => {
@@ -69,13 +74,14 @@ export function settle(log: LogEntry[]): SettleResult {
       case "JOIN": {
         const p = e.data.player;
         if (blobs.has(p.id)) fail(s, `second JOIN for ${p.id}`);
-        blobs.set(p.id, { accountId: p.accountId, kind: p.kind, charged: false, debt: 0, closedAt: null, cashed: false });
+        blobs.set(p.id, { accountId: p.accountId, kind: p.kind, charged: false, debt: 0, closedAt: null, cashed: false, equityOut: 0, chargedAt: 0 });
         break;
       }
       case "CHARGE": {
         const a = live(s, e.data.blob);
         if (a.charged || a.kind === "drone") fail(s, `bad CHARGE for ${e.data.blob}`);
         a.charged = true;
+        a.chargedAt = e.tick;
         const entry = m(s, e.data.entry, "entry");
         pot += entry;
         budget += mulBps(entry, LEVERAGE_CAP_BPS - 10_000);
@@ -120,8 +126,8 @@ export function settle(log: LogEntry[]): SettleResult {
       case "POP":
       case "KEEPER_POP": {
         const v = live(s, e.data.victim);
-        if (e.type === "EAT" && v.kind === "human" && blobs.get(e.data.by)?.kind === "agent" && e.tick - goTick < sToTicks(R.AGENT_NO_EAT_HUMAN_S)) {
-          fail(s, "an agent ate a human in the first 30 s");
+        if (e.type === "EAT" && v.kind === "human" && blobs.get(e.data.by)?.kind === "agent" && e.tick < humanSafeUntil(goTick, v.chargedAt)) {
+          fail(s, "an agent ate a human in their first 30 s");
         }
         const repaid = m(s, e.data.debtRepaid, "debtRepaid");
         const lost = m(s, e.data.badDebt, "badDebt");
@@ -146,15 +152,15 @@ export function settle(log: LogEntry[]): SettleResult {
         if (a.debt !== 0) fail(s, `CASHOUT with ${a.debt} still owed`);
         const amount = m(s, e.data.amount, "cashout");
         if (a.closedAt !== null) lateCashouts.push({ seq: s, tick: e.tick, blob: e.data.blob, amount });
-        else [a.closedAt, a.cashed] = [e.tick, true];
+        else [a.closedAt, a.cashed, a.equityOut] = [e.tick, true, amount];
         paid.set(e.data.blob, (paid.get(e.data.blob) ?? 0) + amount);
         break;
       }
       case "MATCH_END":
         end = e.data;
         reserve += m(s, e.data.dust, "dust");
-        // No-survivor leftover is LP yield: it rides in interest_to_vault, so the contract's
-        // equality holds unchanged.
+        // Leftover to the vault (no survivors, or the part above the bell bonus cap) is LP yield: it
+        // rides in interest_to_vault, so the contract's equality holds unchanged.
         interestToVault += m(s, e.data.toVault, "toVault");
         break;
       case "SPIKE":
@@ -166,19 +172,28 @@ export function settle(log: LogEntry[]): SettleResult {
   if (!end) return fail(last.seq, "log has no MATCH_END");
   // A closed blob is paid again only by the bell (leftover food), which happens on the end tick.
   for (const c of lateCashouts) if (c.tick !== end.tick) fail(c.seq, "CASHOUT after the blob left, before the bell");
-  // Leftover food at the bell: an equal share to each human alive at the bell (dust < their count),
-  // or, with none alive, all of it to the vault. A mid-match cash-out can't land on the bell tick
-  // (it must start by 80 s and takes 4 s), so "closed by cash-out on the end tick" = alive at the bell.
-  const bell = [...blobs].filter(([, a]) => a.kind !== "drone" && a.cashed && a.closedAt === end.tick).map(([id]) => id);
-  const shares = new Set<string>();
+  // Leftover food at the bell: an equal share to each player alive at the bell, capped at
+  // BELL_BONUS_CAP of their own equity at the bell (the capped part goes to the vault), dust < their
+  // count to the reserve. With none alive, all of it to the vault. A mid-match cash-out can't land on
+  // the bell tick (it must start by 80 s and takes 4 s), so "closed by cash-out on the end tick" =
+  // alive at the bell, and that first CASHOUT is their equity.
+  const bell = [...blobs].filter(([, a]) => a.kind !== "drone" && a.cashed && a.closedAt === end.tick);
+  const shares = new Map<string, Micro>();
   for (const c of lateCashouts) {
-    if (!bell.includes(c.blob) || shares.has(c.blob)) fail(c.seq, `${c.blob} is paid leftover but was not alive at the bell`);
-    if (c.amount !== lateCashouts[0]?.amount) fail(c.seq, "leftover shares are not equal");
-    shares.add(c.blob);
+    if (!bell.some(([id]) => id === c.blob) || shares.has(c.blob)) fail(c.seq, `${c.blob} is paid leftover but was not alive at the bell`);
+    shares.set(c.blob, c.amount);
   }
   const dust = end.dust;
-  if (bell.length === 0 ? dust !== 0 : end.toVault !== 0 || dust >= bell.length || (shares.size !== 0 && shares.size !== bell.length)) {
-    fail(last.seq, `leftover split does not match ${bell.length} survivors (toVault ${end.toVault}, dust ${dust})`);
+  if (bell.length === 0) {
+    if (dust !== 0) fail(last.seq, `no survivors but dust ${dust}`);
+  } else {
+    const leftover = [...shares.values()].reduce((x, y) => x + y, 0) + end.toVault + dust;
+    const each = Math.floor(leftover / bell.length);
+    if (dust !== leftover - each * bell.length) fail(last.seq, `leftover split does not match ${bell.length} survivors (dust ${dust})`);
+    for (const [id, a] of bell) {
+      const want = bellShare(each, a.equityOut);
+      if ((shares.get(id) ?? 0) !== want) fail(last.seq, `${id} leftover share ${shares.get(id) ?? 0}, rule says ${want}`);
+    }
   }
   for (const [id, a] of blobs) if (a.debt !== 0) fail(last.seq, `${id} ends owing ${a.debt}`);
 
