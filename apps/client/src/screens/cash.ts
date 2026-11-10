@@ -10,29 +10,30 @@ import { EMAIL_LOGIN, createEmailAccount, onAccount, resumeEmail, signIn, signIn
 import { setPaidSeat } from "../play";
 import type { Screen } from "../router";
 import type { JoinOpts } from "@margin/core";
+import { BTN, header } from "./chrome";
 
 const STEP: Record<PaidStep, string> = { "quick-play": "Turning on quick play", ticket: "Buying ticket", ready: "Joining" };
 const usd = (base: bigint): string => (Number(base) / 1e6).toFixed(2);
 const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-const btn = "sticker sticker-press rounded-box px-5 py-3 font-display text-xl disabled:opacity-50";
 
 type Tone = "info" | "ok" | "error";
 /** One status line for the whole screen: what just happened, in game words. */
 type Say = (text: string, tone?: Tone) => void;
 const TONE: Record<Tone, [string, string]> = {
-  info: ["bg-paper text-ink", "\u00b7"],
-  ok: ["bg-paper text-ink", "\u2713"],
-  error: ["bg-ink text-paper", "!"],
+  info: ["bg-card text-ink", "\u00b7"],
+  ok: ["bg-card text-ink", "\u2713"],
+  error: ["bg-liq text-paper", "!"],
 };
 
 export const cash: Screen = (root) => {
   let stake = "$1"; // replaced by the contract's real entry stake as soon as it is read
   root.innerHTML = `
-  <div class="min-h-full bg-liq px-4 py-8 text-ink">
-    <div class="mx-auto max-w-xl">
-      <a href="#/" class="tag">← MARGIN</a>
-      <h1 class="outlined mt-3 font-display text-6xl text-paper">Play for <span data-stake>$1</span></h1>
-      <p class="mt-2">Humans only. Winners split the pot by equity. ${NETWORK === "testnet" ? "<b>Test money for now, nothing real at stake.</b>" : ""}</p>
+  <div class="min-h-full bg-paper text-ink">
+    ${header()}
+    <div class="mx-auto max-w-xl px-4 pb-16 pt-2">
+      <span class="sticker inline-block rounded-field bg-gold px-3 py-1 text-sm font-bold" style="box-shadow:3px 3px 0 var(--color-ink)">Real stakes</span>
+      <h1 class="mt-3 font-display text-6xl">Play for <span data-stake>$1</span></h1>
+      <p class="mt-2 text-muted">Humans only. Winners split the pot by equity. ${NETWORK === "testnet" ? "<b>Test money for now, nothing real at stake.</b>" : ""}</p>
       <div data-c=body class="mt-6 space-y-4"></div>
       <div data-c=msg class="mt-4" role="status" aria-live="polite"></div>
     </div>
@@ -51,11 +52,11 @@ export const cash: Screen = (root) => {
 
   const draw = async (): Promise<void> => {
     if (!acc && needsName) {
-      body.innerHTML = `<form class="sticker rounded-box bg-paper p-5">
+      body.innerHTML = `<form class="sticker rounded-box bg-card p-5">
         <h2 class="font-display text-3xl">Pick your name</h2>
         <p class="mt-1">It is your account name and shows on the leaderboard. Lowercase letters, numbers, - and _.</p>
-        <input name=n required minlength=2 maxlength=40 pattern="[a-z0-9_\\-]+" autocomplete=off class="mt-3 w-full rounded-field border-4 border-ink bg-paper px-3 py-2 num" />
-        <button class="${btn} mt-3 bg-liq text-paper">Create my account</button></form>`;
+        <input name=n required minlength=2 maxlength=40 pattern="[a-z0-9_\\-]+" autocomplete=off class="mt-3 w-full rounded-field border-4 border-ink bg-cream px-3 py-2 num" />
+        <button class="${BTN.go} mt-3">Create my account</button></form>`;
       const f = body.querySelector("form")!;
       f.addEventListener("submit", (e) => {
         e.preventDefault();
@@ -70,33 +71,33 @@ export const cash: Screen = (root) => {
       return;
     }
     if (!acc) {
-      body.innerHTML = `<article class="sticker rounded-box bg-paper p-5">
+      body.innerHTML = `<article class="sticker rounded-box bg-card p-5">
         <h2 class="font-display text-3xl">Sign in to play for money</h2>
         <p class="mt-1">Winnings land in your own account, not ours. Practice stays free with no sign-in.</p>
-        <div class="mt-4 flex flex-wrap gap-3">${EMAIL_LOGIN ? `<button data-c=email class="${btn} bg-liq text-paper">Log in with email</button>` : ""}
-        <button data-c=signin class="${btn} ${EMAIL_LOGIN ? "bg-paper" : "bg-liq text-paper"}">${EMAIL_LOGIN ? "Other sign-in options" : "Sign in"}</button>
-        <a href="#/play" class="${btn} bg-paper">Practice free</a></div></article>`;
+        <div class="mt-4 flex flex-wrap gap-3">${EMAIL_LOGIN ? `<button data-c=email class="${BTN.go}">Log in with email</button>` : ""}
+        <button data-c=signin class="${EMAIL_LOGIN ? BTN.card : BTN.go}">${EMAIL_LOGIN ? "Other sign-in options" : "Sign in"}</button>
+        <a href="#/play" class="${BTN.card}">Practice free</a></div></article>`;
       body.querySelector("[data-c=signin]")!.addEventListener("click", () => signIn().catch((e: Error) => say(e.message, "error")));
       body.querySelector("[data-c=email]")?.addEventListener("click", () => signInEmail().catch((e: Error) => say(e.message, "error")));
       return;
     }
-    if (!body.querySelector("[data-c=play]")) body.innerHTML = `<article class="sticker animate-pulse rounded-box bg-paper p-5"><p class="tag">Loading your balance</p><div class="mt-3 h-12 w-40 rounded-field bg-ink/10"></div></article>`;
+    if (!body.querySelector("[data-c=play]")) body.innerHTML = `<article class="sticker animate-pulse rounded-box bg-card p-5"><p class="tag">Loading your balance</p><div class="mt-3 h-12 w-40 rounded-field bg-ink/10"></div></article>`;
     const [bal, inWallet] = await Promise.all([balanceOf(acc), walletUsdc(acc).catch(() => 0n)]);
-    body.innerHTML = `<article class="sticker rounded-box bg-paper p-5">
-        <div class="flex items-baseline justify-between gap-3"><span class="tag truncate">Profile: ${esc(acc)}</span>
-          <button data-c=out class="tag shrink-0 whitespace-nowrap underline">Sign out</button></div>
-        <div class="mt-2 font-display text-5xl"><span class="tabular-nums">$${usd(bal)}</span> <span class="text-2xl">balance</span></div>
+    body.innerHTML = `<article class="sticker rounded-box bg-card p-5">
+        <div class="flex items-center justify-between gap-3"><span class="tag truncate">Profile: ${esc(acc)}</span>
+          <button data-c=out class="${BTN.small} shrink-0 whitespace-nowrap">Sign out</button></div>
+        <div class="mt-2 font-display text-5xl"><span class="tabular-nums text-[#B97A0F]">$${usd(bal)}</span> <span class="text-2xl">balance</span></div>
         <div class="mt-4 flex flex-wrap gap-3">
-          <button data-c=play class="${btn} bg-liq text-paper">PLAY <span data-stake>${stake}</span></button>
-          <button data-c=add class="${btn} bg-paper">Add funds</button>
-          ${bal > 0n ? `<button data-c=wd class="tag self-center underline">Withdraw</button>` : ""}
+          <button data-c=play class="${BTN.go}">PLAY <span data-stake>${stake}</span></button>
+          <button data-c=add class="${BTN.card}">Add funds</button>
+          ${bal > 0n ? `<button data-c=wd class="${BTN.card}">Withdraw</button>` : ""}
         </div>
         <div data-c=wdbox></div></article>
-      ${NETWORK === "testnet" ? `<article class="sticker rounded-box bg-paper p-5">
+      ${NETWORK === "testnet" ? `<article class="sticker rounded-box bg-cream p-5">
         <h2 class="font-display text-2xl">Test money</h2>
         <p>Test cash outside the game: <span class="num">$${usd(inWallet)}</span>. Get $10, then move $1 into your balance.</p>
-        <div class="mt-3 flex flex-wrap gap-3"><button data-c=faucet class="${btn} bg-paper">Get test cash</button>
-        <button data-c=dep class="${btn} bg-paper" ${inWallet < 1_000_000n ? "disabled" : ""}>Move $1 in</button></div></article>` : ""}
+        <div class="mt-3 flex flex-wrap gap-3"><button data-c=faucet class="${BTN.card}">Get test cash</button>
+        <button data-c=dep class="${BTN.card}" ${inWallet < 1_000_000n ? "disabled" : ""}>Move $1 in</button></div></article>` : ""}
       <div data-c=funds></div>`;
     const on = (k: string, f: (b: HTMLButtonElement) => Promise<void>): void => {
       const b = body.querySelector<HTMLButtonElement>(`[data-c=${k}]`);
@@ -138,10 +139,10 @@ export const cash: Screen = (root) => {
     // Withdraw asks once, inline, with the exact amount: money never moves on a single stray tap.
     on("wd", async () => {
       const box = body.querySelector<HTMLElement>("[data-c=wdbox]")!;
-      box.innerHTML = `<div class="mt-4 flex flex-wrap items-center gap-3 rounded-field bg-ink/5 p-3">
+      box.innerHTML = `<div class="mt-4 flex flex-wrap items-center gap-3 rounded-field border-4 border-ink bg-cream p-3">
         <span>Withdraw <b class="tabular-nums">$${usd(bal)}</b> to your own account?</span>
-        <button data-c=wdgo class="${btn} bg-ink py-2 text-lg text-paper">Withdraw $${usd(bal)}</button>
-        <button data-c=wdno class="tag underline">Cancel</button></div>`;
+        <button data-c=wdgo class="${BTN.ink} py-2 text-lg">Withdraw $${usd(bal)}</button>
+        <button data-c=wdno class="${BTN.small}">Cancel</button></div>`;
       box.querySelector("[data-c=wdno]")!.addEventListener("click", () => void (box.innerHTML = ""));
       const go = box.querySelector<HTMLButtonElement>("[data-c=wdgo]")!;
       go.addEventListener("click", () => {
@@ -178,7 +179,7 @@ export const cash: Screen = (root) => {
 
 /** Add funds from any chain: token, amount, refund address, then a dry quote with the guaranteed minimum. */
 async function addFunds(box: HTMLElement, acc: string, say: Say): Promise<void> {
-  box.innerHTML = `<article class="sticker animate-pulse rounded-box bg-paper p-5"><p class="tag">Loading the ways to pay</p></article>`;
+  box.innerHTML = `<article class="sticker animate-pulse rounded-box bg-card p-5"><p class="tag">Loading the ways to pay</p></article>`;
   let tokens: OriginToken[];
   try {
     tokens = (await originTokens()).sort((a, b) => a.symbol.localeCompare(b.symbol) || a.blockchain.localeCompare(b.blockchain));
@@ -186,17 +187,17 @@ async function addFunds(box: HTMLElement, acc: string, say: Say): Promise<void> 
     box.innerHTML = "";
     return say(`${(e as Error).message}. Try Add funds again in a minute.`, "error");
   }
-  const field = "mt-1 w-full rounded-field border-4 border-ink bg-paper px-3 py-2";
-  box.innerHTML = `<form class="sticker space-y-3 rounded-box bg-paper p-5">
-    <div class="flex items-start justify-between"><h2 class="font-display text-3xl">Add funds</h2><button type=button data-close class="tag underline">Close</button></div>
+  const field = "mt-1 w-full rounded-field border-4 border-ink bg-cream px-3 py-2";
+  box.innerHTML = `<form class="sticker space-y-3 rounded-box bg-card p-5">
+    <div class="flex items-start justify-between"><h2 class="font-display text-3xl">Add funds</h2><button type=button data-close class="${BTN.small}">Close</button></div>
     <p>Pay from any chain. It arrives as dollars in your MARGIN balance.</p>
     <label class="block">Pay with<select name=t class="${field}">${tokens
       .map((t, i) => `<option value=${i} ${t.symbol === "USDC" && t.blockchain === "base" ? "selected" : ""}>${esc(t.symbol)} on ${esc(t.blockchain)}</option>`)
       .join("")}</select></label>
     <label class="block">Amount<input name=a inputmode=decimal value="2" class="${field} num" /></label>
     <label class="block">Refund address on that chain<input name=r required autocomplete=off spellcheck=false placeholder="0x... / your address there" class="${field} num" />
-      <span class="text-xs text-ink/60">If the swap cannot complete, your money goes back here.</span></label>
-    <button data-get class="${btn} bg-liq text-paper">Get quote</button>
+      <span class="text-xs text-muted">If the swap cannot complete, your money goes back here.</span></label>
+    <button data-get class="${BTN.go}">Get quote</button>
     <div data-q></div></form>`;
   const form = box.querySelector("form")!;
   form.querySelector("[data-close]")!.addEventListener("click", () => void (box.innerHTML = ""));
@@ -219,10 +220,10 @@ async function addFunds(box: HTMLElement, acc: string, say: Say): Promise<void> 
     get.textContent = "Get a new quote";
     if (!r.ok) {
       const badAddress = /refund/i.test(r.reason);
-      q.innerHTML = `<div class="rounded-field bg-ink/5 p-4">
+      q.innerHTML = `<div class="rounded-field border-4 border-ink bg-cream p-4">
         <p class="font-display text-xl">${badAddress ? "Check the refund address" : "No price right now"}</p>
         <p class="text-sm">${badAddress ? `That does not look like a ${esc(t.blockchain)} address. Paste the address you would send from.` : /internal|50\d|unavailable|timeout/i.test(r.reason) ? "The price service did not answer." : esc(r.reason)}</p>
-        ${badAddress ? "" : `<p class="mt-1 text-xs text-ink/60">Markets for some coins pause for a minute. Try again, or pick another coin.</p>`}</div>`;
+        ${badAddress ? "" : `<p class="mt-1 text-xs text-muted">Markets for some coins pause for a minute. Try again, or pick another coin.</p>`}</div>`;
       return;
     }
     const min = usd(BigInt(r.quote.minAmountOut));
@@ -231,7 +232,7 @@ async function addFunds(box: HTMLElement, acc: string, say: Say): Promise<void> 
       <div class="font-display text-3xl text-gold">+$<span class="tabular-nums">${esc(Number(r.quote.amountOutFormatted).toFixed(2))}</span></div>
       <div class="text-sm">At least <span class="num">$${min}</span>, about <span class="num">${Number(r.quote.timeEstimate) || "?"}</span> s</div>
       ${r.dry || !r.quote.depositAddress
-        ? `<p class="tag mt-2 text-muted">Preview price. Deposits open when mainnet goes live.</p>`
+        ? `<p class="tag mt-2 text-paper/70">Preview price. Deposits open when mainnet goes live.</p>`
         : `<p class="mt-2">Send exactly that amount to</p><p class="num break-all font-bold">${esc(r.quote.depositAddress)}</p>
            <p data-st class="tag mt-2 animate-pulse text-gold">${STATE_WORDS.waiting}</p>`}
     </div>`;

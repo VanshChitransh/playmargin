@@ -1,17 +1,21 @@
-// The 404 screen, in the same sticker style as every other page.
+// The 404 screen, in the same Arcade Paper look as every other page.
 import type { Screen } from "./router";
+import { BTN, header } from "./screens/chrome";
 
 export const notFound: Screen = (root) => {
   root.innerHTML = `
-  <main class="grid min-h-full place-items-center bg-liq p-4 text-center text-ink">
-    <div>
-      <img src="/brand/rekt.png" alt="" class="sticker mx-auto w-28 rounded-box" />
-      <h1 class="outlined mt-6 font-display text-7xl text-paper">404</h1>
-      <p class="mt-2 text-lg">This page got liquidated.</p>
-      <nav class="mt-6 flex flex-wrap justify-center gap-3">
-        <a class="sticker sticker-press rounded-box bg-paper px-5 py-3 font-display text-xl" href="#/play">Practice free</a>
-        <a class="sticker sticker-press rounded-box bg-ink px-5 py-3 font-display text-xl text-paper" href="#/">Home</a>
-      </nav>
-    </div>
-  </main>`;
+  <div class="flex min-h-full flex-col bg-paper text-ink">
+    ${header()}
+    <main class="grid flex-1 place-items-center px-4 pb-16 text-center">
+      <div>
+        <img src="/brand/rekt.png" alt="" class="sticker mx-auto w-28 -rotate-6 rounded-box" />
+        <h1 class="mt-6 font-display text-8xl">404</h1>
+        <p class="mt-2 text-lg">This page got <span class="sticker inline-block -rotate-2 rounded-field bg-liq px-2 font-display text-paper" style="box-shadow:3px 3px 0 var(--color-ink)">liquidated.</span></p>
+        <nav class="mt-8 flex flex-wrap justify-center gap-4">
+          <a class="${BTN.go}" href="#/play">▶ Practice free</a>
+          <a class="${BTN.card}" href="#/">Home</a>
+        </nav>
+      </div>
+    </main>
+  </div>`;
 };

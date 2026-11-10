@@ -46,7 +46,8 @@ export const watch: Screen = (root) => {
   const dummy = (): HTMLButtonElement => document.createElement("button");
   const hud = clean ? null : new Hud(root, { boost: dummy(), repay: dummy(), cashout: dummy() }, () => {}, { coach: false });
   const label = document.createElement("div");
-  label.className = "tag pointer-events-none fixed bottom-3 left-3 text-ink/60";
+  label.className = "sticker pointer-events-none fixed bottom-3 left-3 rounded-field bg-card px-3 py-1 text-sm font-bold text-ink";
+  label.style.boxShadow = "3px 3px 0 var(--color-ink)";
   if (!clean) root.appendChild(label);
   const stamp = document.createElement("div");
   stamp.className = "pointer-events-none fixed inset-x-0 top-[28%] z-10 grid place-items-center";
@@ -60,8 +61,8 @@ export const watch: Screen = (root) => {
   let endedAt = 0;
 
   const showStamp = (word: string, who: string): void => {
-    stamp.innerHTML = `<div class="text-center"><div class="stamp inline-block rounded-box border-[6px] border-liq bg-paper/90 px-6 py-2 font-display text-6xl text-liq">${word}</div>
-      <div class="tag mt-2 text-ink">${who.replace(/[&<>"']/g, "")}</div></div>`;
+    stamp.innerHTML = `<div class="text-center"><div class="stamp sticker inline-block rounded-box ${word === "CASHED OUT" ? "bg-safe text-ink" : "bg-liq text-paper"} px-6 py-2 font-display text-5xl sm:text-6xl">${word}</div>
+      <div class="sticker mt-3 inline-block rounded-field bg-card px-3 py-1 text-sm font-bold text-ink" style="box-shadow:3px 3px 0 var(--color-ink)">${who.replace(/[&<>"']/g, "")}</div></div>`;
     setTimeout(() => stamp.firstElementChild?.remove(), 1400);
   };
 

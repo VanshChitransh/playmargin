@@ -2,6 +2,8 @@
 // the home screen stays one idea (hero, live arena, play), and linked from its header.
 import type { Screen } from "../router";
 import { reducedMotion } from "../render/motion";
+import { showStake } from "../stake";
+import { BTN, header } from "./chrome";
 
 // Each card plays a few seconds of real play (scripts/clips.sh, offline practice on the real rules).
 const STEPS: Array<[string, string, string]> = [
@@ -15,34 +17,34 @@ const play = reducedMotion ? "controls" : "autoplay loop";
 export const how: Screen = (root) => {
   window.scrollTo(0, 0);
   root.innerHTML = `
-  <div class="min-h-full bg-ink text-paper">
-    <header class="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
-      <a href="#/" class="flex items-center gap-3">
-        <img src="/brand/margin-icon.svg" alt="" class="sticker size-11 rounded-field" />
-        <span class="outlined font-display text-3xl text-paper">MARGIN</span>
-      </a>
-      <a href="#/" class="tag">Back</a>
-    </header>
-    <section class="px-4 pb-16 pt-6">
-      <h2 class="outlined mx-auto max-w-6xl font-display text-5xl">How it works</h2>
+  <div class="min-h-full bg-paper text-ink">
+    ${header()}
+    <section class="px-4 pb-16 pt-4">
+      <div class="mx-auto max-w-6xl">
+        <span class="sticker inline-block rounded-field bg-warn px-3 py-1 text-sm font-bold" style="box-shadow:3px 3px 0 var(--color-ink)">Three rules, 90 seconds</span>
+        <h1 class="mt-3 font-display text-5xl sm:text-6xl">How it works</h1>
+      </div>
       <div class="mx-auto mt-8 grid max-w-6xl gap-6 md:grid-cols-3">
         ${STEPS.map(
-          ([t, d, clip], i) => `<article class="sticker rounded-box bg-paper p-5 text-ink" style="box-shadow:6px 6px 0 var(--color-liq)">
+          ([t, d, clip], i) => `<article class="sticker rounded-box bg-card p-5 ${["md:-rotate-1", "md:rotate-1", "md:-rotate-1"][i]}">
             <video src="/clips/${clip}.mp4" ${play} muted playsinline preload="metadata" aria-label="${t}: real gameplay"
               class="mb-4 aspect-square w-full rounded-field border-4 border-ink bg-ink object-cover"></video>
-            <span class="tag text-liq">0${i + 1}</span>
-            <h3 class="mt-1 font-display text-3xl">${t}</h3>
-            <p class="mt-2">${d}</p></article>`,
+            <span class="sticker inline-grid size-10 place-items-center rounded-full ${["bg-safe", "bg-warn", "bg-liq text-paper"][i]} font-display text-xl" style="box-shadow:3px 3px 0 var(--color-ink)">${i + 1}</span>
+            <h2 class="mt-3 font-display text-3xl">${t}</h2>
+            <p class="mt-2 text-muted">${d}</p></article>`,
         ).join("")}
       </div>
       <div class="mx-auto mt-12 flex max-w-6xl flex-wrap items-center justify-between gap-4">
-        <a href="#/play" class="sticker sticker-press rounded-box bg-liq px-7 py-4 font-display text-2xl text-paper" style="box-shadow:6px 6px 0 var(--color-paper)">Play now</a>
-        <nav class="tag flex gap-6 text-muted">
-          <a href="https://github.com/VanshChitransh/playmargin" target="_blank" rel="noopener">Code</a>
-          <a href="https://x.com/playmargin" target="_blank" rel="noopener">X</a>
-          <span>playmargin.fun</span>
+        <div class="flex flex-wrap gap-4">
+          <a href="#/play" class="${BTN.go} px-7 py-4 text-2xl">▶ Practice free</a>
+          <a href="#/cash" class="${BTN.ink} px-7 py-4 text-2xl">Play for <span data-stake>$1</span></a>
+        </div>
+        <nav class="flex flex-wrap gap-3">
+          <a href="https://github.com/VanshChitransh/playmargin" target="_blank" rel="noopener" class="${BTN.small}">Code</a>
+          <a href="https://x.com/playmargin" target="_blank" rel="noopener" class="${BTN.small}">X</a>
         </nav>
       </div>
     </section>
   </div>`;
+  void showStake(root);
 };
