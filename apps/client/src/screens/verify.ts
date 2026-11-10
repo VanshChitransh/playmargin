@@ -2,10 +2,13 @@
 // server and contract run (hash chain, money replay, chain anchor). "local" verifies the
 // offline match just played; any log file can be dropped in. A Tamper test button edits one
 // number live so a judge watches the check turn red at the exact event.
-import { MICRO, type LogEntry } from "@margin/core";
+import { MICRO, type LogEntry, type ProofStep } from "@margin/core";
 import { ENDPOINT } from "../net/client";
 import type { Screen } from "../router";
 import { runChecks, type Check, type Report } from "../verify/checks";
+import { EXPLORER } from "../chain/config";
+import { txFunctionCall, viewOnChain } from "../chain/rpc";
+import { anchorOnNear, type AnchorClaim } from "./verifyNear";
 import { BTN, header } from "./chrome";
 
 /** The offline match log, handed over in memory from the results screen. */
@@ -13,6 +16,8 @@ let localLog: LogEntry[] | null = null;
 export const setLocalLog = (log: LogEntry[]): void => void (localLog = log);
 
 interface Loaded {
+  /** Pointers from our server (mode, anchor tx, Merkle proof). Checked on NEAR, never trusted. */
+  claim?: AnchorClaim;
   log: LogEntry[];
   anchorHead?: string | null;
   tx?: string | null;
@@ -38,7 +43,11 @@ export const verify: Screen = (root, { id = "" }) => {
   const body = root.querySelector<HTMLElement>("[data-v=body]")!;
 
   const show = async (d: Loaded, note = "", real?: Loaded): Promise<void> => {
-    render(body, d, await runChecks(d.log, d.anchorHead), note, !!real);
+    // The server's own anchorHead is ignored: the anchor check reads NEAR with the head WE replayed.
+    const r = await runChecks(d.log, null);
+    if (d.claim && r.result) r.anchor = await anchorOnNear(r.result.head, d.claim, { view: viewOnChain, tx: txFunctionCall });
+    else if (d.claim) r.anchor = { state: "skip", detail: "The log does not replay, so there is no final hash to look up on NEAR." };
+    render(body, d, r, note, !!real);
     body.querySelector("[data-v=download]")?.addEventListener("click", () => download(d.log, id));
     body.querySelector("[data-v=tamper]")?.addEventListener("click", () => {
       const t = tamper(d.log);
@@ -62,9 +71,11 @@ export const verify: Screen = (root, { id = "" }) => {
     if (localLog) void show({ log: localLog }, "Offline practice match: not anchored on NEAR.");
     else body.innerHTML = `<p>No offline match in this tab yet. Play one, then press Verify on the receipt.</p>`;
   } else {
-    fetch(`${ENDPOINT}/api/matches/${encodeURIComponent(id)}/log`)
-      .then((r) => (r.ok ? (r.json() as Promise<Loaded>) : Promise.reject(new Error(`HTTP ${r.status}`))))
-      .then((d) => show(d))
+    const get = <T,>(what: string) =>
+      fetch(`${ENDPOINT}/api/matches/${encodeURIComponent(id)}/${what}`).then((r) => (r.ok ? (r.json() as Promise<T>) : Promise.reject(new Error(`HTTP ${r.status}`))));
+    type Proof = { mode: "free" | "paid"; anchor?: { hour: number; proof: ProofStep[]; tx: string | null } | null };
+    Promise.all([get<Loaded>("log"), get<Proof>("proof")])
+      .then(([d, p]) => show({ ...d, claim: { mode: p.mode, matchId: id, anchor: p.anchor ? { hour: p.anchor.hour, proof: p.anchor.proof, tx: p.anchor.tx } : null } }))
       .catch(() => (body.innerHTML = `<p>Could not load this match from the server. You can still check a log file.</p>`));
   }
 };
@@ -81,7 +92,7 @@ function render(body: HTMLElement, d: Loaded, r: Report, note: string, tampered:
   const payouts = r.result?.payouts
     .map((p) => `<tr><td>${esc(names.get(p.id) ?? p.id)}</td><td class="num text-right">${(p.amount / MICRO).toFixed(2)}</td></tr>`)
     .join("");
-  const explorer = d.tx ? `https://${d.network === "mainnet" ? "" : "testnet."}nearblocks.io/txns/${encodeURIComponent(d.tx)}` : null;
+  const explorer = d.tx ? `${EXPLORER}/txns/${encodeURIComponent(d.tx)}` : null;
   // One verdict first, so a judge knows the answer before reading the three checks.
   const bad = [r.chain, r.books, r.anchor].some((c) => c.state === "bad");
   const verdict = bad
