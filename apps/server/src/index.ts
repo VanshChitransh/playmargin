@@ -8,6 +8,7 @@ import { MATCH_TICKS } from "@margin/core";
 import { MatchRoom, drain } from "./rooms/MatchRoom";
 import { mountApi } from "./api";
 import { guardMatchmake } from "./matchmakeGuard";
+import { quietLogger } from "./refusal";
 import { sharedDb } from "./db";
 import { anchorPending } from "./anchor/job";
 import { sharedChain } from "./settlement";
@@ -15,6 +16,8 @@ import { paidStakeBase } from "./settlement/stake";
 import { SETTLER_LOW_NEAR, log, settler } from "./obs";
 
 const server = defineServer({
+  // Expected refusals become one structured line instead of a stack (refusal.ts, QA-A-07).
+  logger: quietLogger,
   rooms: {
     match: defineRoom(MatchRoom).filterBy(["mode"]),
     private: defineRoom(MatchRoom).filterBy(["mode", "roomCode"]),

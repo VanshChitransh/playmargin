@@ -30,6 +30,7 @@ import { Commander, agentView, createBrain, nearAiCall } from "../agents";
 import { sharedDb, userForAccount } from "../db";
 import { uniqueLabel } from "./label";
 import { socialName } from "../social/profile";
+import { isRefusal, refuse } from "../refusal";
 import { settlementFor, sharedChain } from "../settlement";
 import { admitFree, chargeEntry } from "./freeMatch";
 import { admitPaid, refundTickets, seatedAccounts } from "./paidMatch";
@@ -115,10 +116,10 @@ export class MatchRoom extends Room {
   }
 
   override onCreate(opts: unknown): void {
-    if (drain.on) throw new Error("server is restarting, try again in a moment");
-    if (rooms.live >= rooms.max) throw new Error("all arenas are full, try again in a minute");
+    if (drain.on) refuse("server is restarting, try again in a moment", { room: this.roomId });
+    if (rooms.live >= rooms.max) refuse("all arenas are full, try again in a minute", { room: this.roomId });
     this.key = parseRoomKey(opts);
-    if (this.roomName === "private" && !this.key.roomCode) throw new Error("private room needs a 4-letter roomCode");
+    if (this.roomName === "private" && !this.key.roomCode) refuse("private room needs a 4-letter roomCode", { room: this.roomId });
     if (this.roomName !== "private") this.key.roomCode = null;
     if (this.roomName === "judge") {
       this.judge = true;
@@ -160,6 +161,16 @@ export class MatchRoom extends Room {
     opts: unknown,
     ctx?: { ip?: string | string[] },
   ): Promise<string | { accountId: string; name?: string | null } | { spectator: true }> {
+    try {
+      return await this.admit(opts, ctx);
+    } catch (e) {
+      // Our guards throw bare Errors with a message for the player: one log line, no stack (QA-A-07).
+      if (isRefusal(e)) refuse(e.message, { ip: clientIp(ctx), room: this.roomId });
+      throw e;
+    }
+  }
+
+  private async admit(opts: unknown, ctx?: { ip?: string | string[] }): Promise<string | { accountId: string; name?: string | null } | { spectator: true }> {
     if (!joinLimit.allow(clientIp(ctx))) throw new Error("too many joins, slow down");
     // Spectators only watch public free rooms: private codes and paid tickets stay private.
     if ((opts as { spectate?: unknown } | null)?.spectate === true) {
