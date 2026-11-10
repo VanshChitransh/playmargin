@@ -101,6 +101,8 @@ export class MatchRoom extends Room {
   private key: RoomKey = { mode: "free", roomCode: null };
   private startNow = false;
   private joined = 0;
+  /** True once onCreate finished and rooms.live counts this room. */
+  private counted = false;
   private owedMs = 0;
 
   /** Paid roster is final from the 3-2-1 on: open_match names exactly these accounts. */
@@ -146,7 +148,10 @@ export class MatchRoom extends Room {
         ticks.record(performance.now() - t0);
       }
     }, TICK_MS);
-    rooms.live++; // last, so a create that throws above never counts (onDispose won't run for it)
+    // Counted last and only here: Colyseus 0.17 still runs onDispose for a create that threw above
+    // (refused by the cap, a bad room code, paid off), so onDispose must only undo a counted room.
+    rooms.live++;
+    this.counted = true;
   }
 
   /** filterBy skips options a client leaves out, so re-check mode and code here. */
@@ -253,7 +258,7 @@ export class MatchRoom extends Room {
   }
 
   override onDispose(): void {
-    rooms.live--;
+    if (this.counted) rooms.live--;
     for (const a of this.accounts) seatedAccounts.delete(a);
   }
 
