@@ -351,7 +351,9 @@ export const play: Screen = (root, params) => {
 /** Private room: the code stays on screen with one tap to send the link to a friend. */
 function roomChip(root: HTMLElement, code: string): void {
   const b = document.createElement("button");
-  b.className = "pop-sm pop-press fixed bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-2xl bg-warn px-4 py-2 font-display text-lg text-ink";
+  // Phones: the controls fill the bottom right, so the chip moves up under the clock, left of the board.
+  b.className =
+    "pop-sm pop-press fixed bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-2xl bg-warn px-4 py-2 font-display text-lg text-ink max-sm:top-[66px] max-sm:bottom-auto max-sm:left-3 max-sm:translate-x-0 max-sm:px-2.5 max-sm:py-1 max-sm:text-sm";
   const num = document.createElement("span");
   num.className = "num";
   num.textContent = code;
