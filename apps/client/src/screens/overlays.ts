@@ -1,25 +1,32 @@
 // End-of-life overlays over the arena: the LIQUIDATED screen the moment I pop (readable,
-// fair death: who, how greedy, how long red) and the money receipt at the bell. One
-// primary button each (Play again); Watch keeps spectating, so the room stays alive.
+// fair death: who, how greedy, how long red) and the money receipt at the bell, laid out as
+// the v8 Cover Story mockup (research/margin/ui/variants). One primary button each (Play
+// again); Watch keeps spectating, so the room stays alive.
 import type { Outcome } from "../game/receipt";
+import { showStake } from "../stake";
 
 const fmt = (n: number): string => (n >= 0 ? "+" : "−") + Math.abs(n).toFixed(2); // one format, so the column lines up
 const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-function shell(root: HTMLElement, inner: string, grey = false): HTMLElement {
+// Arcade Paper tokens (REVAMP-PLAN 1). The new ones carry their value as a fallback so the
+// screens read right before and after style.css defines them.
+const COBALT = "var(--color-cobalt,#2D4BF0)";
+const CREAM = "var(--color-cream,#FFEFD3)";
+const CARD = "var(--color-card,#FFFFFF)";
+const TAPE = "var(--color-tape,rgba(255,226,140,.82))";
+
+function shell(root: HTMLElement, inner: string, cls: string): HTMLElement {
   const el = document.createElement("div");
-  // Results: agar.io greys the frozen arena behind the card; the death moment stays dark.
-  el.className = `fixed inset-0 z-20 grid place-items-center overflow-y-auto p-4 ${grey ? "bg-ink/45 backdrop-grayscale" : "bg-ink/85"}`;
+  el.className = `fixed inset-0 z-20 overflow-y-auto text-ink ${cls}`;
   el.innerHTML = inner;
   root.appendChild(el);
   return el;
 }
 
-const btn = (act: string, text: string, primary: boolean): string =>
-  `<button data-act="${act}" class="sticker sticker-press rounded-box px-5 py-3 font-display text-xl ${primary ? "bg-paper text-ink" : "bg-navy text-paper"}">${text}</button>`;
-
-// On the dark death screen an ink shadow vanishes, so the hard shadow turns liq red.
-const onDark = (html: string): string => html.replace("<button", '<button style="box-shadow:6px 6px 0 var(--color-liq);border-color:var(--color-paper)"');
+// Every action is a filled sticker button (never an underlined link): fill, text, size.
+const btn = (act: string, text: string, fill: string, size = "h-14 px-4 text-xl sm:h-16 sm:px-6 sm:text-2xl"): string =>
+  `<button data-act="${act}" class="sticker sticker-press flex items-center justify-center gap-3 whitespace-nowrap rounded-box font-display text-ink ${size}" style="background:${fill}">${text}</button>`;
+const tape = (pos: string): string => `<span aria-hidden="true" class="pointer-events-none absolute h-7 w-24" style="background:${TAPE};${pos}"></span>`;
 
 /** The pop moment. Returns the element so the caller can remove it when Watch is pressed. */
 export function showDeath(root: HTMLElement, d: NonNullable<Outcome["death"]>, act: (a: "watch" | "again" | "share") => void): HTMLElement {
@@ -32,63 +39,89 @@ export function showDeath(root: HTMLElement, d: NonNullable<Outcome["death"]>, a
       : "No loan, just outsized.";
   const el = shell(
     root,
-    `<div class="text-center">
-      <div class="stamp inline-block rounded-box border-[6px] border-liq px-6 py-2 font-display text-6xl text-liq sm:text-7xl">${d.eaten ? "EATEN" : "LIQUIDATED"}</div>
-      <p class="tag mt-6 text-paper">${why}</p>
-      <p class="mt-2 text-lg text-paper">${greed}</p>
-      <p class="mt-1 text-sm text-muted">${d.eaten ? "A blob 15% bigger eats you on touch. Run, or grow first." : "Hold REPAY earlier, or run before you go red."}</p>
-      <div class="mt-6 flex justify-center gap-4">${onDark(btn("again", "Play again", true))}${onDark(btn("watch", "Watch", false))}</div>
-      ${d.eaten ? "" : `<button data-act="share" class="tag mt-5 text-paper underline">Get your Liquidation Certificate</button>`}
+    `<div class="grid min-h-full place-items-center p-4">
+      <div class="sticker relative w-full max-w-md rounded-box p-6 pt-8 text-center sm:p-8" style="background:${CARD}">
+        ${tape("left:-18px;top:-6px;transform:rotate(-32deg)")}${tape("right:-18px;top:-6px;transform:rotate(32deg)")}
+        <div class="stamp inline-block rounded-box border-[6px] border-liq bg-white px-5 py-1 font-display text-5xl text-liq sm:text-6xl">${d.eaten ? "EATEN" : "LIQUIDATED"}</div>
+        <p class="mt-6"><span class="tag inline-block rounded-field bg-ink px-3 py-2 text-paper">${why}</span></p>
+        <p class="mt-4 text-lg font-semibold">${greed}</p>
+        <p class="mt-1 text-sm text-muted">${d.eaten ? "A blob 15% bigger eats you on touch. Run, or grow first." : "Hold REPAY earlier, or run before you go red."}</p>
+        <div class="mt-6 grid grid-cols-2 gap-4">${btn("again", "Play again", "var(--color-safe)")}${btn("watch", "Watch", CARD)}</div>
+        ${d.eaten ? "" : `<div class="mt-4">${btn("share", "Get your Liquidation Certificate", "var(--color-warn)", "h-14 w-full px-4 text-lg")}</div>`}
+      </div>
     </div>`,
+    "bg-ink/70",
   );
   wire(el, act);
   return el;
 }
 
-/** The bell: a receipt whose lines add up to the final number. */
+/** The bell: a receipt whose lines add up to the final number (v8 Cover Story layout). */
 export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "home" | "verify" | "share") => void, paid = false): HTMLElement {
   const title = o.kind === "cashed" ? "CASHED OUT" : o.kind === "survived" ? "SURVIVED" : o.death?.eaten ? "EATEN" : "LIQUIDATED";
   const dead = o.kind === "popped";
   const s = o.stats;
-  const tile = (label: string, value: string): string =>
-    `<div class="rounded-field bg-ink/5 px-2 py-1.5"><div class="font-display text-2xl tabular-nums leading-none">${value}</div><div class="tag mt-1 text-[11px] text-ink/60">${label}</div></div>`;
-  const stats = `<div class="mt-4 grid grid-cols-3 gap-2 text-center">
-      ${tile("Food eaten", String(s.foodEaten))}
-      ${tile("Time alive", `${Math.floor(s.aliveS / 60)}:${String(s.aliveS % 60).padStart(2, "0")}`)}
-      ${tile("Blobs eaten", String(s.blobsEaten))}
-      ${tile("Top rank", `#${s.topRank}`)}
-      ${tile("Peak equity", s.peakEquity.toFixed(0))}
-      ${tile("Final rank", `#${o.rank}/${o.of}`)}
+  const why =
+    o.kind === "cashed"
+      ? "You cashed out before the vault came for you."
+      : o.kind === "survived"
+        ? "Still standing at the bell."
+        : o.death?.eaten
+          ? `Eaten by ${esc(o.death.by)}.`
+          : o.death?.keeper
+            ? "The vault closed your loan."
+            : `Popped by ${esc(o.death?.by ?? "the vault")}.`;
+  const cell = (label: string, value: string, span: string, cls = ""): string =>
+    `<div class="${span} px-3 py-3 sm:px-4" style="background:${CARD}"><div class="font-display text-3xl leading-none tabular-nums sm:text-4xl ${cls}">${value}</div><div class="mt-1.5 text-sm font-semibold text-muted">${label}</div></div>`;
+  // Five cells: 3 + 2 on phones (col spans of a 6 grid), one row from sm up. The ink gap is the rule.
+  const stats = `<div class="sticker grid grid-cols-6 gap-[3px] bg-ink sm:grid-cols-5">
+      ${cell("food eaten", String(s.foodEaten), "col-span-2 sm:col-span-1")}
+      ${cell("time alive", `${Math.floor(s.aliveS / 60)}:${String(s.aliveS % 60).padStart(2, "0")}`, "col-span-2 sm:col-span-1")}
+      ${cell("blobs eaten", String(s.blobsEaten), "col-span-2 sm:col-span-1")}
+      ${cell("top rank", `#${s.topRank}`, "col-span-3 sm:col-span-1")}
+      ${cell("peak equity", s.peakEquity.toFixed(0), "col-span-3 sm:col-span-1", "text-[#B97A0F]")}
     </div>`;
-  const rows = o.lines
-    .map((l) => `<div class="flex justify-between gap-6"><span>${esc(l.label)}</span><span class="num ${l.amount < 0 ? "text-liq" : ""}">${fmt(l.amount)}</span></div>`)
-    .join("");
+  const line = (label: string, v: string, neg = false): string =>
+    `<div class="flex justify-between gap-6 border-b border-dashed border-ink/25 py-2"><span>${label}</span><span class="num ${neg ? "text-liq" : ""}">${v}</span></div>`;
+  const rows = o.lines.map((l) => line(esc(l.label), fmt(l.amount), l.amount < 0)).join("");
   const el = shell(
     root,
-    `<div class="sticker w-full max-w-sm rounded-box bg-paper p-5 text-ink">
-      ${dead
-        ? `<div class="mb-2 text-center"><h2 class="stamp inline-block rounded-box border-[5px] border-liq px-4 py-1 font-display text-5xl text-liq">${title}</h2></div>`
-        : `<h2 class="font-display text-4xl">${title}</h2>`}
-      ${s.clutches ? `<p class="tag mt-3 text-center"><span class="rounded-field bg-ink px-2 py-1 text-paper">\u2713 ${s.clutches} clutch save${s.clutches > 1 ? "s" : ""}</span></p>` : ""}
-      ${stats}
-      <div class="mt-4 space-y-1 border-y-2 border-dashed border-ink/40 py-3 font-mono text-sm">
-        <div class="flex justify-between"><span>Start</span><span class="num">${o.start.toFixed(2)}</span></div>
-        ${rows}
-      </div>
-      <div class="mt-3 flex items-baseline justify-between">
-        <span class="tag">You keep</span>
-        <span class="font-display text-5xl tabular-nums ${o.end > o.start ? "" : "text-liq"}">${o.end.toFixed(2)}</span>
-      </div>
-      <p class="mt-1 text-xs text-ink/60">${paid ? "Real dollars, paid to your balance when the match settles." : "Practice credits. Never cash, never bought."}</p>
-      <div class="mt-5 grid grid-cols-2 gap-3">${[
-        btn("again", "Play again", true).replace("bg-paper text-ink", "bg-ink text-paper").replace("<button", '<button style="box-shadow:6px 6px 0 var(--color-gold)"'),
-        btn("share", o.death && !o.death.eaten ? "Certificate" : "Share", false).replace("bg-navy text-paper", "bg-paper text-ink"),
-      ].map((b) => b.replace("px-5", "px-2")).join("")}</div>
-      <div class="tag mt-4 flex justify-center gap-6"><button data-act="verify" class="underline">Verify this match</button><button data-act="home" class="underline">Home</button></div>
+    `<div class="flex min-h-full flex-col lg:flex-row" style="background:color-mix(in srgb, var(--color-paper) 88%, transparent)">
+      <section class="relative px-5 pb-8 pt-7 text-white sm:px-10 lg:w-[540px] lg:shrink-0 lg:pb-10 lg:pr-20 lg:pt-12 lg:[clip-path:polygon(0_0,100%_0,88%_100%,0_100%)]" style="background:${COBALT}">
+        <p class="tag text-warn">${paid ? `<span data-stake>$1</span> match` : "Practice match"} &middot; ${o.of} players</p>
+        <h2 class="${dead ? "mb-2 mt-6" : "mt-3"} font-display text-6xl leading-[.9] sm:text-7xl" style="text-shadow:5px 5px 0 var(--color-ink)">${
+          dead ? `<span class="stamp inline-block rounded-box border-[5px] border-liq bg-white px-4 py-1 text-liq" style="text-shadow:none">${title}</span>` : title
+        }</h2>
+        <p class="mt-4 max-w-sm text-lg text-white/90">${why}</p>
+        ${s.clutches ? `<p class="mt-3"><span class="tag inline-block rounded-field bg-ink px-3 py-2 text-paper">\u2713 ${s.clutches} clutch save${s.clutches > 1 ? "s" : ""}</span></p>` : ""}
+        <div class="mt-5 flex items-end gap-3">
+          <b class="font-display text-[112px] leading-[.8] text-warn sm:text-[132px]" style="text-shadow:6px 6px 0 var(--color-ink)">#${o.rank}</b>
+          <span class="pb-1 font-display text-3xl">/${o.of}<small class="tag block text-warn">final rank</small></span>
+        </div>
+        <div class="mt-8 grid max-w-sm gap-4">
+          ${btn("again", "Play again", "var(--color-safe)")}
+          ${btn("share", o.death && !o.death.eaten ? "Get your Certificate" : "Share", CARD)}
+          <div class="grid grid-cols-2 gap-4">${btn("verify", "Verify this match", CARD, "h-12 px-3 text-base")}${btn("home", "Home", CARD, "h-12 px-3 text-base")}</div>
+        </div>
+      </section>
+      <section class="flex-1 px-4 py-8 sm:px-10 lg:py-12 lg:pl-6">
+        ${stats}
+        <div class="sticker relative mx-auto mt-10 max-w-xl px-5 pb-5 pt-6 sm:px-7 lg:rotate-[-1deg]" style="background:${CREAM}">
+          ${tape("left:-22px;top:-8px;transform:rotate(-30deg)")}${tape("right:-22px;top:-8px;transform:rotate(30deg)")}
+          <h3 class="flex items-baseline justify-between border-b-[3px] border-ink pb-3 font-display text-2xl">RECEIPT <span class="tag text-muted">where your ${o.start.toFixed(0)} went</span></h3>
+          <div class="font-mono text-sm sm:text-base">${line("Start", o.start.toFixed(2))}${rows}</div>
+          <div class="sticker mt-4 flex items-center justify-between bg-gold px-4 py-3" style="box-shadow:none">
+            <span class="font-display text-2xl">YOU KEEP</span>
+            <span class="font-display text-5xl tabular-nums">${o.end.toFixed(2)}</span>
+          </div>
+          <p class="mt-3 text-sm font-semibold text-muted">${paid ? "Real dollars, paid to your balance when the match settles." : "Practice credits. Never cash, never bought."}</p>
+        </div>
+      </section>
     </div>`,
-    true,
+    "backdrop-blur-sm",
   );
   wire(el, act);
+  if (paid) void showStake(el);
   (el.querySelector("[data-act=again]") as HTMLElement).focus();
   return el;
 }
