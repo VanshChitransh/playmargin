@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BlobView, MatchView } from "@margin/core";
-import { displayName, boostBlocked, boostPreview, cashoutOpen, interestPerS, phaseName, fuelGradient, ranking } from "./logic";
+import { displayName, boostBlocked, outsideZone, boostPreview, cashoutOpen, interestPerS, phaseName, fuelGradient, ranking } from "./logic";
 
 const me = (o: Partial<BlobView> = {}): BlobView => ({
   id: "me", kind: "human", label: "me", x: 0, y: 0, radius: 57, ring: "green", pips: 3,
@@ -11,6 +11,14 @@ const live = (timeLeftS: number): MatchView => ({
 });
 
 describe("hud logic", () => {
+  it("flags my blob outside the zone only while alive in a live match", () => {
+    const m = { ...live(20), zone: { cx: 0, cy: 0, r: 100 } };
+    expect(outsideZone(me({ x: 50 }), m)).toBe(false);
+    expect(outsideZone(me({ x: 150 }), m)).toBe(true);
+    expect(outsideZone(me({ x: 150, state: "popped" }), m)).toBe(false);
+    expect(outsideZone(me({ x: 150 }), { ...m, phase: "ENDED" })).toBe(false);
+    expect(outsideZone(undefined, m)).toBe(false);
+  });
   it("names phases by elapsed seconds", () => {
     expect([phaseName(0), phaseName(29), phaseName(30), phaseName(60)]).toEqual(["GROW", "GROW", "HUNT", "SQUEEZE"]);
   });

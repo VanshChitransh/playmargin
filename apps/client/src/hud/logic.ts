@@ -5,6 +5,11 @@ import { MICRO, R, radius, type BlobView, type MatchView, type RateTier } from "
 /** Seconds since GO, from the whole seconds left that the server sends. */
 export const elapsedS = (m: MatchView): number => (m.phase === "LIVE" ? R.MATCH_S - m.timeLeftS : 0);
 
+/** True when my living blob is outside the zone in a live match: the zone drains it every second. */
+export function outsideZone(b: BlobView | undefined, m: MatchView): boolean {
+  return !!b && b.state === "alive" && m.phase === "LIVE" && Math.hypot(b.x - m.zone.cx, b.y - m.zone.cy) > m.zone.r;
+}
+
 /** Grow / Hunt / Squeeze by elapsed seconds (RULES: PHASES_S). */
 export function phaseName(elapsed: number): "GROW" | "HUNT" | "SQUEEZE" {
   return elapsed < R.PHASES_S[0] ? "GROW" : elapsed < R.PHASES_S[1] ? "HUNT" : "SQUEEZE";

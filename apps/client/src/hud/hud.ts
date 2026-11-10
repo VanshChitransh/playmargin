@@ -4,7 +4,7 @@
 import { R, type BlobView } from "@margin/core";
 import type { Frame } from "../game/frame";
 import type { ControlsEls } from "../input/controls";
-import { boostBlocked, cashoutOpen, displayName, elapsedS, interestPerS, phaseName, fuelGradient, fuelOf, ranking } from "./logic";
+import { boostBlocked, cashoutOpen, outsideZone, displayName, elapsedS, interestPerS, phaseName, fuelGradient, fuelOf, ranking } from "./logic";
 import "./hud.css";
 import { isMuted, play as sfx, setMuted } from "../audio";
 import { coachMarks, type Coach } from "./coach";
@@ -61,6 +61,8 @@ export class Hud {
       </div>
       <div data-h=center class="absolute inset-x-0 top-[14%] grid place-items-center text-center"></div>
       <div data-h=frame class="call-frame"></div>
+      <div data-h=zoneframe class="zone-frame hidden"></div>
+      <div data-h=zonecall class="absolute inset-x-0 bottom-40 hidden text-center"><span class="hud-call">OUT OF THE ZONE: get back in</span></div>
       <span data-h=off class="hud-pill absolute left-3 top-[62px] mt-[max(0px,env(safe-area-inset-top))] hidden text-[11px]">offline practice</span>
       <p data-h=cmd style="display:none" class="hud-cmd absolute left-0 top-[58px] m-3 hidden max-w-[min(22rem,60vw)] max-sm:line-clamp-3 max-sm:max-w-[calc(100vw-180px)] max-sm:text-[11px]"></p>
       <button data-h=mute class="hud-pill pointer-events-auto absolute left-0 top-0 m-2.5 mt-[max(10px,env(safe-area-inset-top))] cursor-pointer"></button>
@@ -139,6 +141,10 @@ export class Hud {
       this.lastBeat = now;
       sfx("beat");
     }
+    // Outside the circle the zone drains mass every second: say so on screen, not just in the number.
+    const out = outsideZone(me, m);
+    this.q("zoneframe").classList.toggle("hidden", !out);
+    this.q("zonecall").classList.toggle("hidden", !out || ring === "red"); // the margin call wins the slot
     const cash = cashoutOpen(me, m);
     this.set("cash", String(cash), () => this.onCashoutWindow(cash));
     this.els.repay.classList.toggle("blocked", me.owe <= 0 || m.phase !== "LIVE");

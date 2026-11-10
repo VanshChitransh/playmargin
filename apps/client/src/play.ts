@@ -1,12 +1,12 @@
 // #/play: joins a live free match, or, if no server answers in 2.5 s (or ?local is set),
 // runs offline practice on the real rules with local bots. Either way the same renderer,
 // HUD, receipt and end screens run on top. Open /?fps#/play to see the frame rate.
-import type { GameEventMsg, InputCmd, JoinOpts, LogEntry } from "@margin/core";
+import { R, type GameEventMsg, type InputCmd, type JoinOpts, type LogEntry } from "@margin/core";
 import type { Frame } from "./game/frame";
 import { LocalMatch } from "./game/local";
 import { Receipt, mergeLog, receiptFromLog, type ClutchSave } from "./game/receipt";
 import { Hud } from "./hud/hud";
-import { elapsedS } from "./hud/logic";
+import { elapsedS, outsideZone } from "./hud/logic";
 import { shareCertificate, verifyUrl } from "./share/certificate";
 import { mountSocialShare } from "./social/mount";
 import { shareLink } from "./share/link";
@@ -151,6 +151,19 @@ export const play: Screen = (root, params) => {
     }
   };
 
+  // Once a second outside the zone: the rule's 4% of mass as a number on my blob, plus a hurt tone.
+  let zoneAt = 0;
+  const zoneSting = (f: Frame, now: number): void => {
+    const b = f.blobs.find((x) => x.id === f.me);
+    if (!b || !outsideZone(b, f.match)) return void (zoneAt = 0);
+    if (now - zoneAt < 1000) return;
+    zoneAt = now;
+    const lost = (b.equity + b.owe) * R.ZONE_DMG_PER_S;
+    arena.fx.floatText(b.x, b.y - b.radius, `\u2212${lost >= 10 ? Math.round(lost) : lost.toFixed(1)} ZONE`, C.liq, arena.zoomLevel);
+    sfx("spike", 0.8);
+    navigator.vibrate?.(20);
+  };
+
   const juice = (e: GameEventMsg | ClutchSave, me: string): void => {
     const at = (id: string): { x: number; y: number; r: number } | undefined => {
       const b = lastFrame?.blobs.find((x) => x.id === id);
@@ -254,6 +267,7 @@ export const play: Screen = (root, params) => {
     lastFrame = f;
     hud.update(f, now);
     nitroSound(f);
+    zoneSting(f, now);
     if (repayHeld) {
       repayLevel(hud.repayProgress());
       if (controls.els.repay.classList.contains("blocked")) repayTone(false); // debt cleared: the tone ends
