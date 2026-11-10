@@ -252,7 +252,7 @@ export const play: Screen = (root, params) => {
     void Promise.all([Promise.race([fromLog, wait]), beat]).then(([r]) => {
       if (left) return;
       if (r) mergeLog(o, r);
-      overlay = showResults(root, o, (a) => (a === "again" ? again() : a === "verify" ? void toVerify() : a === "share" ? void shareResult(o, src!.matchId) : home()), wasPaid);
+      overlay = showResults(root, o, (a) => (a === "again" ? again() : a === "verify" ? void toVerify() : a === "share" ? void shareResult(o, src!.matchId, overlay) : home()), wasPaid);
       // near.social post block (S2): a no-op on testnet or signed out, and until overlays has the slot.
       const slot = overlay.querySelector<HTMLElement>("[data-social]");
       if (slot && src) mountSocialShare(slot, { survived: o.kind !== "popped", rank: o.rank, of: o.of, kept: o.end.toFixed(2), verifyUrl: verifyUrl(src.matchId) });
@@ -395,10 +395,18 @@ async function matchLog(src: unknown): Promise<LogEntry[] | null> {
   return null;
 }
 
-function shareResult(o: Outcome, matchId: string): void {
+function shareResult(o: Outcome, matchId: string, el: HTMLElement | null): void {
   if (o.death && !o.death.eaten) return void shareCertificate({ ...o.death, matchId });
   const what = o.kind === "cashed" ? `cashed out ${o.end.toFixed(2)}` : o.kind === "survived" ? `survived with ${o.end.toFixed(2)}` : "got eaten";
-  void shareLink(`I ${what} on MARGIN, rank #${o.rank} of ${o.of}. Get greedy. Get liquidated.`, verifyUrl(matchId));
+  // On a laptop Share copies the link: say so on the button, or the click looks like it did nothing.
+  void shareLink(`I ${what} on MARGIN, rank #${o.rank} of ${o.of}. Get greedy. Get liquidated.`, verifyUrl(matchId)).then((r) => {
+    // Only the button's text node changes, so its arrow icon stays.
+    const label = [...(el?.querySelector("[data-act=share]")?.childNodes ?? [])].find((n) => n.nodeType === Node.TEXT_NODE);
+    if (!label || r === "cancelled" || r === "shared") return;
+    const was = label.textContent;
+    label.textContent = r === "copied" ? "Link copied" : "Copy failed";
+    setTimeout(() => (label.textContent = was), 2000);
+  });
 }
 
 /** The server said no: say why, offer offline practice as an explicit choice, or go home. */

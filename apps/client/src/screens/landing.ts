@@ -27,7 +27,7 @@ export const landing: Screen = (root) => {
     <main class="mx-auto grid w-full max-w-[88rem] flex-1 items-center gap-12 px-4 pt-4 pb-8 lg:grid-cols-[1fr_1fr] xl:gap-16 xl:px-16">
       <section class="min-w-0">
         <p class="pop-sm inline-block rounded-full bg-warn px-4 py-2 text-sm font-bold">The lending market is the arena</p>
-        <h1 class="mt-4 font-display text-7xl leading-[0.9] sm:text-8xl xl:text-[7.6rem]"><span class="whitespace-nowrap">Get greedy.</span>
+        <h1 class="mt-4 font-display text-6xl leading-[0.9] min-[400px]:text-7xl sm:text-8xl xl:text-[7.6rem]"><span class="whitespace-nowrap">Get greedy.</span>
           <span class="mt-3 block text-3xl text-muted xl:text-[2.75rem]">(then get <em class="pop-sm ml-1 inline-block -rotate-2 rounded-xl bg-liq px-3 pb-1.5 not-italic text-card">liquidated.</em>)</span>
         </h1>
         <p class="mt-5 max-w-xl text-lg font-medium text-muted xl:text-[1.3rem] xl:leading-relaxed">A 90-second arena where <b class="font-bold text-ink">BOOST is a loan.</b> Borrow to grow, hunt the ones who went red, cash out before the vault pops you.</p>
