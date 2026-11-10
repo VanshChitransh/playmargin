@@ -28,9 +28,14 @@ export VITE_NEAR_AUTH="${VITE_NEAR_AUTH:-0}"
 echo "building client: network=$NET contract=$CONTRACT server=$VITE_SERVER_URL relayer=$VITE_RELAYER_URL"
 npm run build -w apps/client
 
-npx -y wrangler@4 pages project list 2>/dev/null | grep -q " playmargin " \
-  || npx -y wrangler@4 pages project create playmargin --production-branch main
-npx -y wrangler@4 pages deploy apps/client/dist --project-name playmargin --branch main --commit-dirty=true
+# Wrangler runs from the client app, not the workspace root (wrangler 4 refuses the root). --force on
+# create keeps the classic Pages project type (direct upload) instead of the Workers delegation.
+(
+  cd apps/client
+  npx -y wrangler@4 pages project list 2>/dev/null | grep -q "playmargin" \
+    || npx -y wrangler@4 pages project create playmargin --production-branch main --force
+  npx -y wrangler@4 pages deploy dist --project-name playmargin --branch main --commit-dirty=true
+)
 
 # Custom domains (idempotent: an already attached domain answers with an error we ignore).
 # Cloudflare creates the CNAME records in the playmargin.fun zone; they go live once the zone is active.
