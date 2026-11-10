@@ -7,6 +7,7 @@ import basicAuth from "express-basic-auth";
 import { MATCH_TICKS } from "@margin/core";
 import { MatchRoom, drain } from "./rooms/MatchRoom";
 import { mountApi } from "./api";
+import { guardMatchmake } from "./matchmakeGuard";
 import { sharedDb } from "./db";
 import { anchorPending } from "./anchor/job";
 import { sharedChain } from "./settlement";
@@ -59,6 +60,9 @@ const ch = sharedChain();
 if (ch) void paidStakeBase(ch).catch((err: unknown) => log.error("paid_stake_failed", { err }));
 void anchor();
 
-listen(server).then(() =>
-  log.info("up", { port: Number(process.env.PORT ?? 2567), network: sharedChain()?.cfg.network ?? "off", matchTicks: MATCH_TICKS }),
-);
+listen(server).then((s) => {
+  // After listen, so it wraps the router Colyseus just bound. No http server = nothing to guard.
+  if (s.transport.server) guardMatchmake(s.transport.server);
+  else log.warn("matchmake_unguarded", { note: "transport has no http server" });
+  log.info("up", { port: Number(process.env.PORT ?? 2567), network: sharedChain()?.cfg.network ?? "off", matchTicks: MATCH_TICKS });
+});

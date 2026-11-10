@@ -10,7 +10,9 @@ api.playmargin.fun {
 			header_up X-Forwarded-For {remote_host}
 		}
 	}
-	# The server rate-limits joins by X-Real-IP: set it here so a client can't send its own.
+	# The server rate-limits joins AND seat reservations (POST /matchmake, apps/server/src/matchmakeGuard.ts)
+	# by X-Real-IP: set it here so a client can't send its own. Stock Caddy has no rate_limit directive
+	# (it is the caddy-ratelimit plugin, not in the apt package), so the limit lives in the server.
 	reverse_proxy localhost:2567 {
 		header_up X-Real-IP {remote_host}
 	}
