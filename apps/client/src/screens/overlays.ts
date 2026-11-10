@@ -2,6 +2,7 @@
 // fair death: who, how greedy, how long red) and the money receipt at the bell, laid out as
 // the v8 Cover Story mockup (research/margin/ui/variants). One primary button each (Play
 // again); Watch keeps spectating, so the room stays alive.
+import { R } from "@margin/core";
 import type { Outcome } from "../game/receipt";
 import { showStake } from "../stake";
 
@@ -42,7 +43,10 @@ export function showDeath(root: HTMLElement, d: NonNullable<Outcome["death"]>, a
   const redS = Math.max(1, Math.round(d.redS));
   const greed =
     d.leverage >= 1.05
-      ? `You were <b class="num">${d.leverage.toFixed(1)}x</b>${d.redS >= 0.5 ? `, red for <b class="num">${redS}</b> second${redS === 1 ? "" : "s"}` : ""}.`
+      ? `You were <b class="num">${d.leverage.toFixed(1)}x</b>${d.redS >= 0.5 ? `, red for <b class="num">${redS}</b> second${redS === 1 ? "" : "s"}` : ""}.${
+          // BOOST stops at 2.5x, but spikes and the zone shrink what you own while the loan stays (QA-E-11).
+          d.leverage > R.LEVERAGE_CAP + 0.05 ? ` BOOST stops at ${R.LEVERAGE_CAP}x: losses on a loan pushed you past it.` : ""
+        }`
       : "No loan, just outsized.";
   const el = shell(
     root,
@@ -118,7 +122,7 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
         <div class="mt-6 flex gap-3">${chip("verify", "Verify this match")}${chip("home", "Home")}</div>
         <div data-social class="mt-6 max-w-[360px] rounded-box bg-card p-3 text-ink empty:hidden"></div>
       </section>
-      <section class="flex-1 px-4 py-8 sm:px-10 lg:py-12 lg:pl-6">
+      <section class="relative z-10 flex-1 px-4 py-8 sm:px-10 lg:py-12 lg:pl-6"><!-- above the cat: YOU KEEP is never hidden (QA-E-07) -->
         ${stats}
         <div class="sticker relative mx-auto mt-10 max-w-xl px-5 pb-5 pt-6 sm:px-7 lg:rotate-[-1deg]" style="background:${CREAM}">
           ${tape("left:-22px;top:-8px;transform:rotate(-30deg)")}${tape("right:-22px;top:-8px;transform:rotate(30deg)")}
@@ -131,7 +135,7 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
           <p class="mt-3 text-sm font-semibold text-muted">${paid ? "Real dollars, paid to your balance when the match settles." : "Practice credits. Never cash, never bought."}</p>
         </div>
       </section>
-      <img src="/brand/margin-cat-cutout.svg" alt="" aria-hidden="true" class="pointer-events-none fixed bottom-6 right-10 hidden w-36 rotate-[8deg] lg:block" />
+      <img src="/brand/margin-cat-cutout.svg" alt="" aria-hidden="true" class="pointer-events-none fixed bottom-6 right-10 z-0 hidden w-36 rotate-[8deg] lg:block" />
     </div>`,
     "backdrop-blur-sm",
   );

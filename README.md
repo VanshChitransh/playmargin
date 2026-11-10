@@ -61,7 +61,8 @@ newcomer who never borrows survives about 67% of matches and finishes at median 
 ### Who you play with
 
 - **Free rooms:** you plus labelled AI agents (named, always with the robot glyph, e.g. `Greedy Gus 🤖`) that follow the same rules. Agents may not
-  eat a human in the first 30 s, enforced by the engine and by settle
+  eat a human in that human's first 30 s (from GO, or from a late join). This grace covers being eaten
+  by an agent only: go red and an agent, a drone or the vault can liquidate you at any time. Enforced by the engine and by settle
   (`packages/core/src/step.ts`, `settle.ts`). Their skill is one tuned constant
   (`apps/server/src/agents/freebot.ts`, `AGENT_SKILL`).
 - **Paid rooms:** humans only, plus liquidator drones that cannot eat anyone. They only pop blobs
@@ -86,6 +87,8 @@ Every feature, why it is there, the code, and a testnet transaction: [`docs/NEAR
 | NEAR AI Cloud | The agent commander, structured JSON output | `apps/server/src/agents/commander.ts` |
 | Named accounts for house AI | Each liquidator drone is a registered sub-account. Its bounties settle to it on chain, at most 12% of a match's stakes, so its P&L is public | [drone-1](https://testnet.nearblocks.io/address/drone-1.playmargin.testnet) paid [0.0925 USDC](https://testnet.nearblocks.io/txns/8nDTHu1ZmeW19fSEaa9LoXtrUtdSsEALwVJWdNfpuWwf) in a real match ([registration](https://testnet.nearblocks.io/txns/4eH66oURfLpz9FXafY8Y7QWb3LpRx6kQCwq46yghdgy2)) |
 
+nearblocks links may show a Cloudflare check to scripts: `npm run proofs` reads the same txs straight from NEAR RPC.
+
 ### Proof it works
 
 - **Money is never created or destroyed.** `npm run sim -- --matches 500` plays 500 full matches,
@@ -96,7 +99,7 @@ Every feature, why it is there, the code, and a testnet transaction: [`docs/NEAR
   a human in the first 30 s).
 - **Anyone can verify a match.** The Verify page replays the log in the browser with the same code
   as the server and shows the exact event if anything was changed (`apps/client/src/screens/verify.ts`).
-- **Tests:** 222 TypeScript tests (`npm test`) and 52 contract tests (`cargo test`, 3 in near-sandbox).
+- **Tests:** the whole TypeScript suite (`npm test`) and the contract suite (`cargo test`: unit tests plus 3 near-sandbox integration tests) pass on every commit to main.
 - **Load:** 50 rooms of 12 on one server at about 0.1 ms of CPU per room tick (`npm run soak`).
 
 ### Honest status
@@ -106,8 +109,8 @@ Every feature, why it is there, the code, and a testnet transaction: [`docs/NEAR
 - **Drone wallets are live on testnet.** The liquidator drones are registered NEAR accounts
   (`drone-1..3.playmargin.testnet`, owner-only `set_agents`). Settle pays them their bounties, capped
   by the contract at 12% of a match's stakes: [drone-1 earned 0.0925 USDC](https://testnet.nearblocks.io/txns/8nDTHu1ZmeW19fSEaa9LoXtrUtdSsEALwVJWdNfpuWwf) and
-  [0.0913 USDC](https://testnet.nearblocks.io/txns/41tkSWiySoUYk1kJ3eJrpBtVMJDdTMbxzDipBnwfBHnf) in two real paid matches. Its balance in the contract is the sum,
-  0.183805 USDC (`balance_of("drone-1.playmargin.testnet")`), withdrawable only with the drone's own
+  [0.0913 USDC](https://testnet.nearblocks.io/txns/41tkSWiySoUYk1kJ3eJrpBtVMJDdTMbxzDipBnwfBHnf) in two real paid matches. Its balance in the contract is at least their sum (0.183805 USDC) and grows
+  with every bounty it earns (`balance_of("drone-1.playmargin.testnet")`), withdrawable only with the drone's own
   full key. Free-room agent
   players play for credits and have no account.
 - **NEAR Auth email login** is built behind a flag and waits on NEAR's mainnet approval.
@@ -146,13 +149,13 @@ npm run demo
 (6 bot-driven players + 2 liquidator drones), narrates it, then proves it (seed 109, about 10 s).
 You will see Drone-2 liquidate Player-5 at 20.6 s, Player-6 go red at 29.1 s and hold REPAY out of
 red at 29.5 s (a clutch save, with a hunter close), then go red again at 54.1 s and get liquidated by
-Drone-2 at 54.5 s. The last three lines are the proof
-(they are the same on every run, and change only if the rules change):
+Drone-2 at 54.5 s. These three proof lines are the same on every run, byte for byte, and change only
+if the rules change (one more line after them prints the run time, the only thing that varies):
 
 ```
 vault: lent 1035.0, repaid 1035.0, interest 116.0, fees 7.8 · reserve 7.3
 hash chain: 238 events, head 90eb15d274d6dcf4...
-5880 ticks · 0 micro-units created or destroyed · settle == live ✓ · 10.4 s
+5880 ticks · 0 micro-units created or destroyed · settle == live ✓
 ```
 
 `npm install` takes about a minute. npm 11 may warn that some install scripts were skipped, and
@@ -184,8 +187,8 @@ the room fills with labelled AI agents (🤖).
 | 1 | `npm run demo` | A narrated paid match: BOOSTs (loans), eats, two players liquidated by Drone-2 (20.6 s and 54.5 s), one of them escaping red once with a REPAY hold first ("REPAYS OUT OF RED"), payouts and the drones' bounties, then `0 micro-units created or destroyed` and `settle == live` |
 | 1b | `npm run e2e:local` | The strongest end-to-end proof: boots the real game server with a fresh database, two network clients play a full free match, then it checks the match settled, the credit ledger is exact for both players, and replaying the served log gives exactly the stored payouts. Ends with `E2E OK` (about 35 s). On the way it prints one expected error, `you are already in this match`: that is the test proving the server refuses a second seat for the same player |
 | 2 | `npm run sim -- --matches 500` | 500 full matches (2,940,000 ticks, about 177,000 logged money events) with the conservation check every tick, every hash chain verified, `0 micro-units created or destroyed` and `settle == live in 500/500` (1 to 3 minutes) |
-| 3 | `npm test` | The whole TypeScript suite passes: 222 tests in 44 files (engine, settle, bots, server, client logic), about 15 s |
-| 4 | `cd contracts/margin && cargo test` | 49 contract unit tests and 3 near-sandbox integration tests pass. Slow: about 7 minutes, most of it downloading and running near-sandbox |
+| 3 | `npm test` | The whole TypeScript suite passes (engine, settle, bots, server, client logic), under a minute |
+| 4 | `cd contracts/margin && cargo test` | Every contract unit test and the 3 near-sandbox integration tests pass. Slow: about 7 minutes, most of it downloading and running near-sandbox |
 | 5 | `npm run dev`, open http://localhost:1234, press **Practice free** | A 90 s match: steer with the mouse, hold Space = BOOST (borrow, like nitro: the fuel ring empties as you borrow), hold R = REPAY, E = cash out. Watch your ring go green, yellow, red |
 | 6 | Hold BOOST until the fuel ring is empty, then run into a big spike | Your ring turns red. Within a moment a blob or a drone touches you: "LIQUIDATED", and your receipt shows what the vault took back |
 | 7 | After any match, open the receipt's Verify link (`/#/verify/<id>`) | The browser replays the log with the same code as the server, checks every hash, and shows settle == what you were paid. Press "Tamper" and the exact broken event turns red |
@@ -196,6 +199,7 @@ the room fills with labelled AI agents (🤖).
 | 10 | `npm run soak -- --rooms 50` | 50 rooms of 12 on the real server for one full match (about 100 s at any room count): CPU per room tick and match length under load. Measured about 0.1 ms per room tick at 50 rooms (0.09 to 0.12 across runs) and 0.24 ms at 10 (budget 4 ms). Matches last 90 s at 10 rooms and 92 to 93 s of wall time at 50 |
 | 10b | `npx tsx apps/server/scripts/playtest.ts walls` (needs Google Chrome installed) | Boots a fresh server and client, drives 7 real browser players into the 4 walls, a corner and each other, while a spectator socket checks every blob on every update. Prints `"breaches": 0` (no blob centre ever closer to a wall than 0.65 of its radius), the arena size (4800x4800), FPS per page, and saves screenshots to `playtest-out/` (about 1 minute) |
 | 11 | Put `NEAR_AI_API_KEY` in `.env`, then `npm run commander` (without a key it prints one line saying so and exits normally) | One live match with the AI commander on NEAR AI Cloud. Each new plan prints with its one-line rationale |
+| 12 | `npm run proofs` (no keys, about 20 s) | Checks every on-chain proof without a browser: one `OK` line per tx cited in this README and docs/NEAR.md (signer, receiver, method, key args, the contract's event), ending `N of N cited txs OK on chain (read from NEAR RPC, not nearblocks)`, exit 0. A missing or failed tx prints `FAIL` and exits 1. `npm run proofs -- <hash>` checks any other testnet tx |
 
 ### 3. What needs keys
 

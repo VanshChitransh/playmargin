@@ -27,8 +27,13 @@ function say(w: World, tick: number, text: string): void {
 function narrate(w: World, e: LogEntry): void {
   const d = e.data as Record<string, number & string>;
   switch (e.type) {
-    case "BOOST":
-      return say(w, e.tick, `${label(w, d.blob)} BOOST +${n(d.borrowed)} (owe ${n(w.blobs.get(d.blob)?.debt ?? 0)}, fee ${n(d.fee)})`);
+    case "BOOST": {
+      // A BOOST hold is logged when it ends. Going red ends it (red can't borrow), so a hold that
+      // closes on a red blob was borrowed before the hit: say so, it is not a red blob borrowing.
+      const b = w.blobs.get(d.blob);
+      const late = b && b.state === "alive" && ring(b) === "red" ? " (borrowed before going red, the hold just closed)" : "";
+      return say(w, e.tick, `${label(w, d.blob)} BOOST +${n(d.borrowed)} (owe ${n(b?.debt ?? 0)}, fee ${n(d.fee)})${late}`);
+    }
     case "REPAY":
       if (w.blobs.get(d.blob)?.state === "cashed") return; // a cash-out repays its loan: the CASHOUT line says it
       return say(w, e.tick, `${label(w, d.blob)} REPAY -${n(d.amount)} (owe ${n(w.blobs.get(d.blob)?.debt ?? 0)})`);
@@ -79,5 +84,6 @@ const live = r.payouts.every((p) => w.blobs.get(p.id)?.payout === p.amount) &&
   r.vaultRepaid === w.vault.repaid && r.interestToVault === w.vault.interest && r.fees === w.fees && r.reserve === w.reserve;
 console.log(`\nvault: lent ${n(r.lent)}, repaid ${n(r.vaultRepaid)}, interest ${n(r.interestToVault)}, fees ${n(r.fees)} · reserve ${n(r.reserve)}`);
 console.log(`hash chain: ${log.length} events, head ${r.head.slice(0, 16)}...`);
-console.log(`${ticks} ticks · ${leakOf(w)} micro-units created or destroyed · settle == live ${live ? "✓" : "✗"} · ${((performance.now() - t0) / 1000).toFixed(1)} s`);
+console.log(`${ticks} ticks · ${leakOf(w)} micro-units created or destroyed · settle == live ${live ? "✓" : "✗"}`);
+console.log(`(ran in ${((performance.now() - t0) / 1000).toFixed(1)} s, the only line that changes between runs)`);
 if (!live || leakOf(w) !== 0) process.exit(1);
