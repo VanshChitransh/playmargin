@@ -100,7 +100,7 @@ nearblocks links may show a Cloudflare check to scripts: `npm run proofs` reads 
 - **Anyone can verify a match.** The Verify page replays the log in the browser with the same code
   as the server and shows the exact event if anything was changed (`apps/client/src/screens/verify.ts`).
 - **Tests:** the whole TypeScript suite (`npm test`) and the contract suite (`cargo test`: unit tests plus 3 near-sandbox integration tests) pass on every commit to main.
-- **Load:** 50 rooms of 12 on one server at about 0.1 ms of CPU per room tick (`npm run soak`).
+- **Load:** 50 rooms of 12 on one server at about 0.15 ms of CPU per room tick (`npm run soak`).
 
 ### Honest status
 
@@ -196,7 +196,7 @@ the room fills with labelled AI agents (🤖).
 | 9 | `npm run sweep -- 900` | The balance table behind the rules, for the shipped settings: a greedy player holds BOOST to the cap in every match. Measured: 0.74 to 0.93 liquidations per match, the greedy player popped in 57% (practised) to 79% (first-timer) of matches. About 5 minutes (`npm run sweep -- 300` is faster and lands within a few points) |
 | 9b | `npx tsx tools/sim/human.ts 60` | Can a newcomer win? A careful never-BOOST newcomer bot against 11 agents: measured median rank 4 of 12, top 3 in about 35%, survives about 67% |
 | 9c | `npx tsx tools/sim/contacts.ts 40` | Do players meet? Rooms of 12 agents and no human: about 17 contacts per minute, a typical player's first contact at about 3.5 s. Liquidations here are rare (about 0.1 per match) because agents borrow carefully: greed is what brings liquidations (row 9) |
-| 10 | `npm run soak -- --rooms 50` | 50 rooms of 12 on the real server for one full match (about 100 s at any room count): CPU per room tick and match length under load. Measured about 0.1 ms per room tick at 50 rooms (0.09 to 0.12 across runs) and 0.24 ms at 10 (budget 4 ms). Matches last 90 s at 10 rooms and 92 to 93 s of wall time at 50 |
+| 10 | `npm run soak -- --rooms 50` | 50 public rooms of 12 (1 guest + 11 agents each, checked) on the real server for one full match (about 100 s at any room count): CPU per room tick and match length under load. Measured on 10 Nov on a fresh clone: 0.163 ms per room tick at 50 rooms (0.148 in a second run) and 0.326 ms at 10 (budget 4 ms). Every match lasted 90.0 s of wall time at 10 and at 50 rooms |
 | 10b | `npx tsx apps/server/scripts/playtest.ts walls` (needs Google Chrome installed) | Boots a fresh server and client, drives 7 real browser players into the 4 walls, a corner and each other, while a spectator socket checks every blob on every update. Prints `"breaches": 0` (no blob centre ever closer to a wall than 0.65 of its radius), the arena size (4800x4800), FPS per page, and saves screenshots to `playtest-out/` (about 1 minute) |
 | 11 | Put `NEAR_AI_API_KEY` in `.env`, then `npm run commander` (without a key it prints one line saying so and exits normally) | One live match with the AI commander on NEAR AI Cloud. Each new plan prints with its one-line rationale |
 | 12 | `npm run proofs` (no keys, about 20 s) | Checks every on-chain proof without a browser: one `OK` line per tx cited in this README and docs/NEAR.md (signer, receiver, method, key args, the contract's event), ending `N of N cited txs OK on chain (read from NEAR RPC, not nearblocks)`, exit 0. A missing or failed tx prints `FAIL` and exits 1. `npm run proofs -- <hash>` checks any other testnet tx |
