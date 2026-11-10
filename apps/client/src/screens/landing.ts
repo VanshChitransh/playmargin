@@ -16,7 +16,7 @@ export const landing: Screen = (root) => {
   root.innerHTML = `
   <div class="paper-dots flex min-h-dvh flex-col overflow-x-hidden text-ink">
     <header class="mx-auto flex w-full max-w-[88rem] items-center justify-between gap-3 px-4 pt-5 pb-2 xl:px-16 xl:pt-8">
-      <a href="#/" class="flex items-center gap-3">
+      <a href="#/" aria-label="MARGIN home" class="flex items-center gap-3">
         <span class="pop flex size-12 items-end justify-center overflow-hidden rounded-2xl bg-sky xl:size-15"><img src="/brand/margin-cat-cutout.svg" alt="" class="-mb-1.5 w-[105%]" /></span>
         <span class="hidden font-display text-3xl tracking-wide min-[420px]:inline xl:text-4xl">MARGIN</span>
       </a>

@@ -15,8 +15,8 @@ export default defineConfig({
         name: "MARGIN",
         short_name: "MARGIN",
         description: "Get greedy. Get liquidated. A 90-second arena where BOOST is a loan.",
-        theme_color: "#E5484D",
-        background_color: "#070A12",
+        theme_color: "#FFF6E6",
+        background_color: "#FFF6E6",
         display: "fullscreen",
         orientation: "any",
         start_url: "/#/",
@@ -28,6 +28,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
+        // Email login is off by default and loads only on use, so its ~950 KB chunk is not precached
+        // for every visitor (QA-B-18). When it is on, the browser fetches it on first use.
+        globIgnores: ["**/email-*.js"],
         // SPA fallback so /auth/callback (NEAR Auth redirect) opens the app offline-cached too.
         navigateFallback: "/index.html",
       },
