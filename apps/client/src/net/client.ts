@@ -1,6 +1,7 @@
 // Colyseus connection for one match: joins the "match" room, turns every 20 Hz state
 // patch into a plain Frame snapshot, and exposes my private "owe" and the event stream.
 // The server is the only authority; this file never computes game state.
+import { seat, type SeatTarget } from "./seat";
 import { Client, type Room } from "@colyseus/sdk";
 import { R, TICK_MS, type BlobView, type GameEventMsg, type InputCmd, type JoinOpts, type MatchView, type Phase, type RateTier, type Ring } from "@margin/core";
 import type { Frame } from "../game/frame";
@@ -48,7 +49,7 @@ export class MatchConnection {
   async join(opts: JoinOpts, judge = false): Promise<void> {
     // Server rooms: "judge" = the seeded Judge Run, "private" = filtered by roomCode, else "match".
     const name = judge ? "judge" : opts.roomCode ? "private" : "match";
-    this.wire(await new Client(ENDPOINT).joinOrCreate(name, opts));
+    this.wire(await new Client(ENDPOINT).joinOrCreate(name, opts), judge ? "judge" : (opts.roomCode ?? "play"));
   }
 
   /** Private room host: start the match now (the server ignores it from anyone else). */
@@ -58,13 +59,14 @@ export class MatchConnection {
 
   /**
    * After a reload mid-match, take the same seat back (the server holds it with
-   * allowReconnection). Resolves false when there is no seat to resume.
+   * allowReconnection). Resolves false when there is no seat to resume on this route; a seat
+   * from another route is kept (going back to it still resumes).
    */
-  async resume(): Promise<boolean> {
-    const token = seat.get();
+  async resume(target: SeatTarget): Promise<boolean> {
+    const token = seat.get(target);
     if (!token) return false;
     try {
-      this.wire(await new Client(ENDPOINT).reconnect(token));
+      this.wire(await new Client(ENDPOINT).reconnect(token), target);
       return true;
     } catch {
       seat.clear(); // the match is over or the hold expired: join fresh
@@ -76,13 +78,14 @@ export class MatchConnection {
   async spectate(): Promise<void> {
     const r = await fetch(`${ENDPOINT}/api/watch`);
     if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { error?: string }).error ?? `HTTP ${r.status}`);
-    this.wire(await new Client(ENDPOINT).consumeSeatReservation(await r.json()), false);
+    this.wire(await new Client(ENDPOINT).consumeSeatReservation(await r.json()), null);
   }
 
-  private wire(room: Room, keepSeat = true): void {
+  /** at: the route this seat belongs to, null for a spectator (no seat to come back to). */
+  private wire(room: Room, at: SeatTarget | null): void {
     this.room = room;
     this.lastStateAt = performance.now(); // the clock for "no state yet" starts at the seat
-    if (keepSeat) seat.set(room.reconnectionToken); // a spectator has no seat to come back to
+    if (at !== null) seat.set(room.reconnectionToken, at);
     this.room.onStateChange((raw) => {
       const s = raw as RoomState;
       this.lastStateAt = performance.now();
@@ -187,28 +190,3 @@ export function guestKey(): string {
     return crypto.randomUUID();
   }
 }
-
-/** This tab's seat token (sessionStorage: survives a reload, not a new tab). */
-const seat = {
-  get(): string | null {
-    try {
-      return sessionStorage.getItem("margin.seat");
-    } catch {
-      return null;
-    }
-  },
-  set(t: string): void {
-    try {
-      sessionStorage.setItem("margin.seat", t);
-    } catch {
-      /* private mode: a reload just joins a new room */
-    }
-  },
-  clear(): void {
-    try {
-      sessionStorage.removeItem("margin.seat");
-    } catch {
-      /* nothing stored */
-    }
-  },
-};

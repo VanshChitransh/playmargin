@@ -9,5 +9,7 @@ export function refusalWords(message: string): string {
   if (/credit/i.test(message)) return "You are out of free credits for today. They top up tomorrow.";
   if (/full|restarting|too many|rate|429/i.test(message)) return "Arenas are busy right now. Try again in a minute.";
   if (/already in this match/i.test(message)) return "Your blob is still in another match in this browser.";
+  // A draining server answers matchmaking with 503 and an empty JSON body (Colyseus, before our routes).
+  if (/end of json|json input|\b503\b|service unavailable/i.test(message)) return "The server is restarting for an update. Try again in a few seconds.";
   return `The server said: ${message}`;
 }

@@ -59,7 +59,7 @@ async function connect(roomCode?: string, judge = false): Promise<Source> {
   if (!paid) {
     const back = new MatchConnection();
     const late = new Promise<boolean>((r) => setTimeout(() => r(false), JOIN_TIMEOUT_MS));
-    if (await Promise.race([back.resume(), late])) return back;
+    if (await Promise.race([back.resume(judge ? "judge" : (roomCode ?? "play")), late])) return back;
     back.leave(); // a resume that answers after the timeout must not keep a second seat alive
   }
   // A paid seat never falls back to offline practice: the ticket is real, so the error must show.
