@@ -337,8 +337,9 @@ export const play: Screen = (root, params) => {
     // The Judge Run changes how agents behave, so it is disclosed on phones too (short form there).
     if (params.judge === "1" && !(s instanceof LocalMatch)) {
       status.classList.remove("max-sm:hidden");
-      status.innerHTML = `<span class="max-sm:hidden"></span><span class="sm:hidden">Judge Run: agents only hunt red blobs here, so the lesson is your loan. Drone-1 liquidates anyone who goes red.</span>`;
-      status.firstElementChild!.textContent = "Judge Run: a 90 s scenario on a published seed, normal money rules. Here the agents only hunt red blobs, so the lesson is your own loan: hold BOOST, go red, and Drone-1 liquidates you. Will you?";
+      status.innerHTML = `<span class="max-sm:hidden"></span><span class="sm:hidden">Judge Run: agents only hunt red blobs here, so the lesson is your loan. <span class="whitespace-nowrap">Drone-1</span> liquidates anyone who goes red.</span>`;
+      // Constant text, so innerHTML is safe; "Drone-1" never splits at its hyphen.
+      status.firstElementChild!.innerHTML = `Judge Run: a 90 s scenario on a published seed, normal money rules. Here the agents only hunt red blobs, so the lesson is your own loan: hold BOOST, go red, and <span class="whitespace-nowrap">Drone-1</span> liquidates you. Will you?`;
       // A card, not the grey footer: a disclosure has to be read. Phones: left of the dock, never under it.
       status.className = "pop-sm pointer-events-none fixed bottom-3 left-3 z-10 max-w-[min(44rem,60vw)] rounded-xl bg-card px-3 py-2 text-sm font-semibold leading-snug text-ink max-sm:max-w-[calc(100vw-216px)] max-sm:text-xs";
     }
