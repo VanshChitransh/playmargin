@@ -4,6 +4,7 @@
 // equality (conservation) must hold. Usage:
 //   QA_PORT=2601 QA_DB=/path/qa.sqlite npx tsx tools/sim/qa/qa-c.ts <scenario> [count]
 // Scenarios: agents | duel | twelve | late | lone | afk | collude | borrowfeed | lastcash | wall | spikes
+//   | red | zone | lockout | repay | bait (pass 2: live rule probes with per-50 ms samples of my blob)
 import { DatabaseSync } from "node:sqlite";
 import { Client, type Room } from "@colyseus/sdk";
 import { MICRO, settleVerified, type LogEntry } from "@margin/core";
@@ -20,7 +21,7 @@ const guestKey = (): string => `ed25519:qac${Date.now().toString(36)}${(keySeq++
 const code = (): string => Array.from({ length: 4 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ"[Math.floor(Math.random() * 24)]).join("");
 
 type B = { id: string; kind: string; label: string; x: number; y: number; radius: number; ring: string; equity: number; state: string; cashingOut: boolean };
-type S = { phase: string; timeLeftS: number; blobs: Map<string, B>; food: Map<string, { x: number; y: number }>; spikes: Map<string, { x: number; y: number; live: boolean }>; arenaW: number; arenaH: number };
+type S = { phase: string; timeLeftS: number; blobs: Map<string, B>; food: Map<string, { x: number; y: number }>; spikes: Map<string, { x: number; y: number; live: boolean }>; arenaW: number; arenaH: number; zoneX: number; zoneY: number; zoneR: number };
 /** A brain sees the room state and my id, returns the held input for the next 50 ms. */
 type Brain = (s: S, me: string, owe: number) => { dirX: number; dirY: number; boost: boolean; repay: boolean; cashout: boolean };
 const norm = (x: number, y: number) => { const l = Math.hypot(x, y) || 1; return [x / l, y / l] as const; };
@@ -70,14 +71,86 @@ const toSpikes: Brain = (s, me) => {
   return { dirX, dirY, boost: m.ring === "green", repay: false, cashout: false };
 };
 
-interface Seat { room: Room; brain: Brain; owe: number; key: string; name: string }
+interface Sample { ms: number; left: number; phase: string; ring: string; equity: number; owe: number; x: number; y: number; outside: boolean; food: number }
+const live = (s: S) => s.phase === "LIVE";
+/** Borrow while green, then drive into a spike to go red, then sit on food without REPAY. */
+const redBrain = (): Brain => {
+  let stage = 0;
+  return (s, me, owe) => {
+    const m = mine(s, me);
+    if (!m || m.state !== "alive" || !live(s)) return idle(s, me, owe);
+    if (m.ring === "red") stage = 2;
+    if (stage === 0 && m.ring === "yellow") stage = 1;
+    if (stage === 0) return { ...newcomer()(s, me, owe), boost: true, repay: false };
+    if (stage === 1) return { ...toSpikes(s, me, owe), boost: false };
+    let best = Infinity, dx = 0, dy = 0; // red: chase the nearest food, never REPAY
+    s.food.forEach((f) => { const d = Math.hypot(f.x - m.x, f.y - m.y); if (d < best) (best = d), (dx = f.x - m.x), (dy = f.y - m.y); });
+    const [dirX, dirY] = norm(dx, dy);
+    return { dirX, dirY, boost: false, repay: false, cashout: false };
+  };
+};
+/** Play normally until 62 s, then run out of the zone and stay out. */
+const zoneBrain: Brain = (s, me, owe) => {
+  const m = mine(s, me);
+  if (!m || m.state !== "alive" || !live(s) || s.timeLeftS > 28) return newcomer()(s, me, owe);
+  const [dirX, dirY] = norm(m.x - s.zoneX, m.y - s.zoneY);
+  return { dirX, dirY, boost: false, repay: false, cashout: false };
+};
+/** No BOOST until 77 s, then hold BOOST to the end (RULES: BOOST locks at 80 s). */
+const lockoutBrain: Brain = (s, me, owe) => ({ ...newcomer()(s, me, owe), boost: live(s) && s.timeLeftS <= 13, repay: false });
+/** BOOST 1 s at 50 s, one REPAY tap at 55 s, then hold REPAY from 60 s until clear. */
+const repayBrain = (): Brain => {
+  let tapped = false;
+  return (s, me, owe) => {
+    const base = { ...newcomer()(s, me, owe), boost: false, repay: false };
+    if (!live(s)) return base;
+    const t = 90 - s.timeLeftS;
+    if (t >= 50 && t < 51) return { ...base, boost: true };
+    if (t >= 55 && !tapped) return (tapped = true), { ...base, repay: true };
+    if (t >= 60 && owe > 0) return { ...base, repay: true };
+    return base;
+  };
+};
+/** Park 150 px from the nearest spike and wait: do chasing agents run into it? */
+const baitBrain: Brain = (s, me, owe) => {
+  const m = mine(s, me);
+  if (!m || m.state !== "alive") return idle(s, me, owe);
+  let best = Infinity, dx = 0, dy = 0;
+  s.spikes.forEach((k) => { if (!k.live) return; const d = Math.hypot(k.x - m.x, k.y - m.y); if (d < best) (best = d), (dx = k.x - m.x), (dy = k.y - m.y); });
+  if (best < m.radius + 150) return idle(s, me, owe);
+  const [dirX, dirY] = norm(dx, dy);
+  return { dirX, dirY, boost: false, repay: false, cashout: false };
+};
+
+/** Scenario facts from my own samples (state seen by the client, every 50 ms of real time). */
+function probe(seat: { samples: Array<{ ms: number; left: number; phase: string; ring: string; equity: number; owe: number; outside: boolean; food: number }>; sent: { repay: boolean; boost: boolean }[] }): Record<string, unknown> {
+  const xs = seat.samples;
+  const reds = xs.filter((x, k) => k > 0 && x.ring === "red" && xs[k - 1]!.ring === "red");
+  const redGain = reds.filter((x, k) => { const prev = xs[xs.indexOf(x) - 1]!; return x.equity > prev.equity + 1e-9; });
+  const lockAfter80 = xs.filter((x, k) => k > 0 && x.phase === "LIVE" && 90 - x.left > 80.5 && x.owe > xs[k - 1]!.owe + 1e-9);
+  const out = xs.filter((x) => x.outside && x.phase === "LIVE");
+  const drain = out.length > 20 ? { samples: out.length, equityFrom: out[0]!.equity, equityTo: out.at(-1)!.equity, seconds: +((out.at(-1)!.ms - out[0]!.ms) / 1000).toFixed(2) } : null;
+  // REPAY: owe before the tap vs just after, and the hold time from first held REPAY to owe 0.
+  const tapAt = seat.sent.findIndex((c) => c.repay);
+  const tap = tapAt > 0 ? { oweBefore: xs[tapAt - 1]!.owe, oweAfter: xs[Math.min(xs.length - 1, tapAt + 10)]!.owe } : null;
+  const holdStart = seat.sent.findIndex((c, k) => c.repay && k > tapAt + 20);
+  const cleared = holdStart > 0 ? xs.findIndex((x, k) => k > holdStart && x.owe === 0) : -1;
+  const hold = holdStart > 0 ? { oweAtStart: xs[holdStart]!.owe, msToZero: cleared > 0 ? Math.round(xs[cleared]!.ms - xs[holdStart]!.ms) : null } : null;
+  return {
+    redSamples: reds.length, redEquityRises: redGain.length, redFoodTouches: reds.filter((x) => x.food > 0).length,
+    oweRisesAfter80s: lockAfter80.length, maxOweAfter80: Math.max(0, ...xs.filter((x) => 90 - x.left >= 80).map((x) => x.owe)), oweAt80: xs.find((x) => 90 - x.left >= 80)?.owe,
+    zoneDrain: drain, repayTap: tap, repayHold: hold,
+  };
+}
+
+interface Seat { room: Room; brain: Brain; owe: number; key: string; name: string; samples: Sample[]; rationales: number; sent: { repay: boolean; boost: boolean }[] }
 async function seat(opts: { roomCode?: string; name: string; brain: Brain }): Promise<Seat> {
   const key = guestKey();
   const room = await sdk.joinOrCreate(opts.roomCode ? "private" : "match", { mode: "free", guestKey: key, roomCode: opts.roomCode, name: opts.name });
-  const st: Seat = { room, brain: opts.brain, owe: 0, key, name: opts.name };
+  const st: Seat = { room, brain: opts.brain, owe: 0, key, name: opts.name, samples: [], rationales: 0, sent: [] };
   room.onMessage("me", (m: { owe: number }) => void (st.owe = m.owe));
   room.onMessage("ev", () => {});
-  room.onMessage("commander", () => {});
+  room.onMessage("commander", (m: { rationale: string | null }) => void (m?.rationale && st.rationales++));
   return st;
 }
 function drive(seats: Seat[]): () => void {
@@ -86,8 +159,16 @@ function drive(seats: Seat[]): () => void {
     seq++;
     for (const s of seats) {
       try {
-        const cmd = s.brain(s.room.state as unknown as S, s.room.sessionId, s.owe);
+        const st = s.room.state as unknown as S;
+        const cmd = s.brain(st, s.room.sessionId, s.owe);
         s.room.send("input", { seq, ...cmd });
+        const m = st.blobs?.get(s.room.sessionId);
+        if (m) {
+          let near = 0;
+          st.food.forEach((f) => void (Math.hypot(f.x - m.x, f.y - m.y) < m.radius + 40 && near++));
+          s.samples.push({ ms: performance.now(), left: st.timeLeftS, phase: st.phase, ring: m.ring, equity: m.equity, owe: s.owe, x: m.x, y: m.y, outside: Math.hypot(m.x - st.zoneX, m.y - st.zoneY) > st.zoneR, food: near });
+          s.sent.push({ repay: cmd.repay, boost: cmd.boost });
+        }
       } catch { /* the room may have closed */ }
     }
   }, 50);
@@ -137,6 +218,11 @@ async function runOne(i: number): Promise<Record<string, unknown>> {
     case "afk": seats = [await seat({ name: `QA AFK${i}`, brain: idle })]; break;
     case "wall": seats = [await seat({ name: `QA W${i}`, brain: toWall })]; break;
     case "spikes": seats = [await seat({ name: `QA S${i}`, brain: toSpikes })]; break;
+    case "red": seats = [await seat({ name: `QA R${i}`, brain: redBrain() })]; break;
+    case "zone": seats = [await seat({ name: `QA Z${i}`, brain: zoneBrain })]; break;
+    case "lockout": seats = [await seat({ name: `QA X${i}`, brain: lockoutBrain })]; break;
+    case "repay": seats = [await seat({ name: `QA P${i}`, brain: repayBrain() })]; break;
+    case "bait": seats = [await seat({ name: `QA B${i}`, brain: baitBrain })]; break;
     case "duel": await host(2, () => newcomer({ boost: true })); break;
     case "twelve": await host(12, (k) => newcomer({ boost: k % 2 === 0 })); break;
     case "lone": await host(4, (k) => (k === 0 ? newcomer() : newcomer({ cashAtLeft: 40 }))); break;
@@ -165,7 +251,10 @@ async function runOne(i: number): Promise<Record<string, unknown>> {
   await ended(seats);
   stop();
   await new Promise((r) => setTimeout(r, 500)); // settle is stored right after the bell
-  return check(matchId, `${scenario}#${i}`);
+  const res = await check(matchId, `${scenario}#${i}`);
+  res.commanderPlans = seats[0]!.rationales;
+  res.probe = probe(seats[0]!);
+  return res;
 }
 
 const results = await Promise.all(Array.from({ length: count }, (_, i) => runOne(i).catch((e: Error) => ({ label: `${scenario}#${i}`, error: e.message }))));
