@@ -46,3 +46,21 @@ export function match(pattern: string, path: string): Params | null {
   }
   return params;
 }
+
+/**
+ * A screen whose code loads on first visit, so the home page does not ship the game engine
+ * (QA-B-16). Leaving before the code arrives cancels it; otherwise the real cleanup runs.
+ */
+export function lazy(load: () => Promise<Screen>): Screen {
+  return (root, params) => {
+    let left = false;
+    let cleanup: Cleanup | void;
+    void load().then((screen) => {
+      if (!left) cleanup = screen(root, params);
+    });
+    return () => {
+      left = true;
+      cleanup?.();
+    };
+  };
+}

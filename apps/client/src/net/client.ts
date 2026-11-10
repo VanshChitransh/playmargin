@@ -7,7 +7,8 @@ import { R, TICK_MS, type BlobView, type GameEventMsg, type InputCmd, type JoinO
 import type { Frame } from "../game/frame";
 import { SnapshotBuffer } from "./interp";
 
-export const ENDPOINT = import.meta.env.VITE_SERVER_URL ?? `${location.protocol}//${location.hostname}:2567`;
+import { ENDPOINT } from "./endpoint";
+export { ENDPOINT };
 
 // Structural view of S2's MatchState schema, so the client never imports server code.
 interface Each<T> {

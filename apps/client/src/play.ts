@@ -43,6 +43,8 @@ interface Source {
 const JOIN_TIMEOUT_MS = 10_000;
 /** A held seat answers fast or is gone; a late answer is closed so no second seat stays alive. */
 const RESUME_TIMEOUT_MS = 4000;
+/** "Already in this match" right after leaving one: how long to wait before the one retry. */
+const ALREADY_RETRY_MS = 1500;
 /** No server state for this long (a dead room, a hung socket, a drop that never reconnects): stop
  *  pretending and show the can't-join card. The server sends state every tick, so 5 s is a real stall. */
 const STALL_MS = 5000;
@@ -86,8 +88,17 @@ async function connect(roomCode?: string, judge = false): Promise<Source> {
   if (!wantLocal) {
     const conn = new MatchConnection();
     const timeout = new Promise<never>((_, no) => setTimeout(() => no(new Error("join timeout")), JOIN_TIMEOUT_MS));
+    const opts = { mode: "free" as const, guestKey: guestKey(), roomCode, name: playerName() ?? undefined };
     try {
-      await Promise.race([conn.join({ mode: "free", guestKey: guestKey(), roomCode, name: playerName() ?? undefined }, judge), timeout]);
+      try {
+        await Promise.race([conn.join(opts, judge), timeout]);
+      } catch (e) {
+        // My last blob's leave may still be on its way (slow link): wait a beat and try once more
+        // before showing the card (QA-B-19).
+        if (!/already in this match/i.test((e as Error).message ?? "")) throw e;
+        await new Promise((r) => setTimeout(r, ALREADY_RETRY_MS));
+        await Promise.race([conn.join(opts, judge), timeout]);
+      }
       return conn;
     } catch (e) {
       conn.leave();
@@ -327,7 +338,9 @@ export const play: Screen = (root, params) => {
     src = s;
     hud.offline = s instanceof LocalMatch;
     // Offline practice must be impossible to miss: a yellow sticker instead of the grey footer.
-    if (s instanceof LocalMatch) status.className = "pop-sm pointer-events-none fixed bottom-3 left-3 z-10 max-w-[70vw] rounded-xl bg-warn px-3 py-1.5 text-sm font-bold text-ink";
+    // Phones already show the HUD's "offline practice" tag at the top, so this one stays off them
+    // and never sits on the controls; on wider screens it stops short of the dock (QA-B-21).
+    if (s instanceof LocalMatch) status.className = "pop-sm pointer-events-none fixed bottom-3 left-3 z-10 max-w-[min(70vw,calc(100vw-320px))] rounded-xl bg-warn px-3 py-1.5 text-sm font-bold text-ink max-sm:hidden";
     status.textContent =
       s instanceof LocalMatch
         ? "Offline practice: real rules, local bots, nothing counts"

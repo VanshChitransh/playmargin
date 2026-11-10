@@ -1,13 +1,9 @@
 // playmargin.fun landing ("Arcade Paper", research/margin/ui/variants/v1). The hero IS the game: a bots-only
 // match on the real rules runs in a paper frame, so a judge sees BOOST, red rings and pops before reading a word
 // (inspiration.md section 3: live mini arena + one CTA, crypto invisible above the fold).
-import { LocalMatch } from "../game/local";
-import { ArenaRenderer } from "../render/arena";
-import { Director } from "../render/director";
-import type { Frame } from "../game/frame";
 import type { Screen } from "../router";
 import { newRoomCode } from "../net/room-code";
-import { ENDPOINT } from "../net/client";
+import { ENDPOINT } from "../net/endpoint";
 import { showStake } from "../stake";
 import { nameProblem } from "@margin/core";
 import { playerName, setPlayerName, signedInAccount } from "../player/name";
@@ -104,44 +100,20 @@ export const landing: Screen = (root) => {
     why.classList.toggle("hidden", !problem);
   });
   root.querySelector("[data-challenge]")!.addEventListener("click", () => (location.hash = `#/r/${newRoomCode()}`));
+  // The live arena (pixi + the game engine) loads after first paint, so a phone can tap the
+  // buttons at once instead of waiting for the engine (QA-B-16).
   const box = root.querySelector<HTMLElement>("[data-hero]")!;
-  const arena = new ArenaRenderer();
-  // Nobody is followed: the spectator director films the best action (a pop, a red blob with a
-  // hunter near, a chase) and eases between shots. Following one bot left the shot dead whenever
-  // that bot went quiet.
-  const director = new Director();
-  arena.director = (f, tS) => director.shot(f, tS);
-  let last: Frame | null = null;
-  const hero = (): LocalMatch => {
-    const m = newHero();
-    m.onEvent((e) => director.event(e, last, performance.now() / 1000));
-    return m;
-  };
-  let match = hero();
   let left = false;
-  let mounted = false;
-  void arena
-    .mount(
-      box,
-      (now) => {
-        // A fresh match at the bell, or when fewer than 3 blobs are left to watch.
-        let f = match.frameAt(now);
-        if (f.match.phase === "ENDED" || f.blobs.filter((b) => b.state === "alive").length < 3) f = (match = hero()).frameAt(now);
-        last = { ...f, me: "" };
-        return last;
-      },
-      { fit: box, view: 1200 },
-    )
-    .then(() => {
-      mounted = true;
-      if (left) arena.destroy();
+  let stop = (): void => {};
+  const idle = (f: () => void): void => void ("requestIdleCallback" in window ? requestIdleCallback(f, { timeout: 1500 }) : setTimeout(f, 300));
+  idle(() => {
+    if (left) return;
+    void import("./hero").then(({ mountHero }) => {
+      if (!left) stop = mountHero(box);
     });
+  });
   return () => {
     left = true;
-    if (mounted) arena.destroy();
+    stop();
   };
 };
-
-// Greedy bots (hero only): same engine and rules, but half the bots over-borrow, so red rings and
-// liquidations show up in the first seconds instead of almost never.
-const newHero = (): LocalMatch => new LocalMatch({ seed: (Math.random() * 1e9) | 0, withMe: false, bots: 10, warmupS: 0, greedy: true });
