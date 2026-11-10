@@ -37,7 +37,7 @@ the server (or wait for an empty queue), change it, then restart, so no ticket s
 ## 1. Pre-flight (free, no mainnet tx, about 2 min)
 
 1. Main is green: `npm run typecheck && npm test && (cd contracts/margin && cargo test)`.
-2. Build the exact wasm that ships (204,955 bytes with A7 agents, about 2.05 NEAR of storage):
+2. Build the exact wasm that ships (204,838 bytes with A7 agents, about 2.05 NEAR of storage):
    ```
    cd contracts/margin && cargo near build non-reproducible-wasm --no-embed-abi
    ls -l target/near/margin.wasm
@@ -197,7 +197,7 @@ Never delete or recreate the accounts (name squatters watch for it). Recover val
 
 ## Wasm size
 
-205 KB (204,955 B, with A7 agents) after `--no-embed-abi` (saves 3 KB). `wasm-opt -Oz` saves 1 KB more, and the rest is
+205 KB (204,838 B, with A7 agents) after `--no-embed-abi` (saves 3 KB). `wasm-opt -Oz` saves 1 KB more, and the rest is
 near-sdk's JSON/format machinery that every method needs, so no cheap cut is left. 1 NEAR per
 100 KB means about 2.05 NEAR of refundable storage (1.99 before A7, as in the rehearsal below).
 

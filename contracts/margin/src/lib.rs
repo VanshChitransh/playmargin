@@ -318,7 +318,7 @@ impl Contract {
     }
 
     pub(crate) fn debit(&mut self, account: &AccountId, amount: u128) {
-        let b = self.balances.get_mut(account).expect("no balance");
+        let Some(b) = self.balances.get_mut(account) else { env::panic_str("insufficient balance") };
         require!(*b >= amount, "insufficient balance");
         *b -= amount;
         if *b == 0 {

@@ -273,7 +273,7 @@ all-zero command at once, so nothing stays held.
 
 Every NEAR feature with a testnet transaction proving it: [`docs/NEAR.md`](NEAR.md).
 
-### Contract state (`contracts/margin`, near-sdk 5.30.1, 204,955 B, about 205 KB)
+### Contract state (`contracts/margin`, near-sdk 5.30.1, 204,838 B, about 205 KB)
 
 | Field | Holds |
 |---|---|

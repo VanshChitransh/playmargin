@@ -28,7 +28,7 @@ impl Contract {
         let mut stakes = 0u128;
         for p in &players {
             // A duplicate player fails here: its ticket was assigned on the first pass.
-            let t = self.tickets.get_mut(p).expect("player has no ticket");
+            let Some(t) = self.tickets.get_mut(p) else { env::panic_str("player has no ticket") };
             require!(t.match_id.is_none(), "ticket already assigned");
             t.match_id = Some(match_id.clone());
             stakes = add(stakes, t.stake.0);
@@ -72,7 +72,7 @@ impl Contract {
         head: String,
     ) {
         self.assert_settler();
-        let mut m = self.matches.get(&match_id).cloned().expect("unknown match");
+        let Some(mut m) = self.matches.get(&match_id).cloned() else { env::panic_str("unknown match") };
         require!(m.status == MatchStatus::Open, "match is not open");
         require!(payouts.len() <= MAX_PAYOUTS, "too many payouts");
         require!(head.len() <= MAX_HEAD_LEN, "head too long");
@@ -95,7 +95,7 @@ impl Contract {
         require!(out == add(m.stakes.0, lent.0), "settle does not conserve value");
 
         for p in &m.players {
-            let t = self.tickets.remove(p).expect("ticket missing");
+            let Some(t) = self.tickets.remove(p) else { env::panic_str("ticket missing") };
             require!(t.match_id.as_deref() == Some(match_id.as_str()), "ticket not in this match");
         }
         for (who, amount) in &payouts {
@@ -129,7 +129,7 @@ impl Contract {
     /// match with an old ticket. An unsettled match is cancelled and its budget returns.
     pub fn reclaim(&mut self) {
         let player = env::predecessor_account_id();
-        let t = self.tickets.get(&player).cloned().expect("no ticket");
+        let Some(t) = self.tickets.get(&player).cloned() else { env::panic_str("no ticket for this account") };
         let start = match &t.match_id {
             Some(id) => self.matches.get(id).map_or(t.entered_at, |m| m.opened_at),
             None => t.entered_at,
@@ -145,7 +145,7 @@ impl Contract {
     /// Settler: refund a no-show or unassigned ticket, or one whose match was cancelled.
     pub fn refund_ticket(&mut self, account_id: AccountId) {
         self.assert_settler();
-        let t = self.tickets.get(&account_id).cloned().expect("no ticket");
+        let Some(t) = self.tickets.get(&account_id).cloned() else { env::panic_str("no ticket for this account") };
         if let Some(id) = &t.match_id {
             let status = self.matches.get(id).map(|m| m.status.clone());
             require!(status == Some(MatchStatus::Cancelled), "ticket is in a live match");
@@ -502,6 +502,15 @@ mod tests {
         with_drone(&mut c);
         c.set_agents(vec![], vec![acc("drone-1.near")]);
         assert!(!c.is_agent(acc("drone-1.near")));
+    }
+
+    /// QA-D-05: a caller without a ticket gets a clean message, not a raw panic with a file:line.
+    #[test]
+    #[should_panic(expected = "no ticket for this account")]
+    fn reclaim_without_ticket_is_a_clean_error() {
+        let mut c = setup();
+        ctx("a.near", 0, 0);
+        c.reclaim();
     }
 
     #[test]
