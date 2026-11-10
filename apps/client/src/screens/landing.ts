@@ -40,7 +40,7 @@ export const landing: Screen = (root) => {
         </div>
         <div class="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm font-semibold text-muted">
           <label class="flex items-center gap-2"><span class="shrink-0">Your name</span>
-            <input data-name maxlength=20 autocomplete=nickname class="pop-sm w-40 rounded-lg bg-card px-2 py-1 font-display text-lg text-ink placeholder:text-ink/40" /></label>
+            <input data-name maxlength=15 autocomplete=nickname class="pop-sm w-40 rounded-lg bg-card px-2 py-1 font-display text-lg text-ink placeholder:text-ink/40" /></label>
           <span class="flex items-center gap-2"><span class="size-2.5 rounded-full border-2 border-ink bg-safe"></span>No wallet. No sign-up.</span>
           <span class="pointer-coarse:hidden">Mouse steers, hold <kbd class="pop-sm rounded-md bg-card px-1.5 text-xs font-bold">Space</kbd> = BOOST</span>
         </div>

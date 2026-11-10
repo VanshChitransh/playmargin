@@ -33,6 +33,8 @@ export class BlobSprite extends Container {
   private ring = new Graphics();
   private shield = new Graphics();
   private nameText: Text;
+  /** Label width at scale 1, so the fit below costs nothing per frame. */
+  private nameW = 1;
   private warnSign: Text;
   private drawn = { r: -1, ring: "" as Ring | "", kind: "" };
   private prev = { x: 0, y: 0, speed: 0 };
@@ -56,9 +58,10 @@ export class BlobSprite extends Container {
     const name = displayName(v);
     this.nameText = new Text({
       text: name,
-      style: { fontFamily: ["Rubik", "system-ui", "sans-serif"], fontSize: 28, fontWeight: "700", fill: 0xffffff, stroke: { color: C.ink, width: 5, join: "round" } },
+      style: { fontFamily: ["Rubik", "system-ui", "sans-serif"], fontSize: 28, fontWeight: "700", fill: 0xffffff, stroke: { color: C.ink, width: 4, join: "round" } },
     });
     this.nameText.anchor.set(0.5);
+    this.nameW = Math.max(1, this.nameText.width);
     for (let i = 0; i < v.id.length; i++) this.seed = (this.seed * 31 + v.id.charCodeAt(i)) % 6283;
     this.seed /= 1000;
     this.warnSign = new Text({ text: "⚠", style: { fontSize: 18, fill: C.liq } });
@@ -88,13 +91,14 @@ export class BlobSprite extends Container {
     const k = 1 / zoom;
     this.feel(boosting);
     if (v.kind !== "drone") this.membrane(v, tS, around);
-    // Name inside the blob, sized with it (agar.io), never under ~11 px on screen.
-    // Pressed on a wall the outline shifts and shrinks: the name follows its centre and size.
+    // Name inside the blob like agar.io: sized with it (about 11 px on screen at least), then
+    // shrunk so it never gets wider than 1.6 radius. Pressed on a wall it follows the outline's centre.
     const c = v.kind === "drone" || !this.mem.n ? { x: 0, y: 0, mean: v.radius } : this.mem.centre();
-    const ns = Math.max(Math.min(v.radius, c.mean) * 0.5, 11 / zoom) / 28;
+    const inner = Math.min(v.radius, c.mean);
+    const ns = Math.min(Math.max(inner * 0.5, 11 / zoom) / 28, (inner * 1.6) / this.nameW);
     this.nameText.scale.set(ns);
     this.warnSign.scale.set(k);
-    this.nameText.position.set(c.x, v.kind === "drone" ? r + 14 * k : c.y);
+    this.nameText.position.set(c.x, c.y);
     this.warnSign.visible = v.ring === "red" && v.kind !== "drone";
     this.warnSign.position.set(0, -r - 14 * k);
     this.shield.visible = v.shielded;
