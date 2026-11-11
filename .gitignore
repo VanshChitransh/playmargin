@@ -9,3 +9,17 @@ target/
 .claude/settings.local.json
 .DS_Store
 playtest-out/
+# Pre-public audit (QA): local state and anything key-shaped never gets committed.
+.wrangler/
+*.db
+*.db-*
+*.pem
+*.key
+*.p12
+id_rsa*
+id_ed25519*
+near-credentials/
+.near-credentials/
+# Research and QA evidence live outside this repo (research/margin/); never copy them in.
+/research/
+/qa/
