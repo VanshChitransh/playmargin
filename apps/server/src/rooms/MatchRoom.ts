@@ -13,8 +13,10 @@ import {
   applyJudgeLayout,
   cleanName,
   judgeLineup,
+  matchRateBps,
   matchT,
   newWorld,
+  RATE_BASE_BPS,
   removePlayer,
   startMatch,
   step,
@@ -97,6 +99,10 @@ export class MatchRoom extends Room {
   private opening: "none" | "pending" | "ok" | "failed" = "none";
   /** Paid: the contract's entry stake (USDC base units), read fresh at the 3-2-1. Free rooms ignore it. */
   private stakeBase = 1_000_000;
+  /** The match's one interest rate (RULES): paid rooms read the shared LP vault's utilisation at open,
+   *  free rooms stay at base because practice credits have no LP vault behind them. */
+  private rate = RATE_BASE_BPS;
+  private rateFrom = "base: free rooms have no LP vault";
   /** open_match landed: tickets are bound, so only reclaim (not refund_ticket) frees them. */
   private bound = false;
   private key: RoomKey = { mode: "free", roomCode: null };
@@ -131,6 +137,7 @@ export class MatchRoom extends Room {
     const db = sharedDb();
     this.log = new MatchRecord(db, this.roomId, this.key.mode, settlementFor(this.key.mode, db, this.users));
     this.state.mode = this.key.mode;
+    if (this.key.mode === "paid") void this.readVaultRate(); // async: never throws here, counted lines stay last
     this.onMessage("input", (client, msg: unknown) => this.inputs.push(client.sessionId, msg, Date.now()));
     // Private rooms: only the host starts, and only with a friend in (lobby.ts checks the count again).
     this.onMessage("startNow", (client) => {
@@ -374,7 +381,7 @@ export class MatchRoom extends Room {
     }
     const players = this.roster();
     this.world = newWorld(this.seed, this.key.mode, players, this.roomId, this.stakeBase);
-    startMatch(this.world, this.roomTick);
+    startMatch(this.world, this.roomTick, this.rate, this.rateFrom);
     const human = players.find((p) => p.kind === "human");
     if (this.judge && human) applyJudgeLayout(this.world, human.id);
     for (const b of this.world.blobs.values()) {
@@ -433,6 +440,29 @@ export class MatchRoom extends Room {
   /** NEAR accounts holding a ticket in this room (drone accounts hold none). */
   private staked(): string[] {
     return [...this.world.blobs.values()].flatMap((b) => (b.accountId && b.kind !== "drone" ? [b.accountId] : []));
+  }
+
+  /**
+   * Paid rate from the contract's vault: utilisation = budgets locked by open matches / all LP
+   * liquidity, through core's curve. Set on the world at once so the lobby shows the real Loan cost.
+   * A failed read keeps the base rate and says so in MATCH_START.
+   */
+  private async readVaultRate(): Promise<void> {
+    this.rateFrom = "base: vault not read by GO"; // overwritten below once the read answers
+    try {
+      const chain = sharedChain();
+      const v = chain ? await chain.view<{ free: string; locked: string }>("vault", {}) : undefined;
+      if (!v) throw new Error("no vault view");
+      const free = BigInt(v.free);
+      const locked = BigInt(v.locked);
+      const util = free + locked > 0n ? Number((locked * 10_000n) / (free + locked)) : 0;
+      this.rate = matchRateBps(util);
+      this.rateFrom = `vault: ${util} bps used`;
+      if (this.world.phase !== "LIVE" && this.world.phase !== "ENDED") this.world.ratePerMinBps = this.rate; // before GO only: fixed at GO
+    } catch {
+      this.rate = RATE_BASE_BPS;
+      this.rateFrom = "base: vault read failed";
+    }
   }
 
   /** A7: drone-N.<contract> earns its bounties on chain, but only once the contract registered it. */

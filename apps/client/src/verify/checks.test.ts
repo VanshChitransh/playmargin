@@ -50,4 +50,22 @@ describe("runChecks", () => {
     expect(r.chain.state).toBe("ok");
     expect(r.books.state === "bad" || r.anchor.state === "bad").toBe(true);
   });
+
+  it("a legacy log (no rules version) is never green unless NEAR holds its head", async () => {
+    const log = await playedLog();
+    const t = structuredClone(log);
+    const i = t.findIndex((e) => e.type === "MATCH_START");
+    delete (t[i] as { data: { rulesVersion?: number } }).data.rulesVersion; // a log from before 11 Nov
+    for (let k = i; k < t.length; k++) {
+      if (k > 0) t[k]!.prevHash = t[k - 1]!.hash;
+      t[k]!.hash = await hashEntry(t[k]!);
+    }
+    const unanchored = await runChecks(t, null);
+    expect(unanchored.books.state).toBe("skip");
+    expect(unanchored.books.detail).toMatch(/Legacy log, rules version unproven/);
+    const anchored = await runChecks(t, unanchored.result!.head);
+    expect(anchored.books.state).toBe("ok");
+    expect(anchored.books.detail).toMatch(/under rules v[12]/);
+    expect((await runChecks(log, null)).books.detail).toMatch(/under rules v3/);
+  });
 });

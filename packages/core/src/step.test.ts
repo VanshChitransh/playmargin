@@ -15,13 +15,13 @@ const seeds = (n: number): PlayerSeed[] =>
   Array.from({ length: n }, (_, i) => ({ id: `p${i}`, kind: i < 2 ? "human" : "agent", label: `P${i}`, accountId: null }));
 
 /** Plays a whole match with seeded random steering and taps; returns the tick it ended on. */
-export function playMatch(seed: number, n = 6, goTick = 600): { w: World; endTick: number } {
+export function playMatch(seed: number, n = 6, goTick = 600, rateBps?: number): { w: World; endTick: number } {
   const w = newWorld(seed, "free", seeds(n));
   const bot = { rngState: seedRng(seed ^ 0x9e3779b9) };
   let tick = 0;
   while (w.phase === "WARMUP") {
     tick++;
-    if (tick === goTick) startMatch(w, tick);
+    if (tick === goTick) startMatch(w, tick, rateBps, rateBps === undefined ? undefined : "test rate");
     else step(w, new Map(), tick);
   }
   while (w.phase !== "ENDED") {

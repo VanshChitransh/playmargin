@@ -162,4 +162,8 @@ export interface SettleResult {
   seq: number;
   /** Paid rooms: entry stake in USDC base units from MATCH_START (absent = 1e6 = 1 USDC). */
   stakeBase?: number;
+  /** The rules version the log was verified under (RULES.html "Rules versions"). */
+  rulesVersion?: number;
+  /** No version in the log (before 11 Nov): trust it only if its head matches NEAR (Verify says so). */
+  legacy?: boolean;
 }

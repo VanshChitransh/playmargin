@@ -27,7 +27,7 @@ export async function runChecks(log: LogEntry[], anchorHead?: string | null): Pr
   let books: Check;
   try {
     result = settle(log);
-    books = { state: "ok", detail: "Replayed every money event: not one millionth of a credit created or destroyed." };
+    books = { state: "ok", detail: `Replayed every money event under rules v${result.rulesVersion}: not one millionth of a credit created or destroyed.` };
   } catch (e) {
     books = { state: "bad", detail: e instanceof Error ? e.message : String(e) };
   }
@@ -37,6 +37,11 @@ export async function runChecks(log: LogEntry[], anchorHead?: string | null): Pr
       : result && result.head === anchorHead
         ? { state: "ok", detail: "The final hash matches the one stored on NEAR." }
         : { state: "bad", detail: "The final hash differs from the one stored on NEAR." };
+  // A log with no rules version (before 11 Nov) balances under old rules, but anyone could strip the
+  // version from a new log to claim them. Only NEAR holding the same head proves it is a real old match.
+  if (result?.legacy && books.state === "ok" && anchor.state !== "ok") {
+    books = { state: "skip", detail: `Legacy log, rules version unproven: it balances under rules v${result.rulesVersion} (before 11 Nov), which only counts once NEAR holds the same final hash.` };
+  }
   // A broken chain voids everything after it, even if the numbers happen to add up.
   if (chain.state === "bad" && books.state === "ok") books = { state: "bad", detail: "Not trusted: the hash chain is broken." };
   return { chain, books, anchor, result };

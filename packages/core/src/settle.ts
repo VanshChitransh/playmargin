@@ -3,9 +3,10 @@
 // and refuses any log a live room could not have produced, wherever that is checkable without
 // food flows. What it cannot see (eat gains, bounty vs scatter, the leftover total) is protected by
 // the settler-signed head anchored on NEAR, so always pair it with verifyChain (settleVerified).
-import { BORROW_FEE_BPS, BORROW_FEE_VAULT_BPS, BOUNTY_BPS, INTEREST_FOOD_BPS, INTEREST_VAULT_BPS, LEVERAGE_CAP_BPS, LIQ_FEE_BPS, R, sToTicks } from "./constants";
+import { RATE_BASE_BPS, BORROW_FEE_BPS, BORROW_FEE_VAULT_BPS, BOUNTY_BPS, INTEREST_FOOD_BPS, INTEREST_VAULT_BPS, LEVERAGE_CAP_BPS, LIQ_FEE_BPS, R, sToTicks } from "./constants";
 import type { LogEntry } from "./events";
-import { bellShare, humanSafeUntil } from "./economy";
+import { bellShare, humanSafeUntil, matchRateBps } from "./economy";
+import { RULES_VERSION } from "./world";
 import { verifyChain } from "./log";
 import type { BlobKind, Micro, SettleResult } from "./types";
 import { assertMicro, mulBps, mulDivUp } from "./units";
@@ -29,8 +30,32 @@ const fail = (seq: number, why: string): never => {
   throw new Error(`settle: seq ${seq}: ${why}`);
 };
 
-/** Settle a finished match from its log. Throws if the log is incomplete, impossible or unbalanced. */
+/**
+ * Settle a finished match from its log, under the rules its MATCH_START names (rulesVersion, see
+ * RULES.html "Rules versions"). A log with no version is legacy (testnet, before 11 Nov): it was
+ * written under v1 or v2, so it is checked as v1, then v2, and the result says which it satisfied.
+ * Throws if the log is incomplete, impossible or unbalanced under its rules.
+ */
 export function settle(log: LogEntry[]): SettleResult {
+  const start = log.find((e) => e.type === "MATCH_START");
+  const ver = start?.type === "MATCH_START" ? start.data.rulesVersion : undefined;
+  if (ver !== undefined) {
+    if (!Number.isSafeInteger(ver) || ver < 1 || ver > RULES_VERSION) fail(start!.seq, `unknown rules version ${ver}`);
+    return { ...settleUnder(log, ver), legacy: false };
+  }
+  try {
+    return { ...settleUnder(log, 1), legacy: true };
+  } catch (v1) {
+    try {
+      return { ...settleUnder(log, 2), legacy: true };
+    } catch (v2) {
+      throw new Error(`${(v2 as Error).message} (legacy log: also refused under rules v1: ${(v1 as Error).message})`);
+    }
+  }
+}
+
+/** settle under one rules version: v1 uncapped bell, no-eat from GO; v2 bell cap, no-eat from join; v3 interest ceiling. */
+function settleUnder(log: LogEntry[], ver: number): Omit<SettleResult, "legacy"> {
   let matchId = "";
   let pot: Micro = 0;
   let budget: Micro = 0;
@@ -38,6 +63,7 @@ export function settle(log: LogEntry[]): SettleResult {
   let vaultRepaid: Micro = 0;
   let badDebt: Micro = 0;
   let goTick = 0;
+  let rateBps = RATE_BASE_BPS;
   let stakeBase = 1_000_000;
   let interestToVault: Micro = 0;
   let reserve: Micro = 0;
@@ -70,6 +96,9 @@ export function settle(log: LogEntry[]): SettleResult {
         matchId = e.data.matchId;
         goTick = e.tick;
         stakeBase = e.data.stakeBase ?? 1_000_000;
+        // The match's one interest rate, set from the curve before GO (RULES): it must lie on the curve.
+        rateBps = e.data.ratePerMinBps;
+        if (ver >= 3 && (!Number.isSafeInteger(rateBps) || rateBps < RATE_BASE_BPS || rateBps > matchRateBps(10_000))) fail(s, `rate ${rateBps} is off the curve`);
         break;
       case "JOIN": {
         const p = e.data.player;
@@ -113,6 +142,10 @@ export function settle(log: LogEntry[]): SettleResult {
         const a = live(s, e.data.blob);
         const amount = m(s, e.data.amount, "interest");
         if (a.debt === 0) fail(s, "INTEREST with no debt");
+        // Live charges min(due on the whole debt, the mass left). settle can't see mass, so the due on
+        // the debt it tracks is the ceiling: an honest log is always at or below it (a REPAY in
+        // progress is logged after, so settle's debt is never below the live one).
+        if (ver >= 3 && amount > mulDivUp(a.debt, rateBps, 10_000 * 60)) fail(s, `INTEREST ${amount} is above the logged rate on debt ${a.debt}`);
         const toFood = mulBps(amount, INTEREST_FOOD_BPS);
         const toVault = mulBps(amount, INTEREST_VAULT_BPS);
         if (e.data.toFood !== toFood || e.data.toVault !== toVault || e.data.toReserve !== amount - toFood - toVault) {
@@ -126,7 +159,7 @@ export function settle(log: LogEntry[]): SettleResult {
       case "POP":
       case "KEEPER_POP": {
         const v = live(s, e.data.victim);
-        if (e.type === "EAT" && v.kind === "human" && blobs.get(e.data.by)?.kind === "agent" && e.tick < humanSafeUntil(goTick, v.chargedAt)) {
+        if (e.type === "EAT" && v.kind === "human" && blobs.get(e.data.by)?.kind === "agent" && e.tick < (ver >= 2 ? humanSafeUntil(goTick, v.chargedAt) : humanSafeUntil(goTick, goTick))) {
           fail(s, "an agent ate a human in their first 30 s");
         }
         const repaid = m(s, e.data.debtRepaid, "debtRepaid");
@@ -191,7 +224,7 @@ export function settle(log: LogEntry[]): SettleResult {
     const each = Math.floor(leftover / bell.length);
     if (dust !== leftover - each * bell.length) fail(last.seq, `leftover split does not match ${bell.length} survivors (dust ${dust})`);
     for (const [id, a] of bell) {
-      const want = bellShare(each, a.equityOut);
+      const want = ver >= 2 ? bellShare(each, a.equityOut) : each; // v1: equal split, no cap
       if ((shares.get(id) ?? 0) !== want) fail(last.seq, `${id} leftover share ${shares.get(id) ?? 0}, rule says ${want}`);
     }
   }
@@ -210,7 +243,7 @@ export function settle(log: LogEntry[]): SettleResult {
   // Exact equality, no plug: every Micro that came in (entries + loans) has exactly one home.
   const out = totalPaid + vaultRepaid + interestToVault + reserve + fees;
   if (out !== pot + lent) fail(last.seq, `books off by ${out - (pot + lent)} Micro`);
-  return { matchId, payouts, lent, vaultRepaid, interestToVault, reserve, fees, head: last.hash, seq: last.seq, stakeBase };
+  return { matchId, payouts, lent, vaultRepaid, interestToVault, reserve, fees, head: last.hash, seq: last.seq, stakeBase, rulesVersion: ver };
 }
 
 /** verifyChain then settle: the only entry point the server, contract call and Verify page should use. */
