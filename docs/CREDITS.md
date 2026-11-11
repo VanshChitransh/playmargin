@@ -80,7 +80,9 @@ Installed from npm and crates.io, not vendored. Licences as declared by each pac
 
 | Package | Version | Licence |
 |---|---|---|
-| near-sdk, near-contract-standards (Rust) | 5.30.1 | MIT OR Apache-2.0 |
+| near-sdk (Rust) | 5.30.1 | MIT OR Apache-2.0 |
+| near-contract-standards (Rust, only the testnet mock USDC token in `contracts/mock-usdc`) | 5.30.1 | MIT OR Apache-2.0 |
+| @scure/base (relayer: base58 public keys in `services/relayer/validate.ts`) | 2.4.0 | MIT |
 | near-kit | 0.20.2 | MIT |
 | near-api-js (email login only) | 5.1.1 | MIT AND Apache-2.0 |
 | @fast-auth-near/browser-sdk, @fast-auth-near/javascript-provider | 1.4.2, 1.4.1 | ISC |
