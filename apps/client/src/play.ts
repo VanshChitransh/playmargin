@@ -166,6 +166,23 @@ export const play: Screen = (root, params) => {
   addEventListener("resize", fit);
   fit();
   root.appendChild(small);
+  // Paid rooms: the match's interest rate comes from the LP vault's utilisation when the room opens.
+  // RULES: the lobby shows it as Loan cost LOW / MED / HIGH, above the BOOST dock where the loan starts.
+  const loanCost = document.createElement("div");
+  loanCost.className = "pop-sm pointer-events-none fixed right-3 bottom-[200px] z-10 hidden rounded-xl px-3 py-1.5 text-sm font-bold text-ink";
+  root.appendChild(loanCost);
+  const showLoanCost = (f: Frame): void => {
+    const on = f.match.mode === "paid" && (f.match.phase === "WARMUP" || f.match.phase === "COUNTDOWN");
+    loanCost.classList.toggle("hidden", !on);
+    if (!on) return;
+    const tier = f.match.rateTier;
+    if (loanCost.dataset.tier === tier) return;
+    loanCost.dataset.tier = tier;
+    loanCost.textContent = `Loan cost: ${tier}`;
+    // Colour by meaning: low is safe, medium a warning, high is danger.
+    loanCost.style.background = `var(--color-${tier === "HIGH" ? "liq" : tier === "MED" ? "warn" : "safe"})`;
+    loanCost.style.color = tier === "HIGH" ? "var(--color-card)" : "";
+  };
   // Joining can take a few seconds on a slow link: say so in the middle of the screen.
   const connecting = document.createElement("div");
   connecting.className = "pointer-events-none fixed inset-x-0 top-[38%] z-10 grid place-items-center";
@@ -308,6 +325,7 @@ export const play: Screen = (root, params) => {
     if (!f) return null;
     lastFrame = f;
     hud.update(f, now);
+    showLoanCost(f);
     nitroSound(f);
     zoneSting(f, now);
     if (repayHeld) {
@@ -416,6 +434,7 @@ export const play: Screen = (root, params) => {
     status.remove();
     connecting.remove();
     small.remove();
+    loanCost.remove();
     removeEventListener("resize", fit);
     if (mounted) arena.destroy();
   };
