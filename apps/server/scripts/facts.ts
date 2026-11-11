@@ -68,18 +68,27 @@ async function column(net: Net, src: string): Promise<Column> {
     if (t) rpc.add(host(t.rpc));
     if (t?.status === "ok" && t.method === "anchor") anchors++;
   }
-  // Drone wallets: USDC they hold now, read from the USDC contract (agents earn capped bounties).
-  let droneUsdc = 0n;
+  // Agent (drone) wallets, straight from NEAR whatever DB was given (QA-E-14): bounties are paid into the
+  // contract's own balance (balance_of, what #/judges reads); anything withdrawn sits in the USDC token.
+  let droneInGame = 0n;
+  let droneWallet = 0n;
   let drones = 0;
-  for (let i = 1; i <= 3 && cfg; i++) {
+  for (let i = 1; i <= 3; i++) {
     const id = `drone-${i}.${contract}`;
     const agent = await viewOnChain<boolean>(net, contract, "is_agent", { account_id: id }).catch(() => null);
     if (!agent?.value) continue;
     drones++;
-    const b = await viewOnChain<string>(net, cfg.usdc, "ft_balance_of", { account_id: id }).catch(() => null);
-    if (b) droneUsdc += BigInt(b.value);
+    const inGame = await viewOnChain<string>(net, contract, "balance_of", { account_id: id }).catch(() => null);
+    if (inGame) droneInGame += BigInt(inGame.value);
+    const wallet = cfg ? await viewOnChain<string>(net, cfg.usdc, "ft_balance_of", { account_id: id }).catch(() => null) : null;
+    if (wallet) droneWallet += BigInt(wallet.value);
   }
+  // Latest hourly anchor, straight from the contract (anchor_of keeps only the latest hour).
+  const latest = await viewOnChain<{ seq: number; head: string; at: string | number } | null>(net, contract, "anchor_of", { room_id: "free" }).catch(() => null);
+  if (latest) rpc.add(host(latest.rpc));
   const usd = (base: bigint) => `$${(Number(base) / 1e6).toFixed(2)}`;
+  /** USDC to the base unit, exactly as the chain holds it (6 decimals, no rounding). */
+  const exact = (base: bigint) => `${base / 1_000_000n}.${String(base % 1_000_000n).padStart(6, "0")}`;
   const outside = f.wallets.filter((w) => !team.has(w)).length;
   const rpcNote = rpc.size ? `NEAR RPC (${[...rpc].join(", ")})` : "NEAR RPC (unreachable)";
   return {
@@ -90,11 +99,18 @@ async function column(net: Net, src: string): Promise<Column> {
     cells: {
       matches: `${none(f.matches.free + f.matches.paid)} (${f.matches.free} free, ${f.matches.paid} paid)`,
       players: `${none(f.players.freeGuests + f.players.wallets)} (${f.players.freeGuests} guests, ${f.players.wallets} verified wallets)`,
-      paidOnChain: none(settled),
+      paidOnChain: f.paidSettled.length ? `${settled} of ${f.paidSettled.length} in our records verified` : "none in our records",
       usdc: settled ? usd(stakes) : "none yet",
       agentPops: none(f.agentPops),
-      droneUsdc: drones ? (droneUsdc > 0n ? `${usd(droneUsdc)} across ${drones} drone wallets` : "none yet") : "no drone wallets registered",
-      anchors: none(anchors),
+      droneUsdc: drones
+        ? droneInGame + droneWallet > 0n
+          ? `${exact(droneInGame + droneWallet)} USDC (${usd(droneInGame + droneWallet)}) across ${drones} registered drones: ${exact(droneInGame)} in-game balance, ${exact(droneWallet)} withdrawn to wallets`
+          : `none yet (${drones} registered drones)`
+        : "no drone accounts registered",
+      latestAnchor: latest?.value
+        ? `hour ${latest.value.seq}, ${((Date.now() - Number(latest.value.at) / 1e6) / 3_600_000).toFixed(1)} h ago (head ${latest.value.head.slice(0, 10)}...)`
+        : "none yet",
+      anchors: f.anchors.length ? `${anchors} of ${f.anchors.length} in our records verified` : "none in our records",
       mainnetTx: net === "mainnet" ? none(settled + anchors) : "n/a (testnet)",
       outside: team.size ? none(outside) : `${none(outside)} (no --team given: our own wallets are not excluded)`,
       _offchain: f.source,
@@ -108,11 +124,12 @@ for (const s of sources) cols.push(await column(s.net, s.src));
 const ROWS: Array<[string, keyof Column["cells"], "off" | "rpc"]> = [
   ["Matches played with a real human", "matches", "off"],
   ["Unique human players", "players", "off"],
-  ["Paid matches settled on chain (verified)", "paidOnChain", "rpc"],
+  ["Paid matches settled on chain (our records, each verified on NEAR: no contract view lists matches)", "paidOnChain", "rpc"],
   ["USDC moved through paid matches (on-chain stakes)", "usdc", "rpc"],
   ["Liquidations by AI agents", "agentPops", "off"],
-  ["USDC held by agent (drone) wallets", "droneUsdc", "rpc"],
-  ["Hourly anchors written (verified txs)", "anchors", "rpc"],
+  ["USDC earned by AI agent (drone) accounts", "droneUsdc", "rpc"],
+  ["Latest hourly anchor on NEAR (anchor_of)", "latestAnchor", "rpc"],
+  ["Hourly anchor txs (our records, each verified on NEAR: the contract keeps only the latest)", "anchors", "rpc"],
   ["Mainnet transactions (settles + anchors, verified)", "mainnetTx", "rpc"],
   ["Outside players (wallets that are not ours)", "outside", "off"],
 ];
