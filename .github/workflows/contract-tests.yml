@@ -1,0 +1,25 @@
+# Badge "contract tests": the NEAR contract's unit tests and near-sandbox integration tests.
+# Moved out of ci.yml so it has its own badge (it no longer runs twice).
+name: contract tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts/margin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            contracts/margin
+            contracts/mock-usdc
+      - run: curl --proto '=https' --tlsv1.2 -LsSf https://github.com/near/cargo-near/releases/download/cargo-near-v0.23.0/cargo-near-installer.sh | sh
+      - run: cargo test
