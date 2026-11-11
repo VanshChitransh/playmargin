@@ -151,4 +151,8 @@ export const JUICE = {
   PREVIEW_ALPHA: 0.25,
   /** Smallest blob name on screen, CSS px (agar keeps names readable on the smallest cell). */
   NAME_MIN_PX: 15,
+  /** Smallest liquidator drone on screen (hex radius, CSS px): it must read at a glance. */
+  DRONE_MIN_PX: 26,
+  /** The drone's name, CSS px: bigger than a blob name, it is the one AI that liquidates you. */
+  DRONE_NAME_PX: 20,
 } as const;

@@ -55,7 +55,8 @@ export class BlobSprite extends Container {
 
   constructor(v: BlobView, isMe: boolean) {
     super();
-    const name = displayName(v);
+    // Drones are AI too (the disclosure rule): they get the robot mark like agents.
+    const name = v.kind === "drone" ? `\u{1F916} ${v.label.replaceAll("\u{1F916}", "").trim()}` : displayName(v);
     this.nameText = new Text({
       text: name,
       style: { fontFamily: ["Rubik", "system-ui", "sans-serif"], fontSize: 28, fontWeight: "700", fill: 0xffffff, stroke: { color: C.ink, width: 4, join: "round" } },
@@ -91,16 +92,17 @@ export class BlobSprite extends Container {
     const k = 1 / zoom;
     this.feel(boosting);
     if (v.kind !== "drone") this.membrane(v, tS, around);
+    if (v.kind === "drone") return this.drone(v, zoom);
     // Name inside the blob like agar.io: grows with the radius, shrinks to fit 1.6 radius, but never
     // under NAME_MIN_PX on screen (a long name on a small cell may spill a little, as in agar).
     // Pressed on a wall it follows the outline's centre.
-    const c = v.kind === "drone" || !this.mem.n ? { x: 0, y: 0, mean: v.radius } : this.mem.centre();
+    const c = !this.mem.n ? { x: 0, y: 0, mean: v.radius } : this.mem.centre();
     const inner = Math.min(v.radius, c.mean);
     const ns = Math.max(Math.min((inner * 0.5) / 28, (inner * 1.6) / this.nameW), JUICE.NAME_MIN_PX / zoom / 28);
     this.nameText.scale.set(ns);
     this.warnSign.scale.set(k);
     this.nameText.position.set(c.x, c.y);
-    this.warnSign.visible = v.ring === "red" && v.kind !== "drone";
+    this.warnSign.visible = v.ring === "red";
     this.warnSign.position.set(0, -r - 14 * k);
     this.shield.visible = v.shielded;
     // Red pulses fast (heartbeat), yellow breathes slowly, green is still.
@@ -180,17 +182,34 @@ export class BlobSprite extends Container {
     this.stretch += ((boosting ? JUICE.BOOST_STRETCH : 0) - this.stretch) * Math.min(1, JUICE.STRETCH_EASE / 60);
   }
 
+  private droneR = -1;
+  /**
+   * The liquidator drone, the star of the Judge Run: a solid cyan hex (agent colour) with an ink
+   * outline and a red dashed "liquidator" ring, never under DRONE_MIN_PX on screen, and its
+   * robot-marked name under it at a fixed readable size. It cannot eat or be eaten, so no rim.
+   */
+  private drone(v: BlobView, zoom: number): void {
+    const r = Math.max(v.radius, JUICE.DRONE_MIN_PX / zoom);
+    if (Math.abs(r - this.droneR) > 0.5 / zoom) {
+      this.droneR = r;
+      const w = 4 / zoom;
+      this.body.clear().poly(hex(r)).fill({ color: C.agent, alpha: 0.9 }).stroke({ width: w, color: C.ink, join: "round" });
+      this.ring.clear();
+      dashed(this.ring, hex(r + 7 / zoom), C.liq, 3 / zoom);
+    }
+    this.ring.visible = true;
+    this.nameText.scale.set(JUICE.DRONE_NAME_PX / zoom / 28);
+    this.nameText.position.set(0, r + 20 / zoom);
+    this.warnSign.visible = false;
+  }
+
   private redraw(v: BlobView, isMe: boolean): void {
     this.drawn = { r: v.radius, ring: v.ring, kind: v.kind };
     const r = v.radius;
     this.body.clear();
     this.ring.clear();
     this.shield.clear();
-    if (v.kind === "drone") {
-      // Drones cannot eat or be eaten, so they get no body and no ring.
-      this.body.poly(hex(r)).fill({ color: C.agent, alpha: 0.18 }).stroke({ width: 4, color: C.navy });
-      return;
-    }
+    if (v.kind === "drone") return void (this.droneR = -1); // drone() redraws it at a readable screen size
     this.fill = vivid(v.id);
     this.isMe = isMe;
     this.rimStyle = v.ring;
