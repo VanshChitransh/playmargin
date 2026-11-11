@@ -149,14 +149,21 @@ function placeSpike(w: World, s: Spike): void {
   s.respawnAt = null;
 }
 
-/** GO: charge every entrant, respawn at evenly spaced seeded points, shield, seed food and spikes. */
-export function startMatch(w: World, tick: number, ratePerMinBps: number = C.RATE_BASE_BPS): void {
+/** The rules this engine plays and writes into MATCH_START; settle checks each log under its own. */
+export const RULES_VERSION = 3;
+
+/**
+ * GO: charge every entrant, respawn at evenly spaced seeded points, shield, seed food and spikes.
+ * ratePerMinBps is the match's one interest rate (RULES: set before GO from vault utilisation);
+ * rateFrom says where it came from, written into MATCH_START so Verify shows it.
+ */
+export function startMatch(w: World, tick: number, ratePerMinBps: number = C.RATE_BASE_BPS, rateFrom?: string): void {
   if (w.phase === "LIVE" || w.phase === "ENDED") throw new Error(`startMatch in ${w.phase}`);
   w.phase = "LIVE";
   w.goTick = tick;
   w.tick = tick;
   w.ratePerMinBps = ratePerMinBps;
-  w.pendingLog.push({ type: "MATCH_START", tick, data: { matchId: w.matchId, seed: w.seed, mode: w.mode, ratePerMinBps, stakeBase: w.stakeBase } });
+  w.pendingLog.push({ type: "MATCH_START", tick, data: { matchId: w.matchId, seed: w.seed, mode: w.mode, ratePerMinBps, stakeBase: w.stakeBase, rulesVersion: RULES_VERSION, ...(rateFrom ? { rateFrom } : {}) } });
   const blobs = [...w.blobs.values()];
   // Seeded shuffle so nobody picks a spawn slot by joining order.
   for (let i = blobs.length - 1; i > 0; i--) {

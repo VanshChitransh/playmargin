@@ -3,7 +3,7 @@
 import type { Micro, Mode, PlayerSeed } from "./types";
 
 export type LogEvent =
-  | { type: "MATCH_START"; data: { matchId: string; seed: number; mode: Mode; ratePerMinBps: number; stakeBase?: number } }
+  | { type: "MATCH_START"; data: { matchId: string; seed: number; mode: Mode; ratePerMinBps: number; stakeBase?: number; rateFrom?: string; rulesVersion?: number } }
   | { type: "JOIN"; data: { player: PlayerSeed } }
   | { type: "CHARGE"; data: { blob: string; entry: Micro } }
   | { type: "BOOST"; data: { blob: string; borrowed: Micro; fee: Micro } }

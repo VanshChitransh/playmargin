@@ -97,7 +97,9 @@ function render(body: HTMLElement, d: Loaded, r: Report, note: string, tampered:
   const bad = [r.chain, r.books, r.anchor].some((c) => c.state === "bad");
   const verdict = bad
     ? ["bg-ink text-paper", "\u2717", "This log does not add up.", "Someone changed it after the match. The check below shows where."]
-    : r.anchor.state === "ok"
+    : r.books.state === "skip"
+      ? ["bg-warn text-ink", "?", "Legacy log, rules version unproven.", "It balances under the old rules, but only NEAR holding the same fingerprint can prove it is a real match from before 11 Nov."]
+      : r.anchor.state === "ok"
       ? ["bg-safe text-ink", "\u2713", "Honest match.", "Every hash links, the books balance to the millionth, and NEAR holds the same fingerprint."]
       : ["bg-safe text-ink", "\u2713", "Honest so far.", "Every hash links and the books balance. The NEAR anchor comes with the next hourly batch."];
   body.innerHTML = `

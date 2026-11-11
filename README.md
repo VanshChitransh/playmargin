@@ -1,5 +1,7 @@
 # MARGIN
 
+[![money conserved](https://github.com/VanshChitransh/playmargin/actions/workflows/money-conserved.yml/badge.svg?branch=main)](https://github.com/VanshChitransh/playmargin/actions/workflows/money-conserved.yml) [![settle parity](https://github.com/VanshChitransh/playmargin/actions/workflows/settle-parity.yml/badge.svg?branch=main)](https://github.com/VanshChitransh/playmargin/actions/workflows/settle-parity.yml) [![contract tests](https://github.com/VanshChitransh/playmargin/actions/workflows/contract-tests.yml/badge.svg?branch=main)](https://github.com/VanshChitransh/playmargin/actions/workflows/contract-tests.yml) [![ci](https://github.com/VanshChitransh/playmargin/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/VanshChitransh/playmargin/actions/workflows/ci.yml)
+
 **Get greedy. Get liquidated.** A real-time multiplayer arena where your size is your money, BOOST is
 a loan from a vault, and labelled AI liquidator drones pop anyone who borrows too much. Every match
 is a hash-chained log that settles on NEAR.
@@ -23,7 +25,7 @@ then `npm run dev` and open http://localhost:1234.
 |---|---|---|---|
 | Play (about 2 min) | **Practice free** (or **Practice offline** on the card) | An 8 s warm-up, then a 90 s match against labelled bots (🤖). Hold Space to BOOST: a gold debt shell grows. Hold R: the debt drains to 0 | [playmargin.fun](https://playmargin.fun) |
 | Judge Run | `#/judge` (needs the game server, or locally http://localhost:1234/#/judge) | Hold BOOST, go red, and 🤖 Drone-1 liquidates you within seconds. Never borrow and you survive. Disclosed on screen: the agents here only hunt red blobs | [playmargin.fun/#/judge](https://playmargin.fun/#/judge) |
-| Verify a match | **Verify this match** on the results receipt | "Honest so far": the hash chain links and the books balance to the millionth of a credit. The NEAR anchor check follows (an online free match is anchored within the hour, an offline one never) | `apps/client/src/screens/verify.ts` |
+| Verify a match | **Verify this match** on the results receipt | "Honest so far": the hash chain links and the books balance to the millionth of a credit, under the rules version the match was played with (v3 today, older matches verify under their own). The NEAR anchor check follows (an online free match is anchored within the hour, an offline one never) | `apps/client/src/screens/verify.ts` |
 | Tamper demo | **Tamper test** on the Verify page | The page edits one number in the log and turns red at that exact event: "This log does not add up" | same page |
 | The settle tx | open the link | One real paid match settled on chain: payouts + vault repaid + interest + fees + reserve = stakes + lent, exactly, with the log head stored | [settle](https://testnet.nearblocks.io/txns/3Nw3RqiAfPmFYJ5LKxxXioEfppLhdEswXyTHhyZQABwA) |
 | A drone bounty tx | open the link | Settle pays 0.092521 USDC to `drone-1.playmargin.testnet`, a registered AI liquidator account | [bounty](https://testnet.nearblocks.io/txns/8nDTHu1ZmeW19fSEaa9LoXtrUtdSsEALwVJWdNfpuWwf) |
@@ -165,7 +167,7 @@ marked **Met**, **Partly** or **Not yet**.
 | The economy is the gameplay | Size is money. BOOST is a loan from a vault, interest drains you, spikes and the zone burn mass, red blobs get liquidated, survivors cash out | `packages/core/src/economy.ts`, `step.ts`, every number in `constants.ts`. `npm run demo` | Met |
 | NPCs with wallets | Liquidator drones are registered NEAR accounts that earn bounties on chain. Free-room agents play for credits and have no account | [set_agents](https://testnet.nearblocks.io/txns/4eH66oURfLpz9FXafY8Y7QWb3LpRx6kQCwq46yghdgy2), [bounty](https://testnet.nearblocks.io/txns/8nDTHu1ZmeW19fSEaa9LoXtrUtdSsEALwVJWdNfpuWwf) | Partly |
 | Player-owned markets | None. The vault that lends is the house's, not owned by players | | Not yet |
-| An economy that evolves without a dev patch | The interest curve (base rate, 80% use kink) is in the rules, but every match starts at the base rate today | `constants.ts` `RATE_PER_MIN`, `world.ts` `startMatch` | Not yet |
+| An economy that evolves without a dev patch | Paid rooms: each match's interest rate is set before GO from the shared LP vault's utilisation (budgets locked by open matches over all liquidity), on the RULES curve, and written into the match log so Verify replays it. Free rooms stay at the base rate: practice credits have no LP vault behind them | `apps/server/src/rooms/MatchRoom.ts` `readVaultRate`, `economy.ts` `matchRateBps`, `settle.test.ts` (settle == live at base, kink and full utilisation) | Partly (paid rooms only) |
 | Players never notice the chain (bonus) | Free play: no wallet, no sign-up. Paid play: one wallet approval adds a session key, then no pop-ups, our relayer pays gas | `apps/client/src/chain/session.ts`, [relayed ticket](https://testnet.nearblocks.io/txns/6ZSeFrGuuHC6Y6G6swxtpLodk9gjZUJk6cqhmdR2Tn4P) | Met for free play, Partly for paid |
 | Agent NPCs | Labelled AI players in every free room, retuned live by a NEAR AI Cloud commander whose reasoning is shown in the HUD | `apps/server/src/agents/`, `commander.ts` | Met |
 | Social or email login, no seed phrases | Guest key in the browser (no login at all). NEAR Auth email login is built behind a flag, waiting on NEAR's mainnet approval | `apps/client/src/chain/email.ts` | Partly |
@@ -223,7 +225,7 @@ if the rules change (one more line after them prints the run time, the only thin
 
 ```
 vault: lent 1035.0, repaid 1035.0, interest 116.0, fees 7.8 · reserve 7.3
-hash chain: 238 events, head 90eb15d274d6dcf4...
+hash chain: 238 events, head 330949a645769918...
 5880 ticks · 0 micro-units created or destroyed · settle == live ✓
 ```
 

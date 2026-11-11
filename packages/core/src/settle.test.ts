@@ -2,6 +2,7 @@
 // settle to hand-computed numbers; settle(log) equals the live world for 20 fuzzed matches.
 import { describe, expect, it } from "vitest";
 import { MICRO } from "./constants";
+import { matchRateBps } from "./economy";
 import type { LogEntry } from "./events";
 import { appendLog, canonical, hashEntry, verifyChain } from "./log";
 import { settle, settleVerified } from "./settle";
@@ -21,6 +22,11 @@ function open(): PendingLog[] {
   ];
 }
 
+/** open() with the rules version a new log carries (v3: bell cap, no-eat from join, interest ceiling). */
+function open3(rate = 600): PendingLog[] {
+  return open().map((e) => (e.type === "MATCH_START" ? { ...e, data: { ...e.data, ratePerMinBps: rate, rulesVersion: 3 } } : e));
+}
+
 async function chain(events: PendingLog[]): Promise<LogEntry[]> {
   const log: LogEntry[] = [];
   await appendLog(log, events);
@@ -32,15 +38,16 @@ describe("hand logs", () => {
     const log = await chain([
       ...open(),
       { type: "BOOST", tick: 10, data: { blob: "a", borrowed: u(40), fee: u(0.4) } },
-      { type: "INTEREST", tick: 61, data: { blob: "a", amount: u(0.12), toFood: u(0.096), toVault: u(0.018), toReserve: u(0.006) } },
+      // One second at 6%/min on a 40 debt: 40 x 0.06 / 60 = 0.04 (the engine's value).
+      { type: "INTEREST", tick: 61, data: { blob: "a", amount: u(0.04), toFood: u(0.032), toVault: u(0.006), toReserve: u(0.002) } },
       { type: "REPAY", tick: 5401, data: { blob: "a", amount: u(40) } },
       { type: "CASHOUT", tick: 5401, data: { blob: "a", amount: u(120) } },
-      { type: "CASHOUT", tick: 5401, data: { blob: "b", amount: u(79.576) } },
-      { type: "MATCH_END", tick: 5401, data: { tick: 5401, finalMasses: { a: u(120), b: u(79.576) }, dust: 0, toVault: 0, ranking: [] } },
+      { type: "CASHOUT", tick: 5401, data: { blob: "b", amount: u(79.592) } },
+      { type: "MATCH_END", tick: 5401, data: { tick: 5401, finalMasses: { a: u(120), b: u(79.592) }, dust: 0, toVault: 0, ranking: [] } },
     ]);
     expect(settle(log)).toMatchObject({
-      matchId: "hand", vaultRepaid: u(40), interestToVault: u(0.018), fees: u(0.3), reserve: u(0.106),
-      payouts: [{ id: "a", accountId: "a.testnet", amount: u(120) }, { id: "b", accountId: "b.testnet", amount: u(79.576) }],
+      matchId: "hand", vaultRepaid: u(40), interestToVault: u(0.006), fees: u(0.3), reserve: u(0.102),
+      payouts: [{ id: "a", accountId: "a.testnet", amount: u(120) }, { id: "b", accountId: "b.testnet", amount: u(79.592) }],
       seq: 10,
     });
   });
@@ -147,6 +154,24 @@ describe("settle(log) == live world", () => {
   }, 30_000);
 });
 
+describe("settle(log) == live world at every rate on the curve (paid rooms read the vault)", () => {
+  it("base, the kink and full utilisation: the interest ceiling never refuses a live log", async () => {
+    for (const util of [0, 8_000, 10_000]) {
+      const rate = matchRateBps(util);
+      for (let seed = 200; seed < 205; seed++) {
+        const { w } = playMatch(seed, 8, 600, rate);
+        const log = await chain(w.pendingLog);
+        const start = log.find((e) => e.type === "MATCH_START");
+        expect(start?.type === "MATCH_START" && start.data.ratePerMinBps).toBe(rate);
+        const r = settle(log);
+        expect(r.interestToVault).toBe(w.vault.interest);
+        expect(r.reserve).toBe(w.reserve);
+        for (const b of w.blobs.values()) expect(r.payouts.find((p) => p.id === b.id)?.amount ?? 0).toBe(b.payout);
+      }
+    }
+  }, 30_000);
+});
+
 describe("forgeries a live room cannot produce (money-auditor C5)", () => {
   const end = (fm: Record<string, number>, dust = 0, toVault = 0): PendingLog => ({ type: "MATCH_END", tick: 5401, data: { tick: 5401, finalMasses: fm, dust, toVault, ranking: [] } });
   const cash = (blob: string, amount: number, tick = 5401): PendingLog => ({ type: "CASHOUT", tick, data: { blob, amount } });
@@ -182,12 +207,22 @@ describe("forgeries a live room cannot produce (money-auditor C5)", () => {
     ["capped bonus kept off the books (no vault share)", [
       { type: "SPIKE", tick: 100, data: { blob: "b", spike: 1, damage: u(70) } },
       cash("a", u(100)), cash("b", u(30)), cash("a", u(35)), cash("b", u(15)), end({ a: u(135), b: u(45) })]],
+    // The old hand fixture: 0.12 interest in one second on 40 at 6%/min, three times what the engine charges.
+    ["interest above the logged rate", [
+      { type: "BOOST", tick: 10, data: { blob: "a", borrowed: u(40), fee: u(0.4) } },
+      { type: "INTEREST", tick: 61, data: { blob: "a", amount: u(0.12), toFood: u(0.096), toVault: u(0.018), toReserve: u(0.006) } },
+      { type: "REPAY", tick: 5401, data: { blob: "a", amount: u(40) } },
+      cash("a", u(120)), cash("b", u(79.576)), end({ a: u(120), b: u(79.576) })]],
     ["non-integer charge", [{ type: "CHARGE", tick: 1, data: { blob: "a", entry: 0.5 } }, cash("a", u(100)), cash("b", u(100)), end({ a: u(100), b: u(100) })]],
   ];
+  const V3_ONLY = new Set(["bell bonus above the cap", "interest above the logged rate"]);
+  const V3_WHY: Record<string, RegExp> = { "bell bonus above the cap": /leftover share/, "interest above the logged rate": /above the logged rate/ };
   for (const [name, tail] of bad) {
     it(`refuses: ${name}`, async () => {
-      const events = name === "non-integer charge" ? [...open().slice(0, 4), ...tail] : [...open(), ...tail];
-      await expect(chain(events).then(settle)).rejects.toThrow();
+      // Rules from v2 and v3 only bind a log that names its version (an unversioned log is legacy).
+      const opener = V3_ONLY.has(name) ? open3() : open();
+      const events = name === "non-integer charge" ? [...opener.slice(0, 4), ...tail] : [...opener, ...tail];
+      await expect(chain(events).then(settle)).rejects.toThrow(V3_WHY[name]); // undefined: any refusal, as before
     });
   }
 
@@ -201,10 +236,30 @@ describe("forgeries a live room cannot produce (money-auditor C5)", () => {
     await expect(chain(withAgent(1 + 30 * 60)).then(settle)).resolves.toBeDefined();
   });
 
+  it("refuses a v3 log whose rate is off the curve, or that names an unknown rules version", async () => {
+    await expect(chain([...open3(100), cash("a", u(100)), cash("b", u(100)), end({ a: u(100), b: u(100) })]).then(settle)).rejects.toThrow(/off the curve/);
+    const v9 = open().map((e) => (e.type === "MATCH_START" ? { ...e, data: { ...e.data, rulesVersion: 9 } } : e));
+    await expect(chain([...v9, cash("a", u(100)), cash("b", u(100)), end({ a: u(100), b: u(100) })]).then(settle)).rejects.toThrow(/unknown rules version 9/);
+  });
+
+  it("rules versions: a legacy log keeps the rules it was played under, a v3 log can't claim them", async () => {
+    // The pre-cap bell: leftover 70 split 35 / 35 with no cap (b's bell equity is only 30).
+    const tail = (): PendingLog[] => [
+      { type: "SPIKE", tick: 100, data: { blob: "b", spike: 1, damage: u(70) } },
+      cash("a", u(100)), cash("b", u(30)), cash("a", u(35)), cash("b", u(35)), end({ a: u(135), b: u(65) }),
+    ];
+    const legacy = settle(await chain([...open(), ...tail()]));
+    expect(legacy).toMatchObject({ rulesVersion: 1, legacy: true });
+    await expect(chain([...open3(), ...tail()]).then(settle)).rejects.toThrow(/leftover share/);
+    // A v3 log that follows v3 is not legacy.
+    const ok = settle(await chain([...open3(), cash("a", u(100)), cash("b", u(100)), end({ a: u(100), b: u(100) })]));
+    expect(ok).toMatchObject({ rulesVersion: 3, legacy: false });
+  });
+
   it("a late joiner gets the full 30 s from their own join, not from GO", async () => {
-    // a charges 10 s after GO (late join). 35 s after GO is only 25 s into a's match: refused.
+    // a charges 10 s after GO (late join). 35 s after GO is only 25 s into a's match: refused (v3).
     const late = (eatTick: number): PendingLog[] => [
-      ...open().map((e) => {
+      ...open3().map((e) => {
         if (e.type === "JOIN" && e.data.player.id === "b") return { ...e, data: { player: { ...e.data.player, kind: "agent" as const } } };
         if (e.type === "CHARGE" && e.data.blob === "a") return { ...e, tick: 1 + 10 * 60 };
         return e;
