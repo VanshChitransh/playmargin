@@ -13,6 +13,28 @@ const DEFAULTS: Record<Network, string[]> = {
   mainnet: ["https://rpc.mainnet.fastnear.com", "https://rpc.mainnet.near.org"],
 };
 
+/**
+ * Archival nodes for tx and block reads: regular nodes drop txs older than about 2.5 days, and
+ * judging (16 to 25 Nov) only sees old anchor and settle txs. Both send CORS *, so the browser works.
+ */
+export const ARCHIVAL: Record<Network, string> = {
+  testnet: "https://archival-rpc.testnet.fastnear.com,https://archival-rpc.testnet.near.org",
+  mainnet: "https://archival-rpc.mainnet.fastnear.com,https://archival-rpc.mainnet.near.org",
+};
+
+export const PER_RPC_MS = 20_000;
+
+/** A slow RPC counts as unreachable (NetworkError), so withFallback moves on and nothing hangs. */
+export function inTime<T>(p: Promise<T>, ms = PER_RPC_MS): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<never>((_, no) => {
+      const t = setTimeout(() => no(new NetworkError(`no answer in ${ms / 1000} s`)), ms) as { unref?: () => void };
+      t.unref?.();
+    }),
+  ]);
+}
+
 /** RPC order: `extra` (comma list from env, e.g. a keyed provider) first, then FastNEAR, then NEAR's own. */
 export function rpcUrls(network: Network, extra = ""): string[] {
   const mine = extra.split(",").map((u) => u.trim()).filter(Boolean);
@@ -57,13 +79,13 @@ export async function withFallback<T>(clients: Near[], fn: (near: Near) => Promi
 }
 
 /** withFallback over this network's RPCs, also reporting which RPC answered (the Verify page shows it). */
-async function answered<T>(network: Network, fn: (near: Near) => Promise<T>): Promise<{ value: T; rpc: string }> {
-  const urls = rpcUrls(network);
-  const clients = nearClients(network);
+async function answered<T>(network: Network, fn: (near: Near) => Promise<T>, extra = ""): Promise<{ value: T; rpc: string }> {
+  const urls = rpcUrls(network, extra);
+  const clients = nearClients(network, extra);
   let rpc = "";
   const value = await withFallback(clients, (near) => {
     rpc = urls[clients.indexOf(near)]!;
-    return fn(near);
+    return inTime(fn(near));
   });
   return { value, rpc };
 }
@@ -86,8 +108,11 @@ export type TxView = {
  * near-kit's getTransactionStatus throws on a failed tx instead of returning it.
  */
 export async function txFunctionCall(network: Network, txHash: string, signerId: string) {
-  const { value: tx, rpc } = await answered(network, async (near) => near.rpc.call<TxView>("tx", { tx_hash: txHash, sender_account_id: signerId, wait_until: "FINAL" }));
-  const { value: block } = await answered(network, (near) => near.rpc.getBlock({ blockId: tx.transaction_outcome.block_hash }));
+  // Archival first (old txs and their blocks), regular nodes last for a tx seconds old. NONE: the
+  // tx is long final, so never wait on it.
+  const read = { tx_hash: txHash, sender_account_id: signerId, wait_until: "NONE" };
+  const { value: tx, rpc } = await answered(network, (near) => near.rpc.call<TxView>("tx", read), ARCHIVAL[network]);
+  const { value: block } = await answered(network, (near) => near.rpc.getBlock({ blockId: tx.transaction_outcome.block_hash }), ARCHIVAL[network]);
   return { ...firstCall(tx), block: Number(block.header.height), rpc };
 }
 
