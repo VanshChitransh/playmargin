@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { anchorVerdict, configVerdict, droneVerdict, relayVerdict, sessionKeyVerdict, settleVerdict, type RawTx } from "./claims";
+import { anchorVerdict, configVerdict, count, droneVerdict, relayVerdict, sessionKeyVerdict, settleVerdict, type RawTx } from "./claims";
 
 const C = "playmargin.testnet";
 const b64 = (o: object): string => btoa(JSON.stringify(o));
@@ -10,6 +10,12 @@ const call = (method: string, args: object, fail = false): RawTx => ({
 const settleArgs = { match_id: "m1", lent: "2870000", vault_repaid: "2870000", head: "abc123", payouts: [["drone-1." + C, "92521"]] };
 
 describe("judges desk verdicts", () => {
+  it("counts read as English (QA-E-17)", () => {
+    expect(count(1, "player")).toBe("1 player");
+    expect(count(2, "player")).toBe("2 players");
+    expect(count(0, "match", "matches")).toBe("0 matches");
+    expect(count(1, "match", "matches")).toBe("1 match");
+  });
   it("config: right USDC and a paid entry, or FAIL", () => {
     expect(configVerdict({ owner: "o", settler: "s", usdc: "usdc." + C, entry_stake: "1000000" }, "usdc." + C).state).toBe("ok");
     expect(configVerdict({ owner: "o", settler: "s", usdc: "fake", entry_stake: "1000000" }, "usdc." + C).state).toBe("fail");

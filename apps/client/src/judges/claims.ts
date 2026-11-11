@@ -8,6 +8,9 @@ export interface Verdict {
   detail: string;
 }
 
+/** "1 player", "2 players", "0 matches": every count on the page goes through this (QA-E-17). */
+export const count = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
+
 /** USDC base units (6 decimals) as a short display number. */
 export const usdc = (base: string | number): string => (Number(base) / 1e6).toLocaleString("en", { maximumFractionDigits: 6 });
 
@@ -45,7 +48,7 @@ export function settleVerdict(tx: RawTx, onChain: { status: string; head: string
   if (onChain.status !== "Settled" || onChain.head !== a.head) return { state: "fail", detail: "The contract's record of this match does not match the settle." };
   return {
     state: "ok",
-    detail: `Match ${a.match_id}: ${usdc(onChain.stakes)} USDC staked, ${usdc(a.lent)} lent by the vault and ${usdc(a.vault_repaid)} repaid, ${a.payouts.length ? `${a.payouts.length} payouts` : "no survivor, so the leftover went to the vault"}. The contract checked the books balance exactly before it paid, and stored the log head ${a.head.slice(0, 10)}...`,
+    detail: `Match ${a.match_id}: ${usdc(onChain.stakes)} USDC staked, ${usdc(a.lent)} lent by the vault and ${usdc(a.vault_repaid)} repaid, ${a.payouts.length ? count(a.payouts.length, "payout") : "no survivor, so the leftover went to the vault"}. The contract checked the books balance exactly before it paid, and stored the log head ${a.head.slice(0, 10)}...`,
   };
 }
 

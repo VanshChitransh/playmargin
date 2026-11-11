@@ -8,7 +8,7 @@ import { LocalMatch } from "../game/local";
 import { ENDPOINT } from "../net/client";
 import type { Screen } from "../router";
 import { BTN, header } from "./chrome";
-import { anchorVerdict, configVerdict, firstCall, droneVerdict, relayVerdict, sessionKeyVerdict, settleVerdict, type RawTx, type State, type Verdict } from "../judges/claims";
+import { anchorVerdict, configVerdict, count, firstCall, droneVerdict, relayVerdict, sessionKeyVerdict, settleVerdict, type RawTx, type State, type Verdict } from "../judges/claims";
 
 // Old txs fall out of regular RPC nodes after about 2.5 days, so archival nodes go first (same list as /verify).
 const RPCS = rpcUrls(NETWORK, ARCHIVAL[NETWORK]);
@@ -138,7 +138,7 @@ const claims: Claim[] = [
       if ((await verifyChain(log)) !== null) return { state: "fail", detail: "The match log's hash chain is broken." };
       const r = settle(log);
       const pops = log.filter((e) => e.type === "POP" || e.type === "KEEPER_POP").length;
-      return { state: "ok", detail: `${log.length} events, ${pops} liquidations, hash chain intact, settle() balanced to the last millionth of a credit (head ${r.head.slice(0, 10)}...).` };
+      return { state: "ok", detail: `${count(log.length, "event")}, ${count(pops, "liquidation")}, hash chain intact, settle() balanced to the last millionth of a credit (head ${r.head.slice(0, 10)}...).` };
     },
   },
   {
@@ -151,7 +151,7 @@ const claims: Claim[] = [
       try {
         const s = (await (await fetch(`${ENDPOINT}/api/stats`, { signal: AbortSignal.timeout(8000) })).json()) as { players: number; matches: number; agentPops: number; multiHumanPct: number };
         const st: State = s.players > 0 ? "ok" : "none";
-        return { state: st, detail: `${s.players} players, ${s.matches} matches with a human, ${s.multiHumanPct}% with two or more humans, ${s.agentPops} liquidations by AI agents.${mainnet}` };
+        return { state: st, detail: `${count(s.players, "player")}, ${count(s.matches, "match", "matches")} with a human, ${s.multiHumanPct}% with two or more humans, ${count(s.agentPops, "liquidation")} by AI agents.${mainnet}` };
       } catch {
         return { state: "unreachable", detail: `The game server did not answer, so there is no live count to show.${mainnet}` };
       }
