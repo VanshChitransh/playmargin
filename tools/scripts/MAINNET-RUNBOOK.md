@@ -143,11 +143,37 @@ answers with its balance and `"alarm":false`.
 
 ## 6. Seed the vault and play the first real match
 
-The vault must back every match that is open at the same time: **seed at least
-1.5 x stake x players**. 1 USDC stake, 2 players: 3 USDC. 0.10 stake, 2 players: 0.3 USDC
-(rehearsed), a full 12-player room at 0.10: 1.8 USDC.
+Each paid room reserves a budget **B = 1.5 x stake x players** from `vault.free` at open, and
+(PR #21) its loan cost is set at open from the vault's utilisation, `locked / (free + locked)`:
+6%/min at 0%, rising in a straight line to 15%/min at the 80% kink, then steeply to 75%/min at 100%.
+The lobby shows LOW only at exactly 0% (the first room open at a time), MED below the kink, HIGH from it.
 
-**[TX 6]** owner seeds the vault (amount in base units, 3000000 = 3 USDC, measured 6 s):
+**Seed 5 x B.** Then rooms open at the same time get these rates:
+
+| Room open at the same time | Utilisation it sees | Loan cost | Tier |
+|---|---|---|---|
+| 1st | 0% | 6.00%/min | LOW |
+| 2nd | 20% | 8.25%/min | MED |
+| 3rd | 40% | 10.50%/min | MED |
+| 4th | 60% | 12.75%/min | MED |
+| 5th | 80% | 15.00%/min | HIGH |
+| 6th | refused at `open_match` (no free budget left) | | |
+
+With the old seed of 1 x B, a second room open at the same time could not open at all (no free
+budget), and 3 x B already puts the 3rd room at 13.49%/min.
+
+| Stake | Players per room | B | Seed 5 x B |
+|---|---|---|---|
+| 0.10 USDC | 2 (duel, the expected case) | 0.30 | **1.50 USDC** |
+| 0.10 USDC | 12 (full room) | 1.80 | 9.00 USDC |
+| 1 USDC | 2 | 3.00 | **15.00 USDC** |
+| 1 USDC | 12 | 18.00 | 90.00 USDC |
+
+Interest and fees flow back into the vault, so utilisation only falls over time. Top up later
+with the same TX 6 if more rooms run at once.
+
+**[TX 6]** owner seeds the vault (amount in base units: 1500000 = 1.5 USDC for 0.10 duels, 15000000
+= 15 USDC for 1 USDC duels; the example below sends 3 USDC, measured 6 s):
 
 ```
 near contract call-function as-transaction 17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1 \
