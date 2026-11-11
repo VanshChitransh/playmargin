@@ -3,17 +3,15 @@
 // may open it. Verdict rules live in judges/claims.ts (tested); this file fetches and draws.
 import { settle, verifyChain } from "@margin/core";
 import { CONTRACT_ID, EXPLORER, NETWORK, USDC_ID } from "../chain/config";
+import { ARCHIVAL, rpcUrls } from "../chain/rpc";
 import { LocalMatch } from "../game/local";
 import { ENDPOINT } from "../net/client";
 import type { Screen } from "../router";
 import { BTN, header } from "./chrome";
 import { anchorVerdict, configVerdict, firstCall, droneVerdict, relayVerdict, sessionKeyVerdict, settleVerdict, type RawTx, type State, type Verdict } from "../judges/claims";
 
-// Old txs fall out of regular RPC nodes after about 2.5 days, so the archival node is asked first.
-const RPCS = {
-  testnet: ["https://archival-rpc.testnet.fastnear.com", "https://rpc.testnet.fastnear.com", "https://rpc.testnet.near.org"],
-  mainnet: ["https://archival-rpc.mainnet.fastnear.com", "https://rpc.mainnet.fastnear.com", "https://rpc.mainnet.near.org"],
-}[NETWORK];
+// Old txs fall out of regular RPC nodes after about 2.5 days, so archival nodes go first (same list as /verify).
+const RPCS = rpcUrls(NETWORK, ARCHIVAL[NETWORK]);
 
 // Real transactions to check, per network (signers looked up once, every fact re-read live).
 // Mainnet stays empty until those transactions exist: the cards then say "none yet".
