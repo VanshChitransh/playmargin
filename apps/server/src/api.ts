@@ -116,6 +116,35 @@ export function stats(db: Db) {
   return { users, players, matches, multiHumanPct: matches ? Math.round((100 * multi) / matches) : 0, agentPops };
 }
 
+/**
+ * Raw material for `npm run facts`: counts from the tables (real users only, as stats()) plus the
+ * POINTERS the script checks on NEAR itself (paid match ids + heads, anchor txs). Nothing here is
+ * trusted as an on-chain fact: the script counts only what the chain confirms. All of it is already
+ * public (the Verify page, the leaderboard, the chain).
+ */
+export function facts(db: Db, network = process.env.NETWORK === "mainnet" ? "mainnet" : "testnet", contract: string | null = null) {
+  const one = <T>(sql: string): T => db.prepare(sql).get() as T;
+  const byMode = (mode: string) =>
+    one<{ n: number }>(`SELECT COUNT(*) AS n FROM matches m WHERE m.status = 'settled' AND m.mode = '${mode}' AND m.id IN (SELECT match_id FROM (${REAL_SEATS}))`).n;
+  const seated = (cond: string) => one<{ n: number }>(`SELECT COUNT(DISTINCT r.user_id) AS n FROM (${REAL_SEATS}) r JOIN users u ON u.id = r.user_id WHERE ${cond}`).n;
+  const paidSettled = db
+    .prepare("SELECT id, head, tx_hash AS tx FROM matches WHERE mode = 'paid' AND status = 'settled' AND tx_hash IS NOT NULL ORDER BY ended DESC LIMIT 1000")
+    .all() as Array<{ id: string; head: string; tx: string }>;
+  const anchors = db.prepare("SELECT hour, tx_hash AS tx FROM anchors WHERE length(tx_hash) > 20 ORDER BY hour DESC LIMIT 2000").all() as Array<{ hour: number; tx: string }>;
+  const wallets = (db.prepare(`SELECT DISTINCT u.account_id AS a FROM (${REAL_SEATS}) r JOIN users u ON u.id = r.user_id WHERE u.account_id IS NOT NULL`).all() as Array<{ a: string }>).map((r) => r.a);
+  return {
+    generatedAt: new Date().toISOString(),
+    network,
+    contract,
+    matches: { free: byMode("free"), paid: byMode("paid") },
+    players: { freeGuests: seated("u.account_id IS NULL"), wallets: seated("u.account_id IS NOT NULL") },
+    agentPops: stats(db).agentPops,
+    paidSettled,
+    anchors,
+    wallets,
+  };
+}
+
 /** Mount every /api route. */
 export function mountApi(app: Application, db: () => Db): void {
   app.use("/api", (_req, res, next) => {
@@ -161,6 +190,7 @@ export function mountApi(app: Application, db: () => Db): void {
     });
   });
   app.get("/api/stats", (_req, res) => void res.json(stats(db())));
+  app.get("/api/facts", (_req, res) => void res.json(facts(db(), undefined, sharedChain()?.cfg.contractId ?? null)));
   // Last: any other /api path or method answers JSON like every route above, never Express's HTML page.
   app.use("/api", (_req, res) => void res.status(404).json({ error: "not found" }));
 }

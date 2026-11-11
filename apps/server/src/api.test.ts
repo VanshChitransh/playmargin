@@ -1,6 +1,6 @@
 // Read API numbers must be exactly what the tables say.
 import { describe, expect, it } from "vitest";
-import { leaderboard, matchLog, matchProof, pickWatchRoom, stats } from "./api";
+import { facts, leaderboard, matchLog, matchProof, pickWatchRoom, stats } from "./api";
 import { openDb, userForAccount, userForGuestKey } from "./db";
 import { addMatchPlayer, createMatch, finishMatch, saveEvents } from "./matches";
 import { JUDGE_SEED, type LogEntry } from "@margin/core";
@@ -108,5 +108,28 @@ describe("finishMatch payouts", () => {
     finishMatch(db, "d6", { status: "settled", head: "h", payouts: new Map([["a", 180 * U]]) });
     const rows = db.prepare("SELECT blob_id, payout FROM match_players WHERE match_id = 'd6' ORDER BY blob_id").all();
     expect(rows).toEqual([{ blob_id: "a", payout: 180 * U }, { blob_id: "b", payout: 0 }]);
+  });
+});
+
+describe("facts", () => {
+  it("counts real users only and hands out pointers, not on-chain claims", () => {
+    const db = openDb(":memory:");
+    const w = userForAccount(db, "w.testnet");
+    const g = userForGuestKey(db, "3f2b8c1e-5d4a-4f7b-9c2e-1a6d8e0f4b7c");
+    const qa = userForGuestKey(db, "qa-bot-1");
+    createMatch(db, { id: "p1", mode: "paid", seed: 1, pot: 200 * U });
+    addMatchPlayer(db, { matchId: "p1", userId: w, blobId: "a", entry: 100 * U });
+    finishMatch(db, "p1", { status: "settled", head: "hp", txHash: "TxHash11111111111111111111", payouts: new Map() });
+    createMatch(db, { id: "f1", mode: "free", seed: 2, pot: 100 * U });
+    addMatchPlayer(db, { matchId: "f1", userId: g, blobId: "g", entry: 100 * U });
+    finishMatch(db, "f1", { status: "settled", head: "hf", payouts: new Map() });
+    createMatch(db, { id: "q1", mode: "free", seed: 3, pot: 100 * U });
+    addMatchPlayer(db, { matchId: "q1", userId: qa, blobId: "q", entry: 100 * U });
+    finishMatch(db, "q1", { status: "settled", head: "hq", payouts: new Map() });
+    const f = facts(db, "testnet", "margin.testnet");
+    expect(f.matches).toEqual({ free: 1, paid: 1 }); // the qa- match never counts
+    expect(f.players).toEqual({ freeGuests: 1, wallets: 1 });
+    expect(f.paidSettled).toEqual([{ id: "p1", head: "hp", tx: "TxHash11111111111111111111" }]);
+    expect(f.wallets).toEqual(["w.testnet"]);
   });
 });

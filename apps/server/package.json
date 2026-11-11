@@ -8,7 +8,8 @@
     "start": "tsx --env-file-if-exists=../../.env src/index.ts",
     "typecheck": "tsc -p .",
     "e2e": "tsx scripts/e2e-local.ts",
-    "playtest": "tsx scripts/playtest.ts"
+    "playtest": "tsx scripts/playtest.ts",
+    "facts": "tsx scripts/facts.ts"
   },
   "dependencies": {
     "@colyseus/tools": "~0.17.0",
