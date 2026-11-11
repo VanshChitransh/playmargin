@@ -9,8 +9,40 @@ is a hash-chained log that settles on NEAR.
 <sub>Real play, nothing staged: one Judge Run on a local server, every agent labelled. Click for the mp4. More in [`docs/screenshots/`](docs/screenshots/): home, warm-up, BOOST, margin call, liquidation, receipt, Verify (honest and tampered), and the Liquidation Certificate.</sub>
 <!-- TODO(Vansh): V1 demo video (your voice, at most 2:20) and V2 gameplay trailer, mp4 at most 10 MB each -->
 
-**Play:** TODO(Vansh) live URL · **Demo post on X:** TODO(Vansh) link · **Contract (testnet):**
+**Play:** [playmargin.fun](https://playmargin.fun) (testnet) · **Demo post on X:** TODO(Vansh) link · **Contract (testnet):**
 [`playmargin.testnet`](https://testnet.nearblocks.io/address/playmargin.testnet)
+
+## Judges: start here
+
+Online rooms need the game server. Until it is live at playmargin.fun, **Practice free** and the
+Judge Run show a "Can't join right now" card with a **Practice offline** button (same rules, local
+bots, nothing counts). Everything below also runs on your machine with no keys: `npm install`,
+then `npm run dev` and open http://localhost:1234.
+
+| Check | What to click or run | What you should see | Link |
+|---|---|---|---|
+| Play (about 2 min) | **Practice free** (or **Practice offline** on the card) | An 8 s warm-up, then a 90 s match against labelled bots (🤖). Hold Space to BOOST: a gold debt shell grows. Hold R: the debt drains to 0 | [playmargin.fun](https://playmargin.fun) |
+| Judge Run | `#/judge` (needs the game server, or locally http://localhost:1234/#/judge) | Hold BOOST, go red, and 🤖 Drone-1 liquidates you within seconds. Never borrow and you survive. Disclosed on screen: the agents here only hunt red blobs | [playmargin.fun/#/judge](https://playmargin.fun/#/judge) |
+| Verify a match | **Verify this match** on the results receipt | "Honest so far": the hash chain links and the books balance to the millionth of a credit. The NEAR anchor check follows (an online free match is anchored within the hour, an offline one never) | `apps/client/src/screens/verify.ts` |
+| Tamper demo | **Tamper test** on the Verify page | The page edits one number in the log and turns red at that exact event: "This log does not add up" | same page |
+| The settle tx | open the link | One real paid match settled on chain: payouts + vault repaid + interest + fees + reserve = stakes + lent, exactly, with the log head stored | [settle](https://testnet.nearblocks.io/txns/3Nw3RqiAfPmFYJ5LKxxXioEfppLhdEswXyTHhyZQABwA) |
+| A drone bounty tx | open the link | Settle pays 0.092521 USDC to `drone-1.playmargin.testnet`, a registered AI liquidator account | [bounty](https://testnet.nearblocks.io/txns/8nDTHu1ZmeW19fSEaa9LoXtrUtdSsEALwVJWdNfpuWwf) |
+| A session key that cannot withdraw | the AddKey tx, then the stolen-key results | A key scoped to `enter_arena` only. Used as a thief would: `withdraw` with 1 yocto is refused (`DepositWithFunctionCall`), without it is refused (`MethodNameMismatch`), relayed it is refused (HTTP 400). Re-run: `tools/scripts/n8-paid.ts` (testnet keys) | [AddKey](https://testnet.nearblocks.io/txns/F3GzT78QTH1RkLCwpM89JjFsgdfZAGt9hNqbC365Cug8), [results](docs/NEAR.md#stolen-session-key-cannot-withdraw) |
+| Intents deposit quote | **Add funds** on the $1 screen | Not viewable online yet: it needs our relayer (with the 1-Click partner key) to be live. The quote is a real 1-Click dry run (NEAR Intents has no testnet). A real $1 deposit is planned for mainnet day | `services/relayer/oneclick.ts`, `apps/client/src/chain/addfunds.ts` |
+| Every on-chain claim, no browser | `npm run proofs` (no keys, about 20 s) | One `OK` line per tx cited here and in docs/NEAR.md, ending `N of N cited txs OK on chain (read from NEAR RPC, not nearblocks)` | `tools/scripts/proofs.ts` |
+
+### Try it in 2 minutes (no keys, no wallet)
+
+1. `npm install`: about a minute.
+2. `npm run demo`: a narrated paid match in about 10 s, ending with the three proof lines in
+   [Quick start](#1-quick-start-no-keys-no-wallet-about-1-minute), `0 micro-units created or destroyed` and `settle == live ✓`.
+3. `npm run dev`, open http://localhost:1234, press **Practice free**: the warm-up counter, then GO.
+4. Hold Space for a second: your blob grows and wears a gold "owe" shell. Hold R: the owe drops to 0 in under a second.
+5. At the bell (or when you pop): a receipt whose lines add up to YOU KEEP. Press **Verify this match**: all green. Press **Tamper test**: red at the edited event.
+
+### What is real, today
+
+<!-- Slot for S2's generated table (npm run facts): what is live, measured from the chain and the server. -->
 
 Part 1 is the pitch for human judges: every claim links to a file, a test, a transaction or a public
 source. Part 2 is for AI screeners and developers: every claim is a command you can run.
@@ -119,6 +151,42 @@ nearblocks links may show a Cloudflare check to scripts: `npm run proofs` reads 
   2 or more humans, agent liquidations).
 - **Real money is gated.** Paid rooms will only open where real-money games are legal. India
   (where they are banned) gets free mode only, pending legal advice.
+
+### The track prompts, line by line
+
+We answer the organizers' example prompts for the two tracks we enter. MARGIN is not their example
+game (a market town, a DCA vault), so each line is mapped to what MARGIN does instead, with proof, and
+marked **Met**, **Partly** or **Not yet**.
+
+**Games With Real Economies** ("The economy is the gameplay")
+
+| The prompt asks for | Where in MARGIN | Proof | Status |
+|---|---|---|---|
+| The economy is the gameplay | Size is money. BOOST is a loan from a vault, interest drains you, spikes and the zone burn mass, red blobs get liquidated, survivors cash out | `packages/core/src/economy.ts`, `step.ts`, every number in `constants.ts`. `npm run demo` | Met |
+| NPCs with wallets | Liquidator drones are registered NEAR accounts that earn bounties on chain. Free-room agents play for credits and have no account | [set_agents](https://testnet.nearblocks.io/txns/4eH66oURfLpz9FXafY8Y7QWb3LpRx6kQCwq46yghdgy2), [bounty](https://testnet.nearblocks.io/txns/8nDTHu1ZmeW19fSEaa9LoXtrUtdSsEALwVJWdNfpuWwf) | Partly |
+| Player-owned markets | None. The vault that lends is the house's, not owned by players | | Not yet |
+| An economy that evolves without a dev patch | The interest curve (base rate, 80% use kink) is in the rules, but every match starts at the base rate today | `constants.ts` `RATE_PER_MIN`, `world.ts` `startMatch` | Not yet |
+| Players never notice the chain (bonus) | Free play: no wallet, no sign-up. Paid play: one wallet approval adds a session key, then no pop-ups, our relayer pays gas | `apps/client/src/chain/session.ts`, [relayed ticket](https://testnet.nearblocks.io/txns/6ZSeFrGuuHC6Y6G6swxtpLodk9gjZUJk6cqhmdR2Tn4P) | Met for free play, Partly for paid |
+| Agent NPCs | Labelled AI players in every free room, retuned live by a NEAR AI Cloud commander whose reasoning is shown in the HUD | `apps/server/src/agents/`, `commander.ts` | Met |
+| Social or email login, no seed phrases | Guest key in the browser (no login at all). NEAR Auth email login is built behind a flag, waiting on NEAR's mainnet approval | `apps/client/src/chain/email.ts` | Partly |
+| NEAR Intents | Add funds from any chain through 1-Click, as dry-run quotes until mainnet | `services/relayer/oneclick.ts` | Partly |
+| NEP-245 items | MARGIN has no items: money is NEP-141 USDC held by the contract | `contracts/margin/src/deposit.rs` | Not yet (not used) |
+| Rules in one readable file, the AI's reasoning shown | Every number in one file. The commander's one-line plan is shown to players | `packages/core/src/constants.ts`, HUD commander line | Met |
+| A fast-forward mode to watch the economy move | 500 full matches in under a minute, every Micro checked | `npm run sim`, `npm run sweep -- 900` | Met |
+| Design the loop on paper first | Rules written before the engine (three 30 s phases: grow, hunt, squeeze, and each match asks: borrow or not, cash out or not) | `packages/core/src/constants.ts` header, Part 1 above | Met |
+
+**Unstoppable DeFi** ("Markets that never close")
+
+| The prompt asks for | Where in MARGIN | Proof | Status |
+|---|---|---|---|
+| Lending with liquidation, no custodian | Player USDC sits in the contract, never with us. The settler can only pay a match's own players, exactly balanced. Withdraw needs a full-access key | `contracts/margin/src/arena.rs` `settle`, `withdraw.rs`. [settle](https://testnet.nearblocks.io/txns/3Nw3RqiAfPmFYJ5LKxxXioEfppLhdEswXyTHhyZQABwA), [withdraw](https://testnet.nearblocks.io/txns/H7t24bbuy6KQsbydw2RaURyPYfuUiutpAWtzs4ufuCew) | Met |
+| Nobody can switch it off | If our server dies, a player reclaims the stake from the contract after 15 min, no server needed | `arena.rs` `reclaim`. [reclaim](https://testnet.nearblocks.io/txns/7ZrF2rVJGq3VybmxuTaojzjebGiAAGha3M4DH4Yj1Etk) | Met for stakes |
+| Settles across chains through NEAR Intents | Deposits from any chain land as USDC on NEAR straight into the contract (`customRecipientMsg`). Dry-run quotes today | `services/relayer/oneclick.ts`, `apps/client/src/chain/addfunds.ts` | Partly |
+| 1-Click quotes, deposits and status, REFUNDED and FAILED shown | Quote, deposit address and status polling. REFUNDED and FAILED each have their own message | `addfunds.ts` `depositState`, `STATE_WORDS` | Met in code, not yet run with real funds |
+| Show where funds sit at every step | The $1 screen shows the balance held by the contract and the test USDC still in your wallet, and each paid step is named (quick play, buying ticket, joining) | `apps/client/src/screens/cash.ts` | Partly (no step-by-step trail yet) |
+| A history with explorer links | Every match has a Verify page, and an anchored or settled match links its tx ("See proof on NEAR") | `apps/client/src/screens/verify.ts` | Partly |
+| Dry-run with real quotes and no funds | 1-Click quotes are dry unless `ONECLICK_LIVE=1` | `oneclick.ts` `quoteRequest` | Met (needs the relayer key) |
+| Stretch: Chain Signatures | Not used | | Not yet |
 
 ### What is different
 
