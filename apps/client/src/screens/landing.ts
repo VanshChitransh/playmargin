@@ -18,9 +18,10 @@ export const landing: Screen = (root) => {
         <span class="pop flex size-12 items-end justify-center overflow-hidden rounded-2xl bg-sky xl:size-15"><img src="/brand/margin-cat-cutout.svg" alt="" class="-mb-1.5 w-[105%]" /></span>
         <span class="hidden font-display text-3xl tracking-wide min-[420px]:inline xl:text-4xl">MARGIN</span>
       </a>
-      <nav class="flex items-center gap-2 whitespace-nowrap sm:gap-3">
-        <a href="#/how" class="pop-sm pop-press rounded-xl bg-card px-3 py-2 text-sm font-bold sm:px-5 sm:py-3 sm:text-base">How it works</a>
-        <a href="#/judge" class="pop-sm pop-press rounded-xl bg-ink px-3 py-2 text-sm font-bold text-card sm:px-5 sm:py-3 sm:text-base" title="A seeded 90 s match on normal rules"><span class="text-warn">&#9733;</span> Judge Run</a>
+      <nav class="flex items-center gap-1.5 whitespace-nowrap sm:gap-3">
+        <a href="#/how" class="pop-sm pop-press rounded-xl bg-card px-2 py-2 text-sm font-bold sm:px-5 sm:py-3 sm:text-base">How it works</a>
+        <a href="#/judges" class="pop-sm pop-press rounded-xl bg-card px-2 py-2 text-sm font-bold text-ink sm:px-5 sm:py-3 sm:text-base" title="Every claim, checked live against NEAR"><span class="max-md:hidden">For j</span><span class="md:hidden">J</span>udges</a>
+        <a href="#/judge" class="pop-sm pop-press rounded-xl bg-ink max-[400px]:hidden px-2 py-2 text-sm font-bold text-card sm:px-5 sm:py-3 sm:text-base" title="A seeded 90 s match on normal rules"><span class="text-warn">&#9733;</span> Judge Run</a>
       </nav>
     </header>
     <main class="mx-auto grid w-full max-w-[88rem] flex-1 items-center gap-12 px-4 pt-4 pb-8 lg:grid-cols-[1fr_1fr] xl:gap-16 xl:px-16">

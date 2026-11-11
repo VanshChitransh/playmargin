@@ -31,6 +31,8 @@ else startRouter(app, {
   "/watch": laptop(lazy(() => import("./screens/watch").then((m) => m.watch))),
   "/judge": judge,
   "/verify/:id": lazy(() => import("./screens/verify").then((m) => m.verify)),
+  // Read only, so phones may open it too (like verify).
+  "/judges": lazy(() => import("./screens/judges").then((m) => m.judges)),
   "/r/:code": play,
   "*": notFound,
 });
