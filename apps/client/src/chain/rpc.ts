@@ -3,6 +3,9 @@
 // Shared by the browser chain code and services/relayer, so it reads no env itself.
 import { Near, NetworkError, type NearConfig } from "near-kit";
 
+/** Re-exported so callers with their own near-kit copy throw the class withFallback checks for. */
+export { NetworkError };
+
 type Network = "testnet" | "mainnet";
 
 const DEFAULTS: Record<Network, string[]> = {

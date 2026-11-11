@@ -3,7 +3,7 @@
 // signer, receiver, method and its key arg or event. Exits 1 if any tx is missing or failed.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { nearClients, withFallback } from "../../apps/client/src/chain/rpc.ts";
+import { NetworkError, nearClients, withFallback } from "../../apps/client/src/chain/rpc.ts";
 
 type Network = "testnet" | "mainnet";
 type Action = string | Record<string, Record<string, unknown>>;
@@ -22,8 +22,21 @@ const given = process.argv.slice(2).filter((h) => /^[1-9A-HJ-NP-Za-km-z]{43,44}$
 const txs: [string, Network][] = given.length
   ? given.map((h) => [h, "testnet"])
   : [...new Map(cited.map((m) => [m[2]!, (m[1] ? "testnet" : "mainnet") as Network])).entries()];
-const clients = { testnet: nearClients("testnet"), mainnet: nearClients("mainnet") };
-// tx lookup needs an account only to route to its shard; any of ours works on these RPCs.
+// Regular nodes drop txs older than about 2.5 days (judging is weeks later), so archival nodes go
+// first; the regular FastNEAR and NEAR RPCs stay as the last fallback for brand new txs.
+const ARCHIVAL = {
+  testnet: "https://archival-rpc.testnet.fastnear.com,https://archival-rpc.testnet.near.org",
+  mainnet: "https://archival-rpc.mainnet.fastnear.com,https://archival-rpc.mainnet.near.org",
+};
+// PROOFS_RPC (comma list) goes before the archival nodes, e.g. a keyed archival provider.
+const extra = (n: Network) => [process.env.PROOFS_RPC ?? "", ARCHIVAL[n]].filter(Boolean).join(",");
+const clients = { testnet: nearClients("testnet", extra("testnet")), mainnet: nearClients("mainnet", extra("mainnet")) };
+const PER_RPC_MS = 20_000;
+/** A slow RPC counts as unreachable, so withFallback moves on and a run can never hang. */
+const inTime = <T>(p: Promise<T>): Promise<T> =>
+  Promise.race([p, new Promise<never>((_, no) => setTimeout(() => no(new NetworkError(`no answer in ${PER_RPC_MS / 1000} s`)), PER_RPC_MS).unref())]);
+// tx lookup needs an account only to route to its shard; archival nodes hold every shard, so any
+// of ours works (the printed signer is the real one, read from the tx).
 const route = { testnet: "playmargin.testnet", mainnet: "vanshverse.near" };
 
 const short = (v: unknown, n = 110) => {
@@ -56,7 +69,7 @@ let bad = 0;
 for (const [hash, network] of txs) {
   try {
     const tx = await withFallback(clients[network], (near) =>
-      near.rpc.call<Tx>("EXPERIMENTAL_tx_status", { tx_hash: hash, sender_account_id: route[network], wait_until: "FINAL" }),
+      inTime(near.rpc.call<Tx>("EXPERIMENTAL_tx_status", { tx_hash: hash, sender_account_id: route[network], wait_until: "NONE" })),
     );
     const ok = "SuccessValue" in tx.status || "SuccessReceiptId" in tx.status;
     const { method, detail } = describe(tx);
