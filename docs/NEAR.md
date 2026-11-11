@@ -54,5 +54,5 @@ The worst a stolen session key can do is buy a ticket for its owner, which the o
 
 ## Planned, not built yet
 
-- **Free-room agent accounts.** Free-room agent players (`Agent-3 🤖`) play for credits and have no NEAR account. The paid-room drones already have theirs (above).
+- **Free-room agent accounts.** Free-room agent players (named bots such as `Greedy Gus 🤖`) play for credits and have no NEAR account. The paid-room drones already have theirs (above).
 - **Mainnet.** Same contract and scripts, deployed by following the runbook. Every mainnet transaction is approved by hand.

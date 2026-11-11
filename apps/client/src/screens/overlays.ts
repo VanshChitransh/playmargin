@@ -3,10 +3,9 @@
 // the v8 Cover Story mockup (research/margin/ui/variants). One primary button each (Play
 // again); Watch keeps spectating, so the room stays alive.
 import { R } from "@margin/core";
-import type { Outcome } from "../game/receipt";
+import { centLines, type Outcome } from "../game/receipt";
 import { showStake } from "../stake";
 
-const fmt = (n: number): string => (n >= 0 ? "+" : "−") + Math.abs(n).toFixed(2); // one format, so the column lines up
 const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 // Arcade Paper tokens (REVAMP-PLAN 1). The new ones carry their value as a fallback so the
@@ -102,7 +101,10 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
     </div>`;
   const line = (label: string, v: string, neg = false): string =>
     `<div class="flex justify-between gap-6 border-b border-dashed border-ink/25 py-2"><span>${label}</span><span class="num ${neg ? "text-liq" : ""}">${v}</span></div>`;
-  const rows = o.lines.map((l) => line(esc(l.label), fmt(l.amount), l.amount < 0)).join("");
+  // Whole cents that add up to YOU KEEP on screen (QA-E-16): rounding each line alone could miss by a cent or two.
+  const cents = centLines(o.start, o.lines.map((l) => l.amount), o.end);
+  const money = (c: number): string => (Math.abs(c) / 100).toFixed(2);
+  const rows = o.lines.map((l, i) => line(esc(l.label), (cents[i]! >= 0 ? "+" : "\u2212") + money(cents[i]!), cents[i]! < 0)).join("");
   const el = shell(
     root,
     `<div class="flex min-h-full flex-col lg:flex-row" style="background:color-mix(in srgb, var(--color-paper) 88%, transparent)">
@@ -127,10 +129,10 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
         <div class="sticker relative mx-auto mt-10 max-w-xl px-5 pb-5 pt-6 sm:px-7 lg:rotate-[-1deg]" style="background:${CREAM}">
           ${tape("left:-22px;top:-8px;transform:rotate(-30deg)")}${tape("right:-22px;top:-8px;transform:rotate(30deg)")}
           <h3 class="flex items-baseline justify-between border-b-[3px] border-ink pb-3 font-display text-2xl">RECEIPT <span class="tag text-muted">where your ${o.start.toFixed(0)} went</span></h3>
-          <div class="font-mono text-sm sm:text-base">${line("Start", o.start.toFixed(2))}${rows}</div>
+          <div class="font-mono text-sm sm:text-base">${line("Start", money(Math.round(o.start * 100)))}${rows}</div>
           <div class="sticker mt-4 flex items-center justify-between bg-gold px-4 py-3" style="box-shadow:none">
             <span class="font-display text-2xl">YOU KEEP</span>
-            <span class="font-display text-5xl tabular-nums">${o.end.toFixed(2)}</span>
+            <span class="font-display text-5xl tabular-nums">${money(Math.round(o.end * 100))}</span>
           </div>
           <p class="mt-3 text-sm font-semibold text-muted">${paid ? "Real dollars, paid to your balance when the match settles." : "Practice credits. Never cash, never bought."}</p>
         </div>

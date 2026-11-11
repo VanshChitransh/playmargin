@@ -318,3 +318,22 @@ export function mergeLog(o: Outcome, r: LogReceipt): Outcome {
   if (r.rank !== null) o.rank = r.rank;
   return o;
 }
+
+/**
+ * Receipt lines in whole cents that add up exactly to the shown total (QA-E-16). Each line is
+ * rounded, then the few cents of rounding drift go to the lines closest to the next cent (largest
+ * remainder), so start + lines == end to the cent on screen. View only: the money is untouched.
+ */
+export function centLines(start: number, amounts: readonly number[], end: number): number[] {
+  const exact = amounts.map((a) => a * 100);
+  const cents = exact.map((x) => Math.round(x));
+  let drift = Math.round(end * 100) - Math.round(start * 100) - cents.reduce((s, c) => s + c, 0);
+  const order = exact.map((x, i) => ({ i, r: x - cents[i]! }));
+  // Short a cent: bump the lines rounded down the most. Over by a cent: trim the ones rounded up the most.
+  order.sort((a, b) => (drift > 0 ? b.r - a.r : a.r - b.r));
+  for (let k = 0; drift !== 0 && order.length > 0; k = (k + 1) % order.length) {
+    cents[order[k]!.i]! += Math.sign(drift);
+    drift -= Math.sign(drift);
+  }
+  return cents;
+}

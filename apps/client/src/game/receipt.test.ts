@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BlobView } from "@margin/core";
-import { Receipt } from "./receipt";
+import { Receipt, centLines } from "./receipt";
 
 const b = (id: string, equity: number, o: Partial<BlobView> = {}): BlobView => ({
   id, kind: "human", label: id, x: 0, y: 0, radius: 50, ring: "green", pips: 3, owe: 0,
@@ -55,5 +55,18 @@ describe("Receipt", () => {
     r.event({ type: "clutchSave", blob: "me", clutch: true });
     r.event({ type: "clutchSave", blob: "other", clutch: true });
     expect(r.outcome([]).stats).toMatchObject({ saves: 2, clutches: 1 });
+  });
+
+  it("receipt lines in cents always add up to the shown total (QA-E-16)", () => {
+    // Three lines that each round to 0.33, but the total is 1.00: one line takes the cent.
+    const c = centLines(0, [1 / 3, 1 / 3, 1 / 3], 1);
+    expect(c.reduce((s, x) => s + x, 0)).toBe(100);
+    expect([...c].sort()).toEqual([33, 33, 34]);
+    // A receipt whose lines, each rounded on its own, missed the total by cents.
+    const amounts = [105.404, 274.844, -2.754, -4.574, 67.554, -274.844, -18.774];
+    const end = 80 + amounts.reduce((s, a) => s + a, 0);
+    const cents = centLines(80, amounts, end);
+    expect(8000 + cents.reduce((s, x) => s + x, 0)).toBe(Math.round(end * 100));
+    cents.forEach((x, i) => expect(Math.abs(x - Math.round(amounts[i]! * 100))).toBeLessThanOrEqual(1));
   });
 });
