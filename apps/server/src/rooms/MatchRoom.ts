@@ -451,7 +451,8 @@ export class MatchRoom extends Room {
     this.rateFrom = "base: vault not read by GO"; // overwritten below once the read answers
     try {
       const chain = sharedChain();
-      const v = chain ? await chain.view<{ free: string; locked: string }>("vault", {}) : undefined;
+      if (!chain) return void (this.rateFrom = "base: no chain configured");
+      const v = await chain.view<{ free: string; locked: string }>("vault", {});
       if (!v) throw new Error("no vault view");
       const free = BigInt(v.free);
       const locked = BigInt(v.locked);
