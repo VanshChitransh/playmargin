@@ -4,9 +4,9 @@
 a loan from a vault, and labelled AI liquidator drones pop anyone who borrows too much. Every match
 is a hash-chained log that settles on NEAR.
 
-[![MARGIN Judge Run on a laptop: holding BOOST borrows and grows a gold debt shell (owe 225), a spike turns the rim red with a margin call, and Drone-1, a labelled AI liquidator, pops the blob: LIQUIDATED](docs/hero.gif)](docs/hero.mp4)
+[![MARGIN Judge Run on a laptop: holding BOOST borrows and grows a gold debt shell (owe 218), a spike turns the rim red with a margin call, and Drone-1 (the cyan hexagon, a labelled AI liquidator) closes in and pops the blob: LIQUIDATED](docs/hero.gif)](docs/hero.mp4)
 
-<sub>Real play, nothing staged: one Judge Run on a local server, every agent labelled. Click for the mp4. More in [`docs/screenshots/`](docs/screenshots/): home, warm-up, BOOST, margin call, liquidation, receipt, Verify (honest and tampered).</sub>
+<sub>Real play, nothing staged: one Judge Run on a local server, every agent labelled. Click for the mp4. More in [`docs/screenshots/`](docs/screenshots/): home, warm-up, BOOST, margin call, liquidation, receipt, Verify (honest and tampered), and the Liquidation Certificate.</sub>
 <!-- TODO(Vansh): V1 demo video (your voice, at most 2:20) and V2 gameplay trailer, mp4 at most 10 MB each -->
 
 **Play:** TODO(Vansh) live URL · **Demo post on X:** TODO(Vansh) link · **Contract (testnet):**
