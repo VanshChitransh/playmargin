@@ -121,10 +121,18 @@ export async function drawCertificate(d: CertData): Promise<Blob> {
   // Bot names (botnames.ts) carry the robot mark, not an "Agent-" prefix (QA-B-08).
   const agent = d.by.includes("\u{1F916}") || /^(agent|drone)/i.test(d.by);
   text(d.keeper ? "Closed by" : "Popped by", 410, 530, "600 30px 'JetBrains Mono'", C.muted);
-  text(d.keeper ? "THE VAULT" : d.by, 410, 612, "76px 'Lilita One'", C.ink);
+  // The full name stays (a drone's "(liquidator)" is part of the disclosure): shrink the font until it
+  // fits the 600 px column right of the rekt tile, never past the card's edge.
+  const who = d.keeper ? "THE VAULT" : d.by;
+  let px = 76;
+  for (g.font = `${px}px 'Lilita One'`; px > 36 && g.measureText(who).width > W - 70 - 410; px -= 2) g.font = `${px - 2}px 'Lilita One'`;
+  text(who, 410, 612, `${px}px 'Lilita One'`, C.ink);
   if (agent) {
     sticker(410, 652, 600, 60, C.agent, 30);
-    text("an AI agent with its own NEAR account", 710, 692, "600 26px Rubik", C.ink, "center");
+    // True in every room: only paid-room drones have NEAR accounts, free agents and the Judge Run's
+    // Drone-1 do not, so the chip says what it is, not where its money lives.
+    const drone = /drone|liquidator/i.test(d.by);
+    text(drone ? "an AI liquidator, not a person" : "an AI player, not a person", 710, 692, "600 26px Rubik", C.ink, "center");
   }
 
   // Numbers.
