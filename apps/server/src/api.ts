@@ -8,7 +8,7 @@ import { userForGuestKey, type Db } from "./db";
 import { loadLog } from "./matches";
 import { RateLimiter, rooms } from "./rooms/guard";
 import { drain } from "./rooms/MatchRoom";
-import { settler, ticks } from "./obs";
+import { diskFree, settler, ticks } from "./obs";
 import { sharedChain } from "./settlement";
 
 const DAY_MS = 86_400_000;
@@ -186,6 +186,7 @@ export function mountApi(app: Application, db: () => Db): void {
     res.status(drain.on ? 503 : 200).json({
       ok: !drain.on, draining: drain.on, network: c?.network ?? "off", contract: c?.contractId ?? null,
       settler: c ? { near: settler.near, low: settler.low } : null,
+      disk: diskFree(),
       rooms: rooms.live, uptimeS: Math.round(process.uptime()), rssMB: Math.round(process.memoryUsage().rss / 2 ** 20), ticks: ticks.summary(),
     });
   });

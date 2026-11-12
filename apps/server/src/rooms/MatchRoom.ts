@@ -220,8 +220,11 @@ export class MatchRoom extends Room {
     const p: PlayerSeed = { id, kind: "human", label: uniqueLabel(name ?? `Player ${++this.joined}`, taken), accountId };
     if (this.started) {
       // Late join (free, first 15 s): pay now, then core charges the pot and shields 10 s.
-      if (typeof auth !== "string" || !chargeEntry(sharedDb(), auth, this.roomId)) {
-        client.leave(4001, "not enough credits");
+      if (typeof auth !== "string") return void client.leave(4001, "not enough credits");
+      const charged = this.charge(auth);
+      if (charged !== "ok") {
+        this.guests.delete(auth);
+        client.leave(4001, charged === "poor" ? "not enough credits" : "the server could not save your entry, try again in a minute");
         return;
       }
       addPlayer(this.world, p, this.roomTick);
@@ -333,7 +336,7 @@ export class MatchRoom extends Room {
         break;
       case "LIVE":
         this.log.drain(w);
-        if (this.phaseTick % LOG_FLUSH_TICKS === 0) this.log.flush();
+        if (this.phaseTick % LOG_FLUSH_TICKS === 0) this.log.flushIfIdle();
         if (this.key.mode === "free" && !this.judge && this.phaseTick === LATE_JOIN_TICKS) void this.lock();
         if (w.phase === "ENDED") {
           this.enter("ENDED", false); // core already sent the ENDED phase event
@@ -373,11 +376,12 @@ export class MatchRoom extends Room {
   private go(): void {
     // Entry is charged here and nowhere else; anyone who can no longer pay is sent home uncharged.
     for (const [id, userId] of this.users) {
-      if (chargeEntry(sharedDb(), userId, this.roomId)) continue;
+      const charged = this.charge(userId);
+      if (charged === "ok") continue;
       this.users.delete(id);
       this.guests.delete(userId);
       removePlayer(this.world, id);
-      this.clients.getById(id)?.leave(4001, "not enough credits");
+      this.clients.getById(id)?.leave(4001, charged === "poor" ? "not enough credits" : "the server could not save your entry, try again in a minute");
     }
     const players = this.roster();
     this.world = newWorld(this.seed, this.key.mode, players, this.roomId, this.stakeBase);
@@ -489,8 +493,24 @@ export class MatchRoom extends Room {
   }
 
   private async settle(): Promise<void> {
-    await this.log.settle(this.world);
-    this.settled = true;
+    try {
+      await this.log.settle(this.world); // never throws, and parks its DB writes for retry
+    } finally {
+      this.settled = true; // the room always closes after the bell, whatever the disk did
+    }
+  }
+
+  /**
+   * Entry charge at GO or late join. "error" (a full disk, an I/O error) sends the player home
+   * uncharged, like being short of credits, instead of throwing out of the tick: no charge, no play.
+   */
+  private charge(userId: string): "ok" | "poor" | "error" {
+    try {
+      return chargeEntry(sharedDb(), userId, this.roomId) ? "ok" : "poor";
+    } catch (err) {
+      log.error("db_write_failed", { matchId: this.roomId, what: "entry charge", err });
+      return "error";
+    }
   }
 
   private enter(phase: Phase, announce = true): void {

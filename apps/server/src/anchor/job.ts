@@ -2,7 +2,7 @@
 // anchor("free", hour, root), so a free match is provable with its head, proof and that tx.
 // seq = hour index, which only grows, so hours are anchored oldest first. Without a settler key
 // roots and proofs are still stored and the tx waits for a box that has one.
-import type { Db } from "../db";
+import { withTx, type Db } from "../db";
 import type { Chain } from "../settlement/chain";
 import { merkle } from "@margin/core";
 import { log } from "../obs";
@@ -28,15 +28,10 @@ export async function anchorPending(db: Db, chain: Chain | null, nowMs = Date.no
     if (db.prepare("SELECT 1 FROM anchors WHERE hour = ?").get(hour)) continue; // root already fixed
     const { root, proofs } = await merkle(ms.map((m) => m.head));
     const setProof = db.prepare("UPDATE matches SET anchor_hour = ?, proof = ? WHERE id = ?");
-    db.exec("BEGIN");
-    try {
+    withTx(db, () => {
       db.prepare("INSERT INTO anchors (hour, root, created) VALUES (?, ?, ?)").run(hour, root, nowMs);
       for (const m of ms) setProof.run(hour, JSON.stringify(proofs.get(m.head)), m.id);
-      db.exec("COMMIT");
-    } catch (err) {
-      db.exec("ROLLBACK");
-      throw err;
-    }
+    });
   }
   if (!chain) return 0;
   let sent = 0;

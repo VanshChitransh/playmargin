@@ -2,7 +2,7 @@
 // already debited at GO by the room, so open() has nothing to lock. Idempotent by matchId.
 import type { MatchOpen, SettleResult, Settlement, TxRef } from "@margin/core";
 import { creditsRepo } from "../credits";
-import type { Db } from "../db";
+import { withTx, type Db } from "../db";
 
 export class CreditsSettlement implements Settlement {
   /** users: blob id to credits user id (agents are absent and never paid). */
@@ -19,10 +19,14 @@ export class CreditsSettlement implements Settlement {
       .get(result.matchId);
     if (paid) return null;
     const repo = creditsRepo(this.db);
-    for (const p of result.payouts) {
-      const userId = this.users.get(p.id);
-      if (userId && p.amount > 0) repo.append({ userId, delta: p.amount, reason: "payout", matchId: result.matchId });
-    }
+    // All payouts or none: a write that fails halfway (disk full) must not leave some players paid,
+    // because the check above would then skip the rest on the retry.
+    withTx(this.db, () => {
+      for (const p of result.payouts) {
+        const userId = this.users.get(p.id);
+        if (userId && p.amount > 0) repo.append({ userId, delta: p.amount, reason: "payout", matchId: result.matchId });
+      }
+    });
     return null;
   }
 }

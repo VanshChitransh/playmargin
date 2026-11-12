@@ -65,21 +65,40 @@ const MIGRATIONS: string[] = [
    ALTER TABLE matches ADD COLUMN proof TEXT;`,
 ];
 
+/**
+ * fn inside one transaction. On some errors (SQLITE_FULL, IOERR, NOMEM) SQLite has ALREADY rolled the
+ * transaction back by itself, and a second ROLLBACK then throws "cannot rollback - no transaction is
+ * active", hiding the real error (the disk-full incident). So: roll back only if still open, never let
+ * the rollback's own error replace the real one, and leave the connection clean for the next write.
+ */
+export function withTx<T>(db: Db, fn: () => T): T {
+  db.exec("BEGIN");
+  try {
+    const out = fn();
+    db.exec("COMMIT");
+    return out;
+  } catch (err) {
+    if ((db as unknown as { isTransaction?: boolean }).isTransaction !== false) {
+      try {
+        db.exec("ROLLBACK");
+      } catch {
+        /* already rolled back by SQLite: the real error below is what matters */
+      }
+    }
+    throw err;
+  }
+}
+
 /** Open (or create) the database and apply pending migrations. Use ":memory:" in tests. */
 export function openDb(path = process.env.DB_PATH ?? "margin.sqlite"): Db {
   const db = new DatabaseSync(path);
   db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
   const { user_version } = db.prepare("PRAGMA user_version").get() as { user_version: number };
   for (let v = user_version; v < MIGRATIONS.length; v++) {
-    db.exec("BEGIN");
-    try {
+    withTx(db, () => {
       db.exec(MIGRATIONS[v]!);
       db.exec(`PRAGMA user_version = ${v + 1}`);
-      db.exec("COMMIT");
-    } catch (err) {
-      db.exec("ROLLBACK");
-      throw err;
-    }
+    });
   }
   return db;
 }

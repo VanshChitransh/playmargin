@@ -1,7 +1,7 @@
 // Match records and their hash-chained logs in SQLite. The events table is the durable copy of
 // the log: the read API and the Verify page replay it, and the hourly anchor hashes its heads.
 import type { LogEntry, Micro, Mode } from "@margin/core";
-import type { Db } from "./db";
+import { withTx, type Db } from "./db";
 
 /** retrying: the log is proven but the payment tx has not landed yet (background retries). */
 export type MatchStatus = "live" | "settled" | "retrying" | "refused";
@@ -30,14 +30,9 @@ export function addMatchPlayer(db: Db, p: { matchId: string; userId: string; blo
 /** Persist log entries; re-saving the same seq is a no-op, so flushes can overlap safely. */
 export function saveEvents(db: Db, matchId: string, entries: LogEntry[]): void {
   const ins = db.prepare("INSERT OR IGNORE INTO events (match_id, seq, json, hash) VALUES (?, ?, ?, ?)");
-  db.exec("BEGIN");
-  try {
+  withTx(db, () => {
     for (const e of entries) ins.run(matchId, e.seq, JSON.stringify(e), e.hash);
-    db.exec("COMMIT");
-  } catch (err) {
-    db.exec("ROLLBACK");
-    throw err;
-  }
+  });
 }
 
 /** Close a match: settled with its head (and tx for paid), or refused when settle failed. */
@@ -46,17 +41,20 @@ export function finishMatch(
   id: string,
   f: { status: MatchStatus; head: string | null; txHash?: string | null; payouts?: Map<string, Micro> },
 ): void {
-  db.prepare("UPDATE matches SET status = ?, head = ?, tx_hash = ?, ended = ? WHERE id = ?").run(
-    f.status,
-    f.head,
-    f.txHash ?? null,
-    Date.now(),
-    id,
-  );
-  const up = db.prepare("UPDATE match_players SET payout = ? WHERE match_id = ? AND blob_id = ?");
-  for (const [blobId, amount] of f.payouts ?? []) up.run(amount, id, blobId);
-  // A popped player is not in the payouts: store a real 0, never NULL (QA-D-06), once the books are known.
-  if (f.payouts) db.prepare("UPDATE match_players SET payout = 0 WHERE match_id = ? AND payout IS NULL").run(id);
+  // One transaction: the status, head and every payout land together or not at all.
+  withTx(db, () => {
+    db.prepare("UPDATE matches SET status = ?, head = ?, tx_hash = ?, ended = ? WHERE id = ?").run(
+      f.status,
+      f.head,
+      f.txHash ?? null,
+      Date.now(),
+      id,
+    );
+    const up = db.prepare("UPDATE match_players SET payout = ? WHERE match_id = ? AND blob_id = ?");
+    for (const [blobId, amount] of f.payouts ?? []) up.run(amount, id, blobId);
+    // A popped player is not in the payouts: store a real 0, never NULL (QA-D-06), once the books are known.
+    if (f.payouts) db.prepare("UPDATE match_players SET payout = 0 WHERE match_id = ? AND payout IS NULL").run(id);
+  });
 }
 
 /** The stored log in seq order (what the Verify page replays). */

@@ -14,7 +14,7 @@ import { sharedDb } from "./db";
 import { anchorPending } from "./anchor/job";
 import { sharedChain } from "./settlement";
 import { paidStakeBase } from "./settlement/stake";
-import { SETTLER_LOW_NEAR, log, settler } from "./obs";
+import { DISK_LOW_MB, SETTLER_LOW_NEAR, diskFree, log, settler } from "./obs";
 
 const server = defineServer({
   // Expected refusals become one structured line instead of a stack (refusal.ts, QA-A-07).
@@ -59,6 +59,14 @@ const checkSettler = async () => {
   }
 };
 setInterval(checkSettler, 5 * 60_000).unref();
+
+// Disk alarm, same cadence: a full disk stalls every DB write (they queue and retry, see matchRecord.ts).
+const checkDisk = () => {
+  const d = diskFree();
+  if (d?.low) log.warn("disk_low", { freeMB: d.freeMB, minMB: DISK_LOW_MB });
+};
+setInterval(checkDisk, 5 * 60_000).unref();
+checkDisk();
 void checkSettler();
 // Paid stake from the contract at boot (logs paid_stake, or paid_stake_failed for a stake core cannot settle).
 const ch = sharedChain();

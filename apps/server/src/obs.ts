@@ -1,6 +1,9 @@
 // Observability without a dependency: one JSON object per line on stdout/stderr (journald keeps
 // them, `journalctl -u margin-server -o cat | jq` reads them) and tick timings for /health.
 
+import { statfsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+
 type Fields = Record<string, unknown>;
 
 // A closed log pipe (soak/e2e stopped reading, journald restarted) must not kill or spam the server:
@@ -26,6 +29,21 @@ export const log = {
 /** Settler gas money: a 100 Tgas call needs ~0.101 NEAR free, so warn under 0.12. Null until checked. */
 export const SETTLER_LOW_NEAR = 0.12;
 export const settler = { near: null as number | null, low: false, checkedAt: 0 };
+
+/**
+ * Free space where the DB lives: a full disk is what broke settles (SQLITE_FULL), so /health shows it
+ * and flags it under DISK_LOW_MB (default 1024). Null if the filesystem cannot be read.
+ */
+export const DISK_LOW_MB = Number(process.env.DISK_LOW_MB ?? 1024);
+export function diskFree(dbPath = process.env.DB_PATH ?? "margin.sqlite"): { freeMB: number; low: boolean } | null {
+  try {
+    const s = statfsSync(dirname(resolve(dbPath)));
+    const freeMB = Math.floor((Number(s.bavail) * Number(s.bsize)) / 2 ** 20);
+    return { freeMB, low: freeMB < DISK_LOW_MB };
+  } catch {
+    return null;
+  }
+}
 
 /** Tick durations in ms since boot: count, mean, max and p99 from 0.1 ms buckets up to 100 ms. */
 export const ticks = {
