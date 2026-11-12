@@ -1,6 +1,6 @@
 // Snapshot interpolation: render 100 ms in the past and lerp between the two server
 // snapshots around that moment, so 20 Hz patches look like 60 fps motion. Idea from
-// vzhou842/example-.io-game src/client/state.js (MIT); no own-blob prediction in v1.
+// vzhou842/example-.io-game src/client/state.js (MIT). My own blob is predicted instead (predict.ts).
 import type { BlobView } from "@margin/core";
 import type { Frame } from "../game/frame";
 
@@ -19,6 +19,11 @@ export class SnapshotBuffer {
   push(s: Snapshot): void {
     this.snaps.push(s);
     if (this.snaps.length > KEEP) this.snaps.shift();
+  }
+
+  /** The newest server state as received (no render delay): prediction reads my blob from it. */
+  latest(): Frame | null {
+    return this.snaps[this.snaps.length - 1]?.frame ?? null;
   }
 
   /** Interpolated frame for display at nowMs, or null before the first patch. */

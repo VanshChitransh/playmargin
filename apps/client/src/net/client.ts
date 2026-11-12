@@ -1,11 +1,19 @@
 // Colyseus connection for one match: joins the "match" room, turns every 20 Hz state
 // patch into a plain Frame snapshot, and exposes my private "owe" and the event stream.
-// The server is the only authority; this file never computes game state.
+// The server is the only authority: money, eats and pops are decided there. Only MY blob's
+// position is predicted from my own input (predict.ts), so steering answers this frame.
 import { seat, type SeatTarget } from "./seat";
 import { Client, type Room } from "@colyseus/sdk";
 import { R, TICK_MS, type BlobView, type GameEventMsg, type InputCmd, type JoinOpts, type MatchView, type Phase, type RateTier, type Ring } from "@margin/core";
 import type { Frame } from "../game/frame";
 import { SnapshotBuffer } from "./interp";
+import { OwnPredictor, canBoost, motionOf, type Input } from "./predict";
+
+const params = typeof location === "undefined" ? new URLSearchParams() : new URLSearchParams(location.search);
+/** ?lag=300: test mode that adds a 300 ms round trip (half each way) to inputs and patches. */
+const LAG_MS = Math.max(0, Number(params.get("lag")) || 0);
+/** ?predict=0 turns own-blob prediction off, to compare. */
+const PREDICT = params.get("predict") !== "0";
 
 import { ENDPOINT } from "./endpoint";
 export { ENDPOINT };
@@ -45,6 +53,12 @@ export class MatchConnection {
   onAborted?: (reason: string) => void;
   /** performance.now() of the last server state: the play screen's stall watchdog reads it. */
   lastStateAt = 0;
+  private pred = new OwnPredictor();
+  private input: Input = { dirX: 0, dirY: 0, boost: false };
+  private lastFrameAt = 0;
+  /** Recent round trips (ms) from room.ping, plus the test lag; the median is used. */
+  private rtts: number[] = [];
+  private pinger = 0;
 
   /** Join a match (free or paid); rejects if the server is unreachable or refuses the seat. */
   async join(opts: JoinOpts, judge = false): Promise<void> {
@@ -95,9 +109,22 @@ export class MatchConnection {
         markedLive = true;
         seat.set(room.reconnectionToken, at, true);
       }
-      this.lastStateAt = performance.now();
-      this.buffer.push({ at: this.stamp(s.tick), frame: this.toFrame(s) });
+      const frame = this.toFrame(s);
+      const take = (): void => {
+        this.lastStateAt = performance.now();
+        this.buffer.push({ at: this.stamp(s.tick), frame });
+        this.reconcile(frame);
+      };
+      if (LAG_MS) setTimeout(take, LAG_MS / 2);
+      else take();
     });
+    // Round trip for reconciliation: a ping now and then (cheap, one tiny message).
+    const ping = (): void => this.room?.ping((ms) => {
+      this.rtts.push(ms + LAG_MS);
+      if (this.rtts.length > 5) this.rtts.shift();
+    });
+    ping();
+    this.pinger = window.setInterval(ping, 2000);
     this.room.onMessage("me", (m: { owe: number; ratePerMinBps?: number }) => {
       this.owe = m.owe;
       this.rateBps = m.ratePerMinBps;
@@ -124,7 +151,35 @@ export class MatchConnection {
   }
 
   frameAt(nowMs: number): Frame | null {
-    return this.buffer.frameAt(nowMs);
+    const f = this.buffer.frameAt(nowMs);
+    const dt = Math.min(0.1, (nowMs - (this.lastFrameAt || nowMs)) / 1000);
+    this.lastFrameAt = nowMs;
+    const live = this.buffer.latest();
+    const me = live?.blobs.find((b) => b.id === live.me);
+    if (!f || !me || !this.pred.ready) return f;
+    // My blob moves on my input now; everyone else stays interpolated in the past.
+    this.pred.step(dt, nowMs, this.input, motionOf(me, canBoost(me, live!.match.phase, this.input)), me.radius, live!.arena);
+    return { ...f, blobs: f.blobs.map((b) => (b.id === me.id ? { ...b, x: this.pred.x, y: this.pred.y } : b)) };
+  }
+
+  /** Median round trip in ms (the first second before a ping answers: assume 150). */
+  private rtt(): number {
+    if (!this.rtts.length) return 150 + LAG_MS;
+    const s = [...this.rtts].sort((a, b) => a - b);
+    return s[Math.floor(s.length / 2)]!;
+  }
+
+  /** A new server state: fold my true position into the prediction, or (re)start / stop it. */
+  private reconcile(f: Frame): void {
+    const me = f.blobs.find((b) => b.id === f.me);
+    const moving = f.match.phase === "WARMUP" || f.match.phase === "LIVE";
+    if (!PREDICT || !me || me.state !== "alive" || !moving) {
+      this.pred.ready = false; // dead, cashed out, countdown, the bell: show the server as is
+      return;
+    }
+    const now = performance.now();
+    if (!this.pred.ready) this.pred.snap(me.x, me.y, now);
+    else this.pred.reconcile(me.x, me.y, now, this.rtt(), now);
   }
 
   onEvent(cb: (e: GameEventMsg) => void): () => void {
@@ -133,13 +188,16 @@ export class MatchConnection {
   }
 
   send(cmd: InputCmd): void {
-    this.room?.send("input", cmd);
+    this.input = { dirX: cmd.dirX, dirY: cmd.dirY, boost: cmd.boost };
+    if (LAG_MS) setTimeout(() => this.room?.send("input", cmd), LAG_MS / 2);
+    else this.room?.send("input", cmd);
   }
 
   leave(): void {
     // The seat token stays: after GO my blob stays in the match, so coming back resumes it.
     // Not "consented": after GO the server then holds my seat (allowReconnection) for coming back.
     // The SDK's own auto-reconnect is switched off first, or this closed tab would grab it back.
+    clearInterval(this.pinger);
     if (this.room) this.room.reconnection.enabled = false;
     void this.room?.leave(false);
     this.listeners.clear();
