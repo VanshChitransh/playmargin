@@ -123,17 +123,17 @@ front proxy that does what the Caddyfile does (TLS ends at Cloudflare). Files in
 | Relayer | `:3700`, env `~/margin-prod/relayer.env` (chmod 600) |
 | Front proxy `ops/tunnel/proxy.mjs` | `127.0.0.1:8700` only: `/relay/*` to `:3700` (prefix stripped), the rest (HTTP + WebSocket) to `:2700`. Client IP from `CF-Connecting-IP` (Cloudflare refuses requests that send their own); any `X-Real-IP` / `X-Forwarded-For` from a client is dropped |
 | Tunnel `margin-api` | `~/margin-prod/cloudflared.yml` (from `ops/tunnel/cloudflared.yml.example`), credentials in `~/.cloudflared/`, DNS: CNAME `api` to the tunnel |
-| Supervisor `ops/tunnel/run.sh` | restarts each piece if it exits, runs `caffeinate -dimsu` (no sleep while live), logs in `~/margin-prod/logs/` |
+| Supervisor `ops/tunnel/run.sh` | restarts each piece if it exits, runs `caffeinate -dimsu` (no sleep while live), logs in `~/margin-prod/logs/`. On stop it drains the game server FIRST while proxy, relayer and tunnel stay up (players keep playing to the bell), then stops the rest (tested 12 Nov: a LIVE match drained 85 s, the player got matchEnd, nothing dropped) |
 | launchd `ops/tunnel/fun.playmargin.tunnel.plist` | `~/Library/LaunchAgents/` (replace `__HOME__`): starts at login, restarts the supervisor, 150 s for LIVE matches to drain on stop |
 
 ```
 # first time (once): cloudflared tunnel login; cloudflared tunnel create margin-api;
 #   cloudflared tunnel route dns margin-api api.playmargin.fun
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/fun.playmargin.tunnel.plist   # start
-launchctl kickstart -k gui/$(id -u)/fun.playmargin.tunnel                              # restart (drains first)
+launchctl kill SIGTERM gui/$(id -u)/fun.playmargin.tunnel   # restart: the server drains LIVE matches with players still connected, then launchd restarts all
 launchctl bootout gui/$(id -u)/fun.playmargin.tunnel                                   # stop (Mac may sleep again)
 curl -s https://api.playmargin.fun/health ; curl -s https://api.playmargin.fun/relay/health
-# deploy a new main: cd ~/margin-prod/app && git pull --ff-only (npm ci if a lockfile changed), then kickstart
+# deploy a new main: cd ~/margin-prod/app && git pull --ff-only (npm ci if a lockfile changed), then the restart above
 ```
 The Mac must stay on and online while live. Moving to the droplet later: same env values into `/etc/margin/`,
 Caddy instead of the proxy, then repoint the `api` DNS record and delete the tunnel.
