@@ -87,7 +87,7 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
   // The tile shows the receipt's own food line, so the stat and the receipt can't disagree (QA-B-11).
   const food = o.lines.find((l) => l.label.startsWith("Food"))?.amount ?? 0;
   const foodNet = `${food >= 0 ? "+" : "\u2212"}${Math.abs(food).toFixed(1)}`;
-  const judge = location.hash.startsWith("#/judge"); // the Judge Run route (index.ts), QA-B-12
+  const judge = location.pathname === "/judge"; // the Judge Run route (index.ts), QA-B-12
   const alive = `${Math.floor(s.aliveS / 60)}:${String(s.aliveS % 60).padStart(2, "0")}`;
   const cell = (label: string, value: string, span: string, cls = ""): string =>
     `<div class="${span} px-3 py-3 sm:px-4" style="background:${CARD}"><div class="font-display text-3xl leading-none tabular-nums sm:text-4xl ${cls}">${value}</div><div class="mt-1.5 text-sm font-semibold text-muted">${label}</div></div>`;

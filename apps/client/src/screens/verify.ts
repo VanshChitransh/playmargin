@@ -1,4 +1,4 @@
-// #/verify/:id: anyone re-checks a match in their own browser with the same core code the
+// /verify/:id: anyone re-checks a match in their own browser with the same core code the
 // server and contract run (hash chain, money replay, chain anchor). "local" verifies the
 // offline match just played; any log file can be dropped in. A Tamper test button edits one
 // number live so a judge watches the check turn red at the exact event.

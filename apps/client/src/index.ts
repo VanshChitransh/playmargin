@@ -1,4 +1,4 @@
-// Client entry: theme CSS, then the hash router decides which screen owns #app.
+// Client entry: theme CSS, then the path router decides which screen owns #app.
 import "./style.css";
 import { lazy, startRouter } from "./router";
 import { isAuthCallback, runAuthCallback } from "./auth-callback";
@@ -6,6 +6,8 @@ import { notFound } from "./screens";
 import { landing } from "./screens/landing";
 import { how } from "./screens/how";
 import { unlockAudioOnGesture } from "./audio";
+// Eager: installs the data-track click listener on first import (S5 analytics, anonymous, opt-out aware).
+import { trackView } from "./analytics/track";
 import { laptopCapable } from "./device";
 import type { Screen } from "./router";
 import { laptopOnly } from "./screens/laptop";
@@ -34,5 +36,7 @@ else startRouter(app, {
   // Read only, so phones may open it too (like verify).
   "/judges": lazy(() => import("./screens/judges").then((m) => m.judges)),
   "/r/:code": play,
+  // Private funnel numbers (S5), read only, no laptop guard.
+  "/stats": lazy(() => import("./screens/stats").then((m) => m.stats)),
   "*": notFound,
-});
+}, trackView);

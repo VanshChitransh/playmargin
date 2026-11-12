@@ -1,4 +1,4 @@
-// #/cash: the $1 match. Sign in, see your balance, PLAY $1 (S4 payToPlay: quick-play key, ticket,
+// /cash: the $1 match. Sign in, see your balance, PLAY $1 (S4 payToPlay: quick-play key, ticket,
 // then a paid seat), or Add funds from any chain through 1-Click dry quotes. Chain words stay out:
 // the player sees "balance", "ticket" and "Add funds", never keys or transactions.
 import { NETWORK } from "../chain/config";
@@ -9,6 +9,7 @@ import { NeedFunds, payToPlay, type PaidStep } from "../chain/paid";
 import { EMAIL_LOGIN, createEmailAccount, onAccount, resumeEmail, signIn, signInEmail, signOut } from "../chain/wallet";
 import { setPaidSeat } from "../play";
 import type { Screen } from "../router";
+import { navigate } from "../router";
 import type { JoinOpts } from "@margin/core";
 import { BTN, header } from "./chrome";
 
@@ -76,7 +77,7 @@ export const cash: Screen = (root) => {
         <p class="mt-1">Winnings land in your own account, not ours. Practice stays free with no sign-in.</p>
         <div class="mt-4 flex flex-wrap gap-3">${EMAIL_LOGIN ? `<button data-c=email class="${BTN.go}">Log in with email</button>` : ""}
         <button data-c=signin class="${EMAIL_LOGIN ? BTN.card : BTN.go}">${EMAIL_LOGIN ? "Other sign-in options" : "Sign in"}</button>
-        <a href="#/play" class="${BTN.card}">Practice free</a></div></article>`;
+        <a href="/play" class="${BTN.card}">Practice free</a></div></article>`;
       body.querySelector("[data-c=signin]")!.addEventListener("click", () => signIn().catch((e: Error) => say(e.message, "error")));
       body.querySelector("[data-c=email]")?.addEventListener("click", () => signInEmail().catch((e: Error) => say(e.message, "error")));
       return;
@@ -114,7 +115,7 @@ export const cash: Screen = (root) => {
         const accountId = acc!;
         // join = S4's NEP-413 proof, checked by S2's paid onAuth (not in core JoinOpts yet).
         setPaidSeat(() => ({ mode: "paid", accountId, ticketId: entry.ticketTx ?? "held", join: entry.join() }) as JoinOpts);
-        location.hash = "#/play";
+        navigate("/play");
       } catch (e) {
         b.innerHTML = `PLAY <span data-stake>${stake}</span>`;
         if (e instanceof NeedFunds) {

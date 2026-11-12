@@ -4,9 +4,9 @@ import { postArgs, resultText, waitIndexed } from "./share";
 
 describe("near.social share", () => {
   it("writes one post key with the real result and the verify link", () => {
-    const text = resultText({ survived: true, rank: 2, of: 12, kept: "226.86", verifyUrl: "https://playmargin.fun/#/verify/abc" });
+    const text = resultText({ survived: true, rank: 2, of: 12, kept: "226.86", verifyUrl: "https://playmargin.fun/verify/abc" });
     expect(text).toContain("#2 of 12, kept 226.86");
-    expect(text).toContain("https://playmargin.fun/#/verify/abc");
+    expect(text).toContain("https://playmargin.fun/verify/abc");
     expect(postArgs("1762790000000", text)).toEqual({ "post/1762790000000": { text } });
     expect(/[\u2013\u2014]/.test(text)).toBe(false);
   });

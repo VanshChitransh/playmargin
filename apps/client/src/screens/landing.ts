@@ -2,6 +2,7 @@
 // match on the real rules runs in a paper frame, so a judge sees BOOST, red rings and pops before reading a word
 // (inspiration.md section 3: live mini arena + one CTA, crypto invisible above the fold).
 import type { Screen } from "../router";
+import { navigate } from "../router";
 import { laptopCapable } from "../device";
 import { laptopCardHtml, wireLaptopCard } from "./laptop";
 import { newRoomCode } from "../net/room-code";
@@ -14,14 +15,14 @@ export const landing: Screen = (root) => {
   root.innerHTML = `
   <div class="paper-dots flex min-h-dvh flex-col overflow-x-hidden text-ink">
     <header class="mx-auto flex w-full max-w-[88rem] items-center justify-between gap-3 px-4 pt-5 pb-2 xl:px-16 xl:pt-8">
-      <a href="#/" aria-label="MARGIN home" class="flex items-center gap-3">
+      <a href="/" aria-label="MARGIN home" class="flex items-center gap-3">
         <span class="pop flex size-12 items-end justify-center overflow-hidden rounded-2xl bg-sky xl:size-15"><img src="/brand/margin-cat-cutout.svg" alt="" class="-mb-1.5 w-[105%]" /></span>
         <span class="hidden font-display text-3xl tracking-wide min-[420px]:inline xl:text-4xl">MARGIN</span>
       </a>
       <nav class="flex items-center gap-1.5 whitespace-nowrap sm:gap-3">
-        <a href="#/how" class="pop-sm pop-press rounded-xl bg-card px-2 py-2 text-sm font-bold sm:px-5 sm:py-3 sm:text-base">How it works</a>
-        <a href="#/judges" class="pop-sm pop-press rounded-xl bg-card px-2 py-2 text-sm font-bold text-ink sm:px-5 sm:py-3 sm:text-base" title="Every claim, checked live against NEAR"><span class="max-md:hidden">For j</span><span class="md:hidden">J</span>udges</a>
-        <a href="#/judge" class="pop-sm pop-press rounded-xl bg-ink max-[400px]:hidden px-2 py-2 text-sm font-bold text-card sm:px-5 sm:py-3 sm:text-base" title="A seeded 90 s match on normal rules"><span class="text-warn">&#9733;</span> Judge Run</a>
+        <a href="/how" class="pop-sm pop-press rounded-xl bg-card px-2 py-2 text-sm font-bold sm:px-5 sm:py-3 sm:text-base">How it works</a>
+        <a href="/judges" class="pop-sm pop-press rounded-xl bg-card px-2 py-2 text-sm font-bold text-ink sm:px-5 sm:py-3 sm:text-base" title="Every claim, checked live against NEAR"><span class="max-md:hidden">For j</span><span class="md:hidden">J</span>udges</a>
+        <a href="/judge" class="pop-sm pop-press rounded-xl bg-ink max-[400px]:hidden px-2 py-2 text-sm font-bold text-card sm:px-5 sm:py-3 sm:text-base" title="A seeded 90 s match on normal rules"><span class="text-warn">&#9733;</span> Judge Run</a>
       </nav>
     </header>
     <main class="mx-auto grid w-full max-w-[88rem] flex-1 items-center gap-12 px-4 pt-4 pb-8 lg:grid-cols-[1fr_1fr] xl:gap-16 xl:px-16">
@@ -32,11 +33,11 @@ export const landing: Screen = (root) => {
         </h1>
         <p class="mt-5 max-w-xl text-lg font-medium text-muted xl:text-[1.3rem] xl:leading-relaxed">A 90-second arena where <b class="font-bold text-ink">BOOST is a loan.</b> Borrow to grow, hunt the ones who went red, cash out before the vault pops you.</p>
         <div data-ctas class="mt-5 flex flex-wrap items-center gap-4">
-          <a href="#/play" class="pop pop-press flex h-16 items-center gap-3 rounded-2xl bg-safe px-7 font-display text-2xl xl:h-[4.75rem] xl:text-3xl">&#9654; Practice free</a>
-          <a href="#/cash" class="pop pop-press flex h-16 items-center rounded-2xl bg-ink px-6 font-display text-2xl text-card xl:h-[4.75rem]">Play for&nbsp;<span data-stake>$1</span></a>
+          <a href="/play" data-track="practice_click" class="pop pop-press flex h-16 items-center gap-3 rounded-2xl bg-safe px-7 font-display text-2xl xl:h-[4.75rem] xl:text-3xl">&#9654; Practice free</a>
+          <a href="/cash" class="pop pop-press flex h-16 items-center rounded-2xl bg-ink px-6 font-display text-2xl text-card xl:h-[4.75rem]">Play for&nbsp;<span data-stake>$1</span></a>
         </div>
         <div data-play-only class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-          <button data-challenge class="pop pop-press flex h-14 shrink-0 items-center gap-2.5 rounded-2xl bg-warn px-5 font-display text-xl xl:text-[1.375rem]">
+          <button data-challenge data-track="challenge_link_created" class="pop pop-press flex h-14 shrink-0 items-center gap-2.5 rounded-2xl bg-warn px-5 font-display text-xl xl:text-[1.375rem]">
             <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>Challenge a friend</button>
           <p class="text-sm font-semibold leading-snug text-muted"><b class="block text-base text-ink">Private room link</b>Send it, they join your match.</p>
         </div>
@@ -116,7 +117,7 @@ export const landing: Screen = (root) => {
     why.textContent = problem ?? "";
     why.classList.toggle("hidden", !problem);
   });
-  root.querySelector("[data-challenge]")!.addEventListener("click", () => (location.hash = `#/r/${newRoomCode()}`));
+  root.querySelector("[data-challenge]")!.addEventListener("click", () => navigate(`/r/${newRoomCode()}`));
   // The live arena (pixi + the game engine) loads after first paint, so a phone can tap the
   // buttons at once instead of waiting for the engine (QA-B-16).
   const box = root.querySelector<HTMLElement>("[data-hero]")!;

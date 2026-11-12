@@ -1,4 +1,4 @@
-// #/judges: every claim MARGIN makes, checked live in the viewer's browser against NEAR (and the
+// /judges: every claim MARGIN makes, checked live in the viewer's browser against NEAR (and the
 // game engine), with OK / FAIL / NONE YET and the link to check it yourself. Read only, so phones
 // may open it. Verdict rules live in judges/claims.ts (tested); this file fetches and draws.
 import { settle, verifyChain } from "@margin/core";
@@ -130,7 +130,7 @@ const claims: Claim[] = [
     title: "The game cannot create money",
     how: "Plays a full 90 s match on the real rules right here in your browser, then replays its log through the same settle() the server and contract use.",
     code: "packages/core/src/settle.ts",
-    links: () => [["Play and verify one yourself", "#/play"]],
+    links: () => [["Play and verify one yourself", "/play"]],
     check: async () => {
       const m = new LocalMatch({ seed: (Math.random() * 1e9) | 0, withMe: false, bots: 11, warmupS: 0, greedy: true });
       for (let t = 0; m.w.phase !== "ENDED" && t < 120_000; t += 1000 / 60) m.frameAt(t);

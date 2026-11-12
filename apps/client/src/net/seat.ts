@@ -1,7 +1,7 @@
 // This tab's seat token, kept with the route it was taken on, so a reload resumes the match
-// but opening a different route (a friend's #/r/CODE after a public match) never does.
+// but opening a different route (a friend's /r/CODE after a public match) never does.
 
-/** Where a seat lives: "judge", a private room code, or "play" (public and paid both use #/play). */
+/** Where a seat lives: "judge", a private room code, or "play" (public and paid both use /play). */
 export type SeatTarget = string;
 
 interface Stored {
