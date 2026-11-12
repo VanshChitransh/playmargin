@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- MARGIN tunnel mode: api.playmargin.fun served from this Mac (testnet). Runs ~/margin-prod/run.sh
+     (game server :2700, relayer :3700, proxy :8700, cloudflared, caffeinate), restarts it if it dies,
+     and gives the game server time to drain LIVE matches on stop. See ops/README.md "Tunnel mode". -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>fun.playmargin.tunnel</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>__HOME__/margin-prod/run.sh</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+  <key>ExitTimeOut</key>
+  <integer>150</integer>
+  <key>StandardOutPath</key>
+  <string>__HOME__/margin-prod/logs/launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>__HOME__/margin-prod/logs/launchd.log</string>
+</dict>
+</plist>

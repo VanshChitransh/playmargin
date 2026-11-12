@@ -1,0 +1,8 @@
+# Tunnel mode: api.playmargin.fun -> the local front proxy (TLS ends at Cloudflare). Credentials stay in
+# ~/.cloudflared (never in git). Started by ~/margin-prod/run.sh under launchd.
+tunnel: <TUNNEL_ID>
+credentials-file: __HOME__/.cloudflared/<TUNNEL_ID>.json
+ingress:
+  - hostname: api.playmargin.fun
+    service: http://127.0.0.1:8700
+  - service: http_status:404
