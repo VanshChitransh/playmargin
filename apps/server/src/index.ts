@@ -7,6 +7,7 @@ import basicAuth from "express-basic-auth";
 import { MATCH_TICKS } from "@margin/core";
 import { MatchRoom, drain } from "./rooms/MatchRoom";
 import { mountApi } from "./api";
+import { mountAnalytics } from "./analytics";
 import { guardMatchmake } from "./matchmakeGuard";
 import { quietLogger } from "./refusal";
 import { sharedDb } from "./db";
@@ -24,6 +25,7 @@ const server = defineServer({
     judge: defineRoom(MatchRoom),
   },
   express: (app) => {
+    mountAnalytics(app, sharedDb); // before mountApi: its /api 404 catch-all would swallow these routes
     mountApi(app, sharedDb);
     const pass = process.env.MONITOR_PASS;
     if (pass) {

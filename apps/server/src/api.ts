@@ -91,8 +91,8 @@ export function leaderboard(db: Db, nowMs = Date.now(), limit = 20) {
  * Every test script and harness uses an "ed25519:" or "qa-" guest key, so local test traffic never
  * reaches the public numbers. Judge Runs (published JUDGE_SEED) are a scenario, not traction.
  */
-const REAL_USER = `(u.account_id IS NOT NULL OR (u.guest_key NOT LIKE 'ed25519:%' AND u.guest_key NOT LIKE 'qa-%'))`;
-const REAL_SEATS = `SELECT p.match_id, p.user_id FROM match_players p JOIN users u ON u.id = p.user_id
+export const REAL_USER = `(u.account_id IS NOT NULL OR (u.guest_key NOT LIKE 'ed25519:%' AND u.guest_key NOT LIKE 'qa-%'))`;
+export const REAL_SEATS = `SELECT p.match_id, p.user_id FROM match_players p JOIN users u ON u.id = p.user_id
   JOIN matches m ON m.id = p.match_id WHERE ${REAL_USER} AND m.seed != ${JUDGE_SEED}`;
 
 /** Traction numbers for the README and landing: real users only, straight from the tables, nothing estimated. */
