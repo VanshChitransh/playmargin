@@ -3,6 +3,7 @@
 // Verify stay open on phones.
 import type { Screen } from "../router";
 import { BTN, header } from "./chrome";
+import { track } from "../analytics/track";
 
 /** The card's inner HTML (also used on the home page in place of the play buttons). */
 export function laptopCardHtml(room?: string): string {
@@ -15,14 +16,15 @@ export function laptopCardHtml(room?: string): string {
     <div class="mt-4 flex flex-wrap gap-3">
       <button data-copy class="${BTN.go}">Copy link</button>
       <button data-send class="${BTN.card} hidden">Send it to yourself</button>
-      <a href="#/how" class="${BTN.card}">How it works</a>
+      <a href="/how" class="${BTN.card}">How it works</a>
     </div>
   </div>`;
 }
 
 /** Wire the card's buttons: copy the link (the room link for an invite), or the share sheet. */
 export function wireLaptopCard(el: HTMLElement): void {
-  const url = location.href.includes("#/r/") ? location.href : `${location.origin}/`;
+  track("laptop_card_shown");
+  const url = location.pathname.startsWith("/r/") ? location.href : `${location.origin}/`;
   const copy = el.querySelector<HTMLButtonElement>("[data-copy]")!;
   copy.addEventListener("click", () =>
     void navigator.clipboard.writeText(url).then(

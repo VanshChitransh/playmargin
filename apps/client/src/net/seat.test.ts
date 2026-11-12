@@ -9,7 +9,7 @@ describe("seat resume follows the route", () => {
     expect(seatToken(encodeSeat("r", "BVMT"), "BVMT")).toBe("r");
     expect(seatToken(raw, "judge")).toBeNull();
   });
-  it("treats an old plain token as a #/play seat", () => {
+  it("treats an old plain token as a /play seat", () => {
     expect(seatToken("abc123", "play")).toBe("abc123");
     expect(seatToken("abc123", "BVMT")).toBeNull();
     expect(seatToken(null, "play")).toBeNull();

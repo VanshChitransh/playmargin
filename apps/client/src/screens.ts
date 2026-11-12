@@ -12,8 +12,8 @@ export const notFound: Screen = (root) => {
         <h1 class="mt-6 font-display text-8xl">404</h1>
         <p class="mt-2 text-lg">This page got <span class="sticker inline-block -rotate-2 rounded-field bg-liq px-2 font-display text-paper" style="box-shadow:3px 3px 0 var(--color-ink)">liquidated.</span></p>
         <nav class="mt-8 flex flex-wrap justify-center gap-4">
-          <a class="${BTN.go}" href="#/play">▶ Practice free</a>
-          <a class="${BTN.card}" href="#/">Home</a>
+          <a class="${BTN.go}" href="/play">▶ Practice free</a>
+          <a class="${BTN.card}" href="/">Home</a>
         </nav>
       </div>
     </main>

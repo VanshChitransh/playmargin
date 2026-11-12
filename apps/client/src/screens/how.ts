@@ -1,4 +1,4 @@
-// #/how: the three rules with a short real-gameplay clip each. Kept off the landing page so
+// /how: the three rules with a short real-gameplay clip each. Kept off the landing page so
 // the home screen stays one idea (hero, live arena, play), and linked from its header.
 import type { Screen } from "../router";
 import { reducedMotion } from "../render/motion";
@@ -37,8 +37,8 @@ export const how: Screen = (root) => {
       </div>
       <div class="mx-auto mt-12 flex max-w-6xl flex-wrap items-center justify-between gap-4">
         ${laptopCapable() ? `<div class="flex flex-wrap gap-4">
-          <a href="#/play" class="${BTN.go} px-7 py-4 text-2xl">▶ Practice free</a>
-          <a href="#/cash" class="${BTN.ink} px-7 py-4 text-2xl">Play for <span data-stake>$1</span></a>
+          <a href="/play" class="${BTN.go} px-7 py-4 text-2xl">▶ Practice free</a>
+          <a href="/cash" class="${BTN.ink} px-7 py-4 text-2xl">Play for <span data-stake>$1</span></a>
         </div>` : `<p class="font-display text-2xl">Play it on a laptop: mouse and keyboard.</p>`}
         <nav class="flex flex-wrap gap-3">
           <a href="https://github.com/VanshChitransh/playmargin" target="_blank" rel="noopener" aria-label="MARGIN source code on GitHub (opens in a new tab)" class="${BTN.small}">Code on GitHub</a>

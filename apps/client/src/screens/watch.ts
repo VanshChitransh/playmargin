@@ -1,8 +1,8 @@
-// #/watch: a spectator view for trailers and B-roll. A director camera follows the action
+// /watch: a spectator view for trailers and B-roll. A director camera follows the action
 // (a pop that just happened, a red blob about to be popped, a cash-out, else the biggest blob)
 // with smooth pans. It spectates a real server match (S2 /api/watch: the busiest public room,
 // or an agents-only one), and only if the server cannot be reached a local match of labelled
-// bots on the real rules. /?clean=1#/watch hides the HUD and keeps
+// bots on the real rules. /watch?clean=1 hides the HUD and keeps
 // only the stamp moments. Real gameplay only: nothing here is scripted or staged.
 import type { GameEventMsg } from "@margin/core";
 import type { Frame } from "../game/frame";

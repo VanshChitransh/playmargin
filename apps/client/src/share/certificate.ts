@@ -21,7 +21,7 @@ export const greedScore = (peakLeverage: number): number => Math.round(Math.min(
 /** m:ss, like the HUD clock (which counts the time left). */
 export const clock = (s: number): string => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
-export const verifyUrl = (matchId: string): string => `${location.origin}/#/verify/${encodeURIComponent(matchId)}`;
+export const verifyUrl = (matchId: string): string => `${location.origin}/verify/${encodeURIComponent(matchId)}`;
 
 /** The certificate as a PNG blob. */
 export async function drawCertificate(d: CertData): Promise<Blob> {

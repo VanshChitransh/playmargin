@@ -1,6 +1,8 @@
-// Hash router: works on any static host (Cloudflare Pages, a phone on the LAN) with
-// no server rewrite rules. Each screen gets the root and returns its own cleanup,
-// so leaving #/play can tear down the Pixi canvas and the room connection.
+// Path router on the History API: playmargin.fun/play, /verify/<id>, /r/<CODE>. Each screen gets
+// the root and returns its own cleanup, so leaving /play can tear down the Pixi canvas and the room
+// connection. Old hash links (/#/verify/x, shared certificates, README links) are rewritten to the
+// clean path on load, so nothing that was ever shared breaks. Hosting serves index.html for every
+// path (Cloudflare Pages SPA fallback, Vite dev does the same).
 
 export type Params = Record<string, string>;
 export type Cleanup = () => void;
@@ -8,26 +10,69 @@ export type Screen = (root: HTMLElement, params: Params) => Cleanup | void;
 
 let render: () => void = () => {};
 
-/** Re-run the current route (Play again on the same #/play hash fires no hashchange). */
+/** Re-run the current route (Play again on the same /play path changes no URL). */
 export const rerender = (): void => render();
 
-/** Route patterns like "/verify/:id"; the first match wins, "*" is the fallback. */
-export function startRouter(root: HTMLElement, routes: Record<string, Screen>): void {
+/** Go to an app path ("/play", "/verify/x"): a new history entry, then render. */
+export function navigate(to: string, replace = false): void {
+  if (replace) history.replaceState(null, "", to);
+  else history.pushState(null, "", to);
+  render();
+}
+
+/** The clean path for an old hash link ("#/verify/x" -> "/verify/x"), keeping its query; else null. */
+export function legacyPath(hash: string, search: string): string | null {
+  if (!hash.startsWith("#/")) return null;
+  const p = hash.slice(1);
+  return p.includes("?") || !search ? p : `${p}${search}`;
+}
+
+/** The route key a path renders: the first pattern that matches, "*" (404) when none does. */
+export function pickRoute(patterns: string[], path: string): { key: string; params: Params } {
+  for (const key of patterns) {
+    if (key === "*") continue;
+    const params = match(key, path);
+    if (params) return { key, params };
+  }
+  return { key: "*", params: {} };
+}
+
+/** Same-origin app links render here instead of reloading the page. */
+function internalHref(a: HTMLAnchorElement, e: MouseEvent): string | null {
+  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return null;
+  if (a.target || a.hasAttribute("download") || a.origin !== location.origin) return null;
+  // Real files (clips, brand images, the service worker) are fetched, not routed.
+  if (/\.[a-z0-9]{2,5}$/i.test(a.pathname)) return null;
+  return a.pathname + a.search + a.hash;
+}
+
+/** Route patterns like "/verify/:id"; the first match wins, "*" is the fallback. onRoute sees every path. */
+export function startRouter(root: HTMLElement, routes: Record<string, Screen>, onRoute?: (path: string) => void): void {
+  const legacy = legacyPath(location.hash, location.search);
+  if (legacy) history.replaceState(history.state, "", legacy);
   let cleanup: Cleanup | void;
   render = (): void => {
     cleanup?.();
     root.replaceChildren();
-    const path = location.hash.replace(/^#/, "") || "/";
-    for (const [pattern, screen] of Object.entries(routes)) {
-      const params = match(pattern, path);
-      if (params) {
-        cleanup = screen(root, params);
-        return;
-      }
-    }
-    cleanup = routes["*"]?.(root, {});
+    const path = location.pathname.replace(/\/+$/, "") || "/";
+    const { key, params } = pickRoute(Object.keys(routes), path);
+    onRoute?.(path);
+    cleanup = routes[key]?.(root, params);
   };
-  window.addEventListener("hashchange", render);
+  window.addEventListener("popstate", render);
+  // An old hash link pasted while the app is open: same rewrite.
+  window.addEventListener("hashchange", () => {
+    const p = legacyPath(location.hash, location.search);
+    if (p) navigate(p, true);
+  });
+  document.addEventListener("click", (e) => {
+    const a = (e.target as Element | null)?.closest?.("a");
+    const href = a ? internalHref(a, e) : null;
+    if (!href) return;
+    e.preventDefault();
+    if (href !== location.pathname + location.search + location.hash) navigate(href);
+    else render();
+  });
   render();
 }
 

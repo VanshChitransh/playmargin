@@ -1,6 +1,6 @@
 // /auth/callback: NEAR Auth redirects here (whitelisted exactly as
 // https://playmargin.fun/auth/callback). The path is served by the SPA fallback; S4's
-// resumeEmail finishes the sign-in, then #/cash shows the balance or asks a new player for a name.
+// resumeEmail finishes the sign-in, then /cash shows the balance or asks a new player for a name.
 import { resumeEmail } from "./chain/wallet";
 
 /** True if this page load is the auth redirect (then the caller skips the normal router). */
@@ -16,7 +16,7 @@ export async function runAuthCallback(root: HTMLElement): Promise<void> {
   const msg = root.querySelector<HTMLElement>("[data-msg]")!;
   try {
     if ((await resumeEmail()) === "out") throw new Error("not logged in after the redirect");
-    location.replace("/#/cash");
+    location.replace("/cash");
   } catch (e) {
     msg.textContent = "Sign-in failed. Try again from the home page.";
     console.error(e);
