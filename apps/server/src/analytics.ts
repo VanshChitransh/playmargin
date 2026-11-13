@@ -2,7 +2,7 @@
 // that lives only in the player's browser (not the guestKey, so it never links to credits). We keep
 // daily counters and which hashed ids were seen on which day. No names, IPs or wallets are stored.
 // GET /api/insights is private: it answers only with the STATS_KEY, otherwise it looks like a 404.
-// POST /api/team (same key) marks team and QA browsers, guests and wallets: kept, never counted.
+// POST /api/team (its own TEAM_KEY) marks team and QA browsers, guests and wallets: kept, never counted.
 import { createHash, timingSafeEqual } from "node:crypto";
 import express, { type Application } from "express";
 import { userForGuestKey, type Db } from "./db";
@@ -129,7 +129,8 @@ export function mountAnalytics(app: Application, db: () => Db): void {
     } catch {
       /* not JSON: the key check below answers 404 */
     }
-    if (!keyOk(body?.key)) return void res.status(404).json({ error: "not found" });
+    // TEAM_KEY, never STATS_KEY: the team link goes to friends and into browser history.
+    if (!keyOk(body?.key, process.env.TEAM_KEY)) return void res.status(404).json({ error: "not found" });
     res.json({ marked: markTeam(db(), body) });
   });
   app.get("/api/insights", (req, res) => {

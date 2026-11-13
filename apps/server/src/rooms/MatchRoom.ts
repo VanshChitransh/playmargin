@@ -125,6 +125,8 @@ export class MatchRoom extends Room {
   }
 
   override onCreate(opts: unknown): void {
+    // The US box sets MATCH_ID_PREFIX=u- so a match id says which server holds its log (Verify routes by it).
+    if (process.env.MATCH_ID_PREFIX) this.roomId = `${process.env.MATCH_ID_PREFIX}${this.roomId}`;
     if (drain.on) refuse("server is restarting, try again in a moment", { room: this.roomId });
     if (rooms.live >= rooms.max) refuse("all arenas are full, try again in a minute", { room: this.roomId });
     this.key = parseRoomKey(opts);
