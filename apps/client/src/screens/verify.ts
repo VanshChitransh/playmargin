@@ -92,7 +92,7 @@ function render(body: HTMLElement, d: Loaded, r: Report, note: string, tampered:
   };
   const names = new Map<string, string>();
   // Agents and drones wear 🤖 everywhere they are named, here too (P06).
-  for (const e of d.log) if (e.type === "JOIN") names.set(e.data.player.id, `${e.data.player.kind === "human" ? "" : "🤖 "}${e.data.player.label}`);
+  for (const e of d.log) if (e.type === "JOIN") names.set(e.data.player.id, e.data.player.kind === "human" || e.data.player.label.includes("🤖") ? e.data.player.label : `🤖 ${e.data.player.label}`);
   const payouts = r.result?.payouts
     .map((p) => `<tr><td>${esc(names.get(p.id) ?? p.id)}</td><td class="num text-right">${(p.amount / MICRO).toFixed(2)}</td></tr>`)
     .join("");
