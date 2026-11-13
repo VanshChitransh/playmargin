@@ -341,8 +341,9 @@ export class MatchRoom extends Room {
       const view = agentView(w, id);
       if (view) inputs.set(id, brain.decide(view, this.roomTick));
     }
-    this.commander?.update(w, this.roomTick, this.brains);
-    const why = this.commander?.rationale ?? null;
+    // No agents in the room (a private room of humans): no Commander, no "for both agents" bubbles.
+    if (this.brains.size) this.commander?.update(w, this.roomTick, this.brains);
+    const why = this.brains.size ? (this.commander?.rationale ?? null) : null;
     if (why !== this.lastRationale) {
       this.lastRationale = why;
       this.broadcast("commander", { rationale: why });

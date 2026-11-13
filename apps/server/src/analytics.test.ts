@@ -2,7 +2,7 @@
 // needs the key, and player numbers use the same "real player" filter as /api/stats.
 import { describe, expect, it } from "vitest";
 import { openDb, type Db } from "./db";
-import { ensureTables, insights, keyOk, recordEvents } from "./analytics";
+import { ensureTables, insights, keyOk, markTeam, recordEvents } from "./analytics";
 
 const DAY = 86_400_000;
 const T0 = Date.UTC(2026, 10, 10, 12);
@@ -69,5 +69,30 @@ describe("insights", () => {
     expect(r.multi).toEqual([{ day: "2026-11-10", n: 1 }]); // m2: u1 + u2 (the qa seat is not real)
     expect(r.paid).toEqual([{ day: "2026-11-10", n: 1 }]);
     expect(r.stats.players).toBe(2);
+  });
+});
+
+describe("markTeam", () => {
+  it("team browsers, guests and wallets stay in the DB but leave every count, past seats included", () => {
+    const db = fresh();
+    const TEAM = "1a2b3c4d-team-browser-01";
+    recordEvents(db, { id: ID, events: ["home_view"] }, T0);
+    recordEvents(db, { id: TEAM, events: ["home_view"] }, T0);
+    const user = (id: string, key: string | null, acc: string | null) =>
+      db.prepare("INSERT INTO users (id, guest_key, account_id, created) VALUES (?, ?, ?, 0)").run(id, key, acc);
+    user("out", "7b0f1c9a-outside-player", null);
+    user("dev", "9d8e7f6a-team-guest-key", null);
+    user("qa2-user-0001", "5e4d3c2b-qa-agent-guest", null);
+    user("w", null, "vanshverse.near");
+    db.prepare("INSERT INTO matches (id, mode, seed, status, created, ended) VALUES ('m', 'free', 1, 'settled', 0, ?)").run(T0);
+    for (const u of ["out", "dev", "qa2-user-0001", "w"]) db.prepare("INSERT INTO match_players (match_id, user_id, blob_id, entry) VALUES ('m', ?, ?, 0)").run(u, u);
+    expect(insights(db, T0, 7).stats).toMatchObject({ users: 4, players: 4, matches: 1, multiHumanPct: 100 });
+    // A ?team visit sends the browser id and guest key; wallets and old QA users are marked by hand.
+    expect(markTeam(db, { browserId: TEAM, guestKey: "9d8e7f6a-team-guest-key", accountId: "vanshverse.near", userIds: ["qa2-user-0001", "x;drop"] }, T0)).toBe(4);
+    expect(markTeam(db, { guestKey: "9d8e7f6a-team-guest-key" }, T0)).toBe(0); // idempotent
+    const r = insights(db, T0, 7);
+    expect(r.stats).toMatchObject({ users: 1, players: 1, matches: 1, multiHumanPct: 0 });
+    expect(r.totals.find((t) => t.event === "home_view")?.guests).toBe(1);
+    expect(db.prepare("SELECT COUNT(*) AS n FROM match_players").get()).toEqual({ n: 4 }); // excluded, never deleted
   });
 });

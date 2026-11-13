@@ -63,6 +63,9 @@ const MIGRATIONS: string[] = [
   // v2: each free match remembers which hourly anchor covers it and its Merkle proof (JSON).
   `ALTER TABLE matches ADD COLUMN anchor_hour INTEGER;
    ALTER TABLE matches ADD COLUMN proof TEXT;`,
+  // v3: team and QA traffic, left in place but out of every public count. kind: 'user' (users.id),
+  // 'account' (a NEAR account), 'browser' (a hashed analytics id, see analytics.ts).
+  `CREATE TABLE team (kind TEXT NOT NULL, id TEXT NOT NULL, added INTEGER NOT NULL, PRIMARY KEY (kind, id));`,
 ];
 
 /**
