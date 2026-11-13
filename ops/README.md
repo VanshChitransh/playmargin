@@ -11,6 +11,7 @@ Caddy and systemd files get their first real check in step 7 below.
 | `margin-server.service` | Game server unit. Stop = SIGTERM = drain: LIVE matches finish and settle first. `Restart=always`. |
 | `margin-relayer.service` | Relayer unit (S4's `services/relayer`). Stateless, `Restart=always`. |
 | `Caddyfile` | TLS for `api.playmargin.fun`: game WebSocket + API, and the relayer at `/relay/*`. |
+| `Caddyfile.cloudflare` | EC2 mode: same routes behind Cloudflare's proxy, DNS-01 cert, real client IP from CF-Connecting-IP. |
 | `deploy.sh` | Laptop to droplet: new release dir, `npm ci`, tests, flip `current`, restart both, health check. |
 
 ## Deploy day
@@ -111,6 +112,51 @@ The variables it sets (also usable for a Pages git build: command `npm run build
 ### 9. Smoke
 Play one free match from a laptop on the public URL (S9 gate; phones get the laptop card), then one paid match per the runbook.
 
+## EC2 mode (live since 13 Nov: api.playmargin.fun on AWS, testnet)
+
+One t4g.small (Ubuntu 24.04 arm64, 20 GB gp3) in ap-south-1, Elastic IP `15.207.255.76`, all resources tagged
+`Name=margin-*` (key pair `vansh-mac`, SG `margin-api-sg`: 22 from Vansh's IP only, 80 and 443 open). The layout is
+the droplet layout above: `setup.sh`, the two systemd units, `/etc/margin/{env,relayer.env}`, DB
+`/var/lib/margin/margin.sqlite`, releases in `/opt/margin/releases`. Deploy with
+`DEPLOY_HOST=ubuntu@15.207.255.76 ./ops/deploy.sh` (it uses sudo on the box).
+
+DNS: `api` is an A record to the Elastic IP with Cloudflare's proxy ON (orange cloud). Two things differ from the
+droplet Caddyfile, both in `Caddyfile.cloudflare`:
+
+| What | Why |
+|---|---|
+| TLS via Let's Encrypt **DNS-01** (`caddy-dns/cloudflare`, token in `/etc/caddy/cf.env` root 600, loaded by `/etc/systemd/system/caddy.service.d/cf.conf`) | HTTP-01 cannot reach the box behind the proxy, and the token cannot issue a Cloudflare Origin cert. A real cert also works in every Cloudflare SSL mode. Renewal is automatic while the token is valid |
+| `trusted_proxies` = Cloudflare's ranges, `client_ip_headers CF-Connecting-IP`, then `X-Real-IP {client_ip}` | Without it every player has the edge's IP and shares one join limit. Only Cloudflare's ranges are believed, so a direct hit on the IP cannot forge it |
+| Port 80 serves the same site (no redirect) | Cloudflare's edge already sends players to HTTPS, and a Flexible zone would loop on a redirect |
+
+```
+# one time on the box (after setup.sh)
+sudo caddy add-package github.com/caddy-dns/cloudflare
+printf '[Service]\nEnvironmentFile=/etc/caddy/cf.env\n' | sudo tee /etc/systemd/system/caddy.service.d/cf.conf
+sudo cp Caddyfile.cloudflare /etc/caddy/Caddyfile && sudo systemctl daemon-reload && sudo systemctl restart caddy
+# test before any DNS change: pin the name to the box, the cert must verify without -k
+curl --resolve api.playmargin.fun:443:15.207.255.76 https://api.playmargin.fun/health
+```
+
+**Cutover from the tunnel (done 13 Nov, about 1 min down).** Before it, the box ran with `SETTLER_PRIVATE_KEY`
+commented out, so two servers never signed for the same settler account at once.
+1. `/health` shows `rooms: 0`. Stop the box server and move its test DB aside (never delete).
+2. `launchctl bootout gui/$(id -u)/fun.playmargin.tunnel` (drains LIVE matches, up to 150 s).
+3. `sqlite3 ~/margin-prod/margin.db ".backup '<copy>'"`, the online backup API (a raw `cp` of a WAL database can
+   miss pages), then `PRAGMA integrity_check` = ok.
+4. scp the copy to `/var/lib/margin/margin.sqlite` (margin:margin 600), uncomment the settler key, start.
+5. Cloudflare API: PATCH the `api` record from the tunnel CNAME to `A 15.207.255.76`, proxied. The edge answers
+   1033/530 (stale tunnel route) for about 20 s, then serves the box.
+
+**Rollback:** PATCH `api` back to `CNAME <tunnel-id>.cfargotunnel.com`, copy the box DB back to
+`~/margin-prod/margin.db` the same way, `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/fun.playmargin.tunnel.plist`.
+
+**Latency (13 Nov, from Bengaluru, median of 50 in-game pings):** about 170 to 240 ms through Cloudflare against
+66 to 71 ms direct to the IP. The WSS handshake takes about 800 ms via Cloudflare and 225 ms direct. Indian traffic
+enters Cloudflare at Singapore (`colo=SIN`) and comes back to Mumbai. Switching the proxy off (grey cloud) gives the
+direct numbers, but then Caddy needs HTTP-01 or keeps DNS-01, `trusted_proxies` must go (or every client could
+send its own CF-Connecting-IP), and the IP becomes public.
+
 ## Tunnel mode (no droplet: api.playmargin.fun served from a Mac, testnet)
 
 Live since 12 Nov while there is no droplet. Cloudflare Tunnel carries https://api.playmargin.fun to a local
@@ -135,8 +181,7 @@ launchctl bootout gui/$(id -u)/fun.playmargin.tunnel                            
 curl -s https://api.playmargin.fun/health ; curl -s https://api.playmargin.fun/relay/health
 # deploy a new main: cd ~/margin-prod/app && git pull --ff-only (npm ci if a lockfile changed), then the restart above
 ```
-The Mac must stay on and online while live. Moving to the droplet later: same env values into `/etc/margin/`,
-Caddy instead of the proxy, then repoint the `api` DNS record and delete the tunnel.
+Replaced by EC2 mode on 13 Nov. The plist, `~/margin-prod` and the tunnel stay for 24 h as the rollback.
 
 ## Day to day
 - Health: `curl -s localhost:2567/health` (503 while draining, `settler.low` under 0.12 NEAR) and `curl -s localhost:3030/health` (relayer NEAR balance + `alarm`).
