@@ -62,6 +62,9 @@ export const drain = { on: false };
 /** Seconds a private lobby keeps a dropped seat (a reload takes about 2 s). */
 const LOBBY_HOLD_S = 20;
 
+/** Paid warm-up ended with one human: paid rooms are humans only, so there is no match (P01). */
+export const NO_MATCH_PAID = "No other paid player online right now. Your stake is back in your balance.";
+
 export class MatchRoom extends Room {
   override state = new MatchState();
   override maxClients: number = R.ROOM_SIZE;
@@ -276,6 +279,8 @@ export class MatchRoom extends Room {
   }
 
   override onReconnect(client: Client): void {
+    // The seat was given up at the 3-2-1 or GO while this player was away (B01): nothing was charged.
+    if (!this.world.blobs.has(client.sessionId)) return void client.leave(4001, "the match started without you, nothing was charged");
     this.inputs.open(client.sessionId);
     this.lastMe.delete(client.sessionId);
   }
@@ -294,13 +299,36 @@ export class MatchRoom extends Room {
     const id = client.sessionId;
     if (this.spectators.delete(id)) return void this.publish();
     this.inputs.close(id);
-    if (this.started || this.paidLocked) return; // after GO (paid: after the 3-2-1) the blob stays
+    // After GO (paid: after the 3-2-1) the blob stays. ENDED before GO (no match, abort): the room
+    // already refunds every ticket and onDispose frees the seats.
+    if (this.started || this.paidLocked || this.phase === "ENDED") return;
+    this.unseat(id);
+    this.countHeads();
+  }
+
+  /** Give a seat back before GO: nothing is charged, and a paid ticket is refunded (P02), never left held. */
+  private unseat(id: string): void {
     this.guests.delete(this.users.get(id) ?? "");
     this.users.delete(id);
-    const acc = this.world.blobs.get(id)?.accountId;
-    if (acc) (seatedAccounts.delete(acc), this.accounts.delete(acc));
+    const acc = this.key.mode === "paid" ? this.world.blobs.get(id)?.accountId : null;
+    if (acc) {
+      this.accounts.delete(acc);
+      // Still "seated" until the refund lands, so a quick PLAY again can't join on the old ticket.
+      void refundTickets([acc]).finally(() => seatedAccounts.delete(acc));
+    }
     removePlayer(this.world, id);
-    this.countHeads();
+  }
+
+  /** Seats held for a dropped player (private lobby reload window) are never played or charged (B01). */
+  private pruneDropped(): void {
+    for (const b of [...this.world.blobs.values()]) if (b.kind === "human" && !this.clients.getById(b.id)) this.unseat(b.id);
+  }
+
+  /** Warm-up ends with no match (a lone paid player, an idle private lobby): nobody is charged, tickets come back. */
+  private noMatch(): void {
+    this.enter("ENDED", false);
+    if (this.key.mode === "paid") this.broadcast("aborted", { reason: NO_MATCH_PAID });
+    void refundTickets(this.staked()).finally(() => this.disconnect());
   }
 
   private tick(): void {
@@ -325,7 +353,7 @@ export class MatchRoom extends Room {
       case "WARMUP": {
         const humans = this.state.humans;
         const next = warmupNext({ mode: this.key.mode, private: !!this.key.roomCode, humans, phaseTick: this.phaseTick, startNow: this.startNow });
-        if (next === "close") void this.disconnect();
+        if (next === "close") this.noMatch();
         if (next === "countdown") this.countdown();
         break;
       }
@@ -351,6 +379,9 @@ export class MatchRoom extends Room {
 
   /** Lock the room; public free rooms fill the empty seats with labelled agents (private: friends only), paid rooms add liquidator drones. */
   private countdown(): void {
+    this.pruneDropped();
+    // A paid seat that dropped can leave one human: paid rooms are humans only, so no match.
+    if (this.key.mode === "paid" && [...this.world.blobs.values()].filter((b) => b.kind === "human").length < R.PAID_MIN_HUMANS) return this.noMatch();
     void this.lock();
     const human = [...this.world.blobs.values()].find((b) => b.kind === "human");
     const fill = this.judge && human ? judgeLineup(human).slice(1) : this.key.mode === "free" ? (this.key.roomCode ? [] : agentFill(this.state.humans, this.seed)) : droneFill(this.state.humans);
@@ -375,6 +406,8 @@ export class MatchRoom extends Room {
   /** GO: charge, build the real world for this head count, seeded fair respawn. No vanishing after this. */
   private go(): void {
     // Entry is charged here and nowhere else; anyone who can no longer pay is sent home uncharged.
+    // Free only: a paid seat held through the 3-2-1 has a bound ticket and plays on (RULES).
+    if (this.key.mode === "free") this.pruneDropped();
     for (const [id, userId] of this.users) {
       const charged = this.charge(userId);
       if (charged === "ok") continue;
@@ -525,7 +558,7 @@ export class MatchRoom extends Room {
   override onBeforePatch(): void {
     const w = this.world;
     const left =
-      this.phase === "WARMUP" ? (this.key.roomCode ? 0 : (this.key.mode === "paid" ? PAID_WAIT_TICKS : WARMUP_TICKS) - this.phaseTick)
+      this.phase === "WARMUP" ? (this.key.roomCode ? 0 : Math.max(0, (this.key.mode === "paid" ? PAID_WAIT_TICKS : WARMUP_TICKS) - this.phaseTick))
       : this.phase === "COUNTDOWN" ? Math.max(0, COUNTDOWN_TICKS - this.phaseTick)
       : 0;
     syncState(this.state, w, this.roomTick, this.started ? null : left / R.TICK_HZ);
