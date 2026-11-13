@@ -15,7 +15,7 @@
   font: 500 16px/1.5 Geist, system-ui, sans-serif;
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 .home a {
   color: inherit;

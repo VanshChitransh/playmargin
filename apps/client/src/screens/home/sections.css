@@ -1,8 +1,6 @@
 /* Home sections below the hero (How it plays, the proof block, the footer), ported from
    research/margin/ui/drafts/how.css and trust.css. Every rule is scoped under .home so nothing
    leaks into the game or the other screens. */
-/* overflow clip, not hidden: hidden makes .home a scroll box and the pinned story stops sticking */
-.home.home{overflow-x:clip}
 .home{--bg:#FFFFFF;--soft:#F4F5F7;--line:#E4E6EB;--text:#0A0B0D;--muted:#5B616E;--blue:#0052FF;--safe:#16C46B;--warn:#E8B500;--liq:#E0243F;--gold:#E0A21B;--ink:#0A0B0D;--ink2:#14161A;--inkline:#262A31;--inkmuted:#9AA0AC}
 .home .how,.home .trust,.home .foot{font-family:Geist,system-ui,sans-serif;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
 .home :where(.how,.trust,.foot) *{box-sizing:border-box}
