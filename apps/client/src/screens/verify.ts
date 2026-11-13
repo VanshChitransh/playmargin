@@ -3,7 +3,7 @@
 // offline match just played; any log file can be dropped in. A Tamper test button edits one
 // number live so a judge watches the check turn red at the exact event.
 import { MICRO, type LogEntry, type ProofStep } from "@margin/core";
-import { ENDPOINT } from "../net/client";
+import { serverFor } from "../net/region";
 import type { Screen } from "../router";
 import { runChecks, type Check, type Report } from "../verify/checks";
 import { EXPLORER } from "../chain/config";
@@ -47,7 +47,9 @@ export const verify: Screen = (root, { id = "" }) => {
   const show = async (d: Loaded, note = "", real?: Loaded): Promise<void> => {
     // The server's own anchorHead is ignored: the anchor check reads NEAR with the head WE replayed.
     const r = await runChecks(d.log, null);
-    if (d.claim && r.result) r.anchor = await anchorOnNear(r.result.head, d.claim, { view: viewOnChain, tx: txFunctionCall });
+    // One hourly anchor slot on the contract belongs to the Mumbai box: US matches are never anchored.
+    if (d.claim?.matchId.startsWith("u-")) r.anchor = { state: "skip", detail: "Not anchored on NEAR: US server matches are verified here only (hash chain and books)." };
+    else if (d.claim && r.result) r.anchor = await anchorOnNear(r.result.head, d.claim, { view: viewOnChain, tx: txFunctionCall });
     else if (d.claim) r.anchor = { state: "skip", detail: "The log does not replay, so there is no final hash to look up on NEAR." };
     render(body, d, r, note, !!real);
     body.querySelector("[data-v=download]")?.addEventListener("click", () => download(d.log, id));
@@ -74,7 +76,7 @@ export const verify: Screen = (root, { id = "" }) => {
     else body.innerHTML = `<p>No offline match in this tab yet. Play one, then press Verify on the receipt.</p>`;
   } else {
     const get = <T,>(what: string) =>
-      fetch(`${ENDPOINT}/api/matches/${encodeURIComponent(id)}/${what}`).then((r) => (r.ok ? (r.json() as Promise<T>) : Promise.reject(new Error(`HTTP ${r.status}`))));
+      fetch(`${serverFor(id).url}/api/matches/${encodeURIComponent(id)}/${what}`).then((r) => (r.ok ? (r.json() as Promise<T>) : Promise.reject(new Error(`HTTP ${r.status}`))));
     type Proof = { mode: "free" | "paid"; anchor?: { hour: number; proof: ProofStep[]; tx: string | null } | null };
     Promise.all([get<Loaded>("log"), get<Proof>("proof")])
       .then(([d, p]) => show({ ...d, claim: { mode: p.mode, matchId: id, anchor: p.anchor ? { hour: p.anchor.hour, proof: p.anchor.proof, tx: p.anchor.tx } : null } }))

@@ -16,6 +16,7 @@ import { isRoomCode, shareRoom } from "./net/room-code";
 import { Controls } from "./input/controls";
 import { playerName, setPlayerName } from "./player/name";
 import { ENDPOINT, MatchConnection, guestKey } from "./net/client";
+import { REGIONS, serverFor } from "./net/region";
 import { joinFailWords } from "./net/refusal";
 import { track } from "./analytics/track";
 import { seat } from "./net/seat";
@@ -429,6 +430,13 @@ export const play: Screen = (root, params) => {
     if (code && !(s instanceof LocalMatch)) chip = roomChip(root, code);
     receipt = new Receipt(s.me);
     if (import.meta.env.DEV) (window as unknown as { __receipt: Receipt }).__receipt = receipt;
+    if (s instanceof MatchConnection && REGIONS.length > 1) {
+      // Two servers: say which one this match is on, so the pick is honest (and lag explainable).
+      const where = document.createElement("p");
+      where.className = "pointer-events-none fixed left-3 top-14 z-10 text-xs font-semibold text-muted";
+      where.textContent = `Server: ${s.server.label}`;
+      root.appendChild(where);
+    }
     if (s instanceof MatchConnection) {
       const dog = setInterval(() => {
         if (left || ended) return clearInterval(dog);
@@ -509,7 +517,7 @@ async function matchLog(src: unknown): Promise<LogEntry[] | null> {
   const id = (src as { matchId?: string } | null)?.matchId;
   if (!id) return null;
   for (let i = 0; i < 3; i++) {
-    const r = await fetch(`${ENDPOINT}/api/matches/${encodeURIComponent(id)}/log`);
+    const r = await fetch(`${serverFor(id).url}/api/matches/${encodeURIComponent(id)}/log`);
     // The room saves entries as they happen: only a log that reached MATCH_END is the whole match.
     const log = r.ok ? ((await r.json()) as { log: LogEntry[] }).log : null;
     if (log?.at(-1)?.type === "MATCH_END") return log;

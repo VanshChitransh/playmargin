@@ -5,6 +5,7 @@ import "./home/hero.css";
 import type { Screen } from "../router";
 import { navigate } from "../router";
 import { newRoomCode } from "../net/room-code";
+import { freeRegion, hintFor } from "../net/region";
 import { showStake } from "../stake";
 import { VERIFY_EXAMPLE } from "./home/proof";
 import { nameProblem } from "@margin/core";
@@ -81,7 +82,9 @@ export const landing: Screen = (root) => {
     why.hidden = !problem;
   });
   // A private room is just a fresh code: the first one in creates it, the friend's link joins it.
-  root.querySelector("[data-challenge]")!.addEventListener("click", () => navigate(`/r/${newRoomCode()}`));
+  // The room is made on the host's fastest server, and the link names it so a friend lands there too.
+  void freeRegion();
+  root.querySelector("[data-challenge]")!.addEventListener("click", () => void freeRegion().then((r) => navigate(`/r/${newRoomCode()}${hintFor(r)}`)));
   return cleanup;
 };
 
