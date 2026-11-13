@@ -75,10 +75,6 @@ export function withLabels(text: string | null, w: { blobs: ReadonlyMap<string, 
   return text.replace(new RegExp(ids.join("|"), "g"), (id) => w.blobs.get(id)?.label ?? id);
 }
 
-/** Free guests with an OPEN socket, user id -> room id (F04/B02): a second tab in any room is refused.
- *  Only connected seats count: a closed tab (seat held for a reload) never blocks Play again. */
-const connectedGuests = new Map<string, string>();
-
 export class MatchRoom extends Room {
   override state = new MatchState();
   override maxClients: number = R.ROOM_SIZE;
@@ -214,7 +210,6 @@ export class MatchRoom extends Room {
     if (this.key.mode === "free") {
       const userId = admitFree(sharedDb(), opts);
       if (this.guests.has(userId)) throw new Error("you are already in this match");
-      if (connectedGuests.has(userId)) throw new Error("you are already playing in another tab");
       this.guests.add(userId);
       return userId;
     }
@@ -256,10 +251,7 @@ export class MatchRoom extends Room {
     } else {
       addPlayer(this.world, p);
     }
-    if (typeof auth === "string") {
-      this.users.set(id, auth);
-      connectedGuests.set(auth, this.roomId);
-    }
+    if (typeof auth === "string") this.users.set(id, auth);
     this.inputs.open(id);
     if (this.lastRationale) client.send("commander", { rationale: this.lastRationale });
     this.countHeads();
@@ -287,7 +279,6 @@ export class MatchRoom extends Room {
 
   override onDrop(client: Client): void {
     if (this.spectators.has(client.sessionId)) return; // watchers just rejoin, nothing to hold
-    this.disconnected(client.sessionId);
     // Before GO leaving is free (onLeave runs next), except a paid 3-2-1: the ticket is being bound.
     // A private lobby holds a dropped seat briefly, so a reload keeps the blob and the host role
     // (host = earliest human still here) instead of handing START to whoever joined next.
@@ -308,18 +299,9 @@ export class MatchRoom extends Room {
     if (!this.world.blobs.has(client.sessionId)) return void client.leave(4001, "the match started without you, nothing was charged");
     this.inputs.open(client.sessionId);
     this.lastMe.delete(client.sessionId);
-    const userId = this.users.get(client.sessionId);
-    if (userId) connectedGuests.set(userId, this.roomId);
-  }
-
-  /** This seat's socket is gone: the guest may play in another tab or room now. */
-  private disconnected(id: string): void {
-    const userId = this.users.get(id);
-    if (userId && connectedGuests.get(userId) === this.roomId) connectedGuests.delete(userId);
   }
 
   override onDispose(): void {
-    for (const id of this.users.keys()) this.disconnected(id);
     if (this.counted) rooms.live--;
     for (const a of this.accounts) seatedAccounts.delete(a);
   }
@@ -332,7 +314,6 @@ export class MatchRoom extends Room {
   override onLeave(client: Client): void {
     const id = client.sessionId;
     if (this.spectators.delete(id)) return void this.publish();
-    this.disconnected(id);
     this.inputs.close(id);
     // After GO (paid: after the 3-2-1) the blob stays. ENDED before GO (no match, abort): the room
     // already refunds every ticket and onDispose frees the seats.
@@ -447,7 +428,6 @@ export class MatchRoom extends Room {
     for (const [id, userId] of this.users) {
       const charged = this.charge(userId);
       if (charged === "ok") continue;
-      this.disconnected(id);
       this.users.delete(id);
       this.guests.delete(userId);
       removePlayer(this.world, id);
