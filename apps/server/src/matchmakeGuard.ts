@@ -42,7 +42,7 @@ export function requestIp(req: IncomingMessage): string {
  */
 export function guardMatchmake(
   server: Server,
-  limiter = new RateLimiter(Number(process.env.MATCHMAKE_LIMIT_PER_MIN ?? 30), 60_000),
+  limiter = new RateLimiter(Number(process.env.MATCHMAKE_LIMIT_PER_MIN ?? 100), 60_000),
   draining: () => boolean = () => false,
 ): void {
   const listeners = server.listeners("request") as Array<(req: IncomingMessage, res: ServerResponse) => void>;
