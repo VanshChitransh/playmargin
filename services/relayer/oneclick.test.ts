@@ -13,6 +13,8 @@ describe("1-Click proxy", () => {
     expect(quoteInputError({ ...ok, accountId: "Bad Account" }, known)).toMatch(/account/);
     expect(quoteInputError({ ...ok, originAsset: "nep141:evil" }, known)).toMatch(/token/);
     expect(quoteInputError({ ...ok, amount: "0" }, known)).toMatch(/amount/);
+    expect(quoteInputError({ ...ok, amount: "1".repeat(19) }, known)).toMatch(/amount/); // B04: 39-digit amounts went to 1-Click
+    expect(quoteInputError({ ...ok, amount: "1".repeat(18) }, known)).toBeNull();
     expect(quoteInputError({ ...ok, amount: "1.5" }, known)).toMatch(/amount/);
     expect(quoteInputError({ ...ok, refundTo: "" }, known)).toMatch(/refund/);
   });

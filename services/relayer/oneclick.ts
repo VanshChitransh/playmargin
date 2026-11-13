@@ -49,7 +49,7 @@ const ACCOUNT = /^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]
 export function quoteInputError(q: Partial<QuoteInput>, known: (assetId: string) => boolean): string | null {
   if (typeof q.accountId !== "string" || !ACCOUNT.test(q.accountId)) return "bad account";
   if (typeof q.originAsset !== "string" || !known(q.originAsset)) return "unsupported token";
-  if (typeof q.amount !== "string" || !/^[1-9]\d{0,38}$/.test(q.amount)) return "bad amount";
+  if (typeof q.amount !== "string" || !/^[1-9]\d{0,17}$/.test(q.amount)) return "bad amount"; // B04: 18 digits is 1e12 USDC, more is junk
   if (typeof q.refundTo !== "string" || q.refundTo.length < 4 || q.refundTo.length > 128) return "bad refund address";
   return null;
 }

@@ -113,6 +113,11 @@ async function relay(req: IncomingMessage, res: ServerResponse): Promise<void> {
 }
 
 const quoteLimiter = new RateLimit(1_000);
+// B04/B05: the accountId is the client's choice, so the IP limits too; /status was not limited at all.
+const quoteIpLimiter = new RateLimit(1_000);
+const statusIpLimiter = new RateLimit(500);
+/** 1-Click deposit addresses: NEAR, EVM, base58, bech32. Anything else never reaches 1-Click. */
+const DEPOSIT_RE = /^[A-Za-z0-9._:-]{8,128}$/;
 
 /** POST /quote {accountId, originAsset, amount, refundTo}: 1-Click quote into the contract. */
 async function quote(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -125,7 +130,7 @@ async function quote(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const known = new Set((await oneclick.tokens()).map((t) => t.assetId));
   const why = oneclick.quoteInputError(body, (id) => known.has(id));
   if (why) return reply(res, 400, { error: why });
-  if (!quoteLimiter.allow(String(body.accountId), Date.now())) return reply(res, 429, { error: "slow down" });
+  if (!quoteIpLimiter.allow(ip(req), Date.now()) || !quoteLimiter.allow(String(body.accountId), Date.now())) return reply(res, 429, { error: "slow down" });
   const r = await oneclick.quote(body as unknown as oneclick.QuoteInput);
   reply(res, r.status, r.body as object);
 }
@@ -195,6 +200,8 @@ createServer((req, res) => {
   if (req.method === "GET" && req.url === "/tokens") return void oneclick.tokens().then((t) => reply(res, 200, t), fail);
   if (req.method === "POST" && req.url === "/quote") return void quote(req, res).catch(fail);
   const st = req.method === "GET" && req.url?.startsWith("/status?") ? new URL(req.url, "http://x").searchParams.get("depositAddress") : null;
+  if (st && !DEPOSIT_RE.test(st)) return reply(res, 400, { error: "bad depositAddress" });
+  if (st && !statusIpLimiter.allow(ip(req), Date.now())) return reply(res, 429, { error: "slow down" });
   if (st) return void oneclick.status(st).then((r) => reply(res, r.status, r.body as object), fail);
   reply(res, 404, { error: "not found" });
 }).listen(PORT, () => console.log(`relayer ${RELAYER_ID} -> ${policy.contractId} on :${PORT} (${NETWORK})`));
