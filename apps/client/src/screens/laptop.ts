@@ -1,6 +1,6 @@
-// "MARGIN plays on a laptop": the only page a phone or tablet ever sees (every route is gated in
-// index.ts, docs/future_feature.md has the mobile plan). No nav: every link would lead back here.
-// It says what MARGIN is with one real clip, and helps carry the link over to a laptop.
+// "MARGIN plays on a laptop": what a phone or tablet sees instead of the game itself (play, $1, Judge
+// Run, a room link; gated in index.ts, docs/future_feature.md has the mobile plan). Every other page
+// stays readable on a phone under mountPhoneBanner. It shows one real clip and carries the link over.
 import type { Screen } from "../router";
 import { BTN } from "./chrome";
 import { track } from "../analytics/track";
@@ -21,6 +21,7 @@ export const laptopOnly: Screen = (root, params) => {
       <button data-copy class="${BTN.go}">Copy link</button>
       <button data-send class="${BTN.card} hidden">Send it to yourself</button>
     </div>
+    <p class="mt-4 text-sm text-muted"><a href="/" class="font-semibold text-ink underline">Home</a> · <a href="/how" class="font-semibold text-ink underline">How it works</a> · <a href="/judges" class="font-semibold text-ink underline">For judges</a></p>
     <figure class="pop mt-10 overflow-hidden rounded-2xl bg-card">
       <video class="block aspect-video w-full bg-cream object-cover" src="/clips/liquidated.mp4" muted loop playsinline ${still ? "" : "autoplay"} preload="metadata" aria-label="Real gameplay: a greedy blob goes red and gets popped"></video>
       <figcaption class="px-4 py-3 text-sm text-muted"><b class="text-ink">Get greedy. Get liquidated.</b> agar.io, but your size is a loan.</figcaption>
@@ -42,3 +43,20 @@ export const laptopOnly: Screen = (root, params) => {
     send.addEventListener("click", () => void navigator.share(data).catch(() => {}));
   }
 };
+
+/** Phones and tablets: a slim sticky note over every readable page, with the link to copy. */
+export function mountPhoneBanner(): void {
+  const bar = document.createElement("div");
+  bar.setAttribute("role", "note");
+  bar.className = "sticky top-0 z-50 flex items-center gap-3 border-b border-grid bg-ink px-4 py-2 text-sm text-white";
+  bar.innerHTML = `<p class="min-w-0 flex-1 leading-snug"><b>MARGIN plays on a laptop.</b> Open playmargin.fun on your computer to play.</p>
+    <button type="button" class="shrink-0 rounded-full bg-white px-3 py-1 font-semibold text-ink">Copy link</button>`;
+  const btn = bar.querySelector("button")!;
+  btn.addEventListener("click", () =>
+    void navigator.clipboard.writeText("https://playmargin.fun").then(
+      () => void (btn.textContent = "Copied"),
+      () => void (btn.textContent = "playmargin.fun"),
+    ),
+  );
+  document.body.prepend(bar);
+}

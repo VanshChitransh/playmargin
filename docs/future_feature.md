@@ -1,7 +1,9 @@
 # Future feature: MARGIN on phones (the mobile app)
 
 MARGIN is laptop only for now: mouse to steer, hold Space to BOOST, hold R to REPAY. A phone or tablet
-sees only a "MARGIN plays on a laptop" page with the link to copy, on every route (13 Nov 2026).
+can read every page (home, How it works, Verify, Judges, Watch) under a slim "MARGIN plays on a laptop"
+banner with the link to copy. Only the game itself (practice, the $1 match, Judge Run, a room link)
+shows the "plays on a laptop" card instead (14 Nov 2026).
 This page records what we had, what broke and how to bring phones back.
 
 ## Why it is parked (10 Nov 2026)

@@ -325,8 +325,7 @@
   .h-nav {
     padding: 16px;
   }
-  .h-links .h-quiet,
-  .h-links a[data-proof-link] {
+  .h-links .h-quiet {
     display: none;
   }
   .h-top h1 {
@@ -335,6 +334,17 @@
   .h-window {
     width: calc(100% - 32px);
     height: 300px;
+  }
+}
+
+/* Phones read the home page (Q18): one nav pill, and no keyboard hints over the recording. */
+@media (max-width: 480px) {
+  .h-links a:not(.h-judge),
+  .h-keys {
+    display: none;
+  }
+  .h-links .h-judge {
+    white-space: nowrap;
   }
 }
 
