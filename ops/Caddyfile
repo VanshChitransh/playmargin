@@ -4,7 +4,8 @@
 # The cert comes from Let's Encrypt via DNS-01 (caddy-dns/cloudflare, token in /etc/caddy/cf.env), so it
 # renews whether or not the record is proxied. With no proxy in front, the client IP is the TCP peer
 # ({remote_host}): no header from the client is believed. Orange cloud instead? Use ops/Caddyfile.cloudflare.
-api.playmargin.fun {
+# MARGIN_HOST (in /etc/caddy/cf.env): us.api.playmargin.fun on the US box, else api.playmargin.fun.
+{$MARGIN_HOST:api.playmargin.fun} {
 	tls {
 		dns cloudflare {env.CF_API_TOKEN}
 		resolvers 1.1.1.1

@@ -30,9 +30,11 @@ ln -sfn "$DIR" /opt/margin/current
 install -m 644 ops/margin-server.service /etc/systemd/system/margin-server.service
 install -m 644 ops/margin-relayer.service /etc/systemd/system/margin-relayer.service
 systemctl daemon-reload
-systemctl enable margin-server margin-relayer >/dev/null
+systemctl enable margin-server >/dev/null
+# The relayer (paid money path) runs only where it is configured: Mumbai. The US box is free only.
+if [[ -f /etc/margin/relayer.env ]]; then systemctl enable margin-relayer >/dev/null; fi
 echo "restarting (drain can take up to 2 min if a match is LIVE)"
-systemctl restart margin-relayer
+if [[ -f /etc/margin/relayer.env ]]; then systemctl restart margin-relayer; fi
 systemctl restart margin-server
 for i in $(seq 1 30); do
   if curl -fsS localhost:2567/health >/dev/null 2>&1; then
