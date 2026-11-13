@@ -121,7 +121,7 @@ function render(body: HTMLElement, d: Loaded, r: Report, note: string, tampered:
       ${tampered
         ? `<button data-v=restore class="${BTN.go} text-lg">Restore the real log</button>`
         : `<button data-v=tamper class="${BTN.ink} text-lg">Tamper test</button>`}
-      ${explorer ? `<a href="${explorer}" target="_blank" rel="noopener" class="${BTN.go} text-lg">✓ See proof on NEAR</a>` : ""}
+      ${explorer ? `<a href="${explorer}" target="_blank" rel="noopener" class="${tampered ? BTN.card : BTN.go} text-lg">${tampered ? "See the real record on NEAR" : "✓ See proof on NEAR"}</a>` : ""}
     </div>`;
 }
 
