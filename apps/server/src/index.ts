@@ -7,6 +7,7 @@ import basicAuth from "express-basic-auth";
 import { MATCH_TICKS } from "@margin/core";
 import { MatchRoom, drain } from "./rooms/MatchRoom";
 import { mountApi } from "./api";
+import { corsFor } from "./cors";
 import { mountAnalytics } from "./analytics";
 import { guardMatchmake } from "./matchmakeGuard";
 import { quietLogger } from "./refusal";
@@ -34,14 +35,9 @@ const server = defineServer({
   },
 });
 
-// B09: Colyseus reflects ANY origin with credentials. We use no cookies: allow only our site, its
-// Pages previews and a local dev client, and never send credentials.
-const ORIGIN_OK = /^(https:\/\/(www\.)?playmargin\.fun|https:\/\/([a-z0-9-]+\.)?playmargin\.pages\.dev|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?)$/;
+// B09 + the 13 Nov P0: pinned CORS with credentials for our origins only (cors.ts).
 delete (matchMaker.controller.DEFAULT_CORS_HEADERS as Record<string, string>)["Access-Control-Allow-Credentials"];
-matchMaker.controller.getCorsHeaders = (headers: Headers) => {
-  const origin = headers.get("origin") ?? "";
-  return { "Access-Control-Allow-Origin": ORIGIN_OK.test(origin) ? origin : "https://playmargin.fun", Vary: "Origin" };
-};
+matchMaker.controller.getCorsHeaders = (headers: Headers) => corsFor(headers.get("origin") ?? "");
 
 // SIGTERM: Colyseus locks every room and waits for them to close; drain also blocks new rooms.
 server.onBeforeShutdown(() => {
