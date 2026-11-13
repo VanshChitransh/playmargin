@@ -26,7 +26,7 @@ export const landing: Screen = (root) => {
       </div>
     </nav>
     <header class="h-top">
-      <p class="h-eyebrow"><i></i>Live on NEAR</p>
+      <p class="h-eyebrow"><i></i>Live on NEAR testnet</p>
       <h1>Get greedy. <span>Get liquidated.</span></h1>
       <p class="h-sub">agar.io, but your size is a loan. <b>Owe too much, you're food.</b></p>
       <div data-ctas>
@@ -41,7 +41,7 @@ export const landing: Screen = (root) => {
     </header>
     <section class="h-window" aria-label="Live match: bots playing on the real rules">
       <div class="h-bar">
-        <p class="h-label"><i data-live></i>Live on NEAR · humans and 🤖 bots, same rules</p>
+        <p class="h-label"><i data-live></i>Bots match in your browser · 🤖 same rules as yours</p>
         <p class="h-keys"><span><kbd>Space</kbd>boost</span><span><kbd>R</kbd>repay</span><span><kbd>E</kbd>cash out</span></p>
       </div>
       <div class="h-stage"><div data-hero class="h-arena"></div><div data-feed class="h-feed" aria-live="off"></div></div>
