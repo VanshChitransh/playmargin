@@ -129,7 +129,7 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
         </div>
         <div class="mt-10 grid max-w-[360px] gap-4">
           ${btn("again", `Play again${icon("M3 12a9 9 0 1 0 3-6.7M3 4v5h5")}`, "var(--color-safe)", BIG)}
-          ${btn("share", `${o.death && !o.death.eaten ? "Get your Certificate" : "Share"}${icon("M7 17 17 7M8 7h9v9")}`, CARD, BIG)}
+          ${btn("share", `${o.death && !o.death.eaten ? "Get your Certificate" : "share" in navigator ? "Share" : "Post on X"}${icon("M7 17 17 7M8 7h9v9")}`, CARD, BIG)}
         </div>
         <div class="mt-6 flex gap-3">${chip("verify", "Verify this match")}${chip("home", "Home")}</div>
         <div data-social class="mt-6 max-w-[360px] rounded-box bg-card p-3 text-ink empty:hidden"></div>

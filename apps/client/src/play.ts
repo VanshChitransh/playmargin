@@ -521,6 +521,11 @@ async function matchLog(src: unknown): Promise<LogEntry[] | null> {
 function shareResult(o: Outcome, matchId: string, el: HTMLElement | null): void {
   if (o.death && !o.death.eaten) return void shareCertificate({ ...o.death, matchId });
   const what = o.kind === "cashed" ? `cashed out ${o.end.toFixed(2)}` : o.kind === "survived" ? `survived with ${o.end.toFixed(2)}` : "got eaten";
+  // No share sheet (most laptops): the button says Post on X and opens a ready post with the verify link (F16).
+  if (!("share" in navigator)) {
+    const q = new URLSearchParams({ text: `I ${what} on MARGIN, rank #${o.rank} of ${o.of}. Get greedy. Get liquidated.`, url: verifyUrl(matchId) });
+    return void window.open(`https://x.com/intent/post?${q}`, "_blank", "noopener");
+  }
   // On a laptop Share copies the link: say so on the button, or the click looks like it did nothing.
   void shareLink(`I ${what} on MARGIN, rank #${o.rank} of ${o.of}. Get greedy. Get liquidated.`, verifyUrl(matchId)).then((r) => {
     // Only the button's text node changes, so its arrow icon stays.
