@@ -6,6 +6,7 @@ import type { Frame } from "./game/frame";
 import { LocalMatch } from "./game/local";
 import { Receipt, mergeLog, receiptFromLog, type ClutchSave } from "./game/receipt";
 import { Hud } from "./hud/hud";
+import { stakeLabel } from "./stake";
 import { elapsedS, outsideZone } from "./hud/logic";
 import { shareCertificate, verifyUrl } from "./share/certificate";
 import { mountSocialShare } from "./social/mount";
@@ -301,8 +302,11 @@ export const play: Screen = (root, params) => {
     if (src instanceof LocalMatch) setLocalLog(await src.log());
     navigate(`/verify/${encodeURIComponent(src?.matchId ?? "")}`);
   };
+  // The contract's entry stake in dollars, read early so the paid receipt can show dollars (P03).
+  let stakeUsd = 1;
+  if (wasPaid) void stakeLabel().then((l) => (stakeUsd = Number(l.slice(1)) || 1));
   const results = (o: ReturnType<Receipt["outcome"]>): HTMLElement =>
-    showResults(root, o, (a) => (a === "again" ? again() : a === "verify" ? void toVerify() : a === "share" ? void shareResult(o, src!.matchId, overlay) : home()), wasPaid);
+    showResults(root, o, (a) => (a === "again" ? again() : a === "verify" ? void toVerify() : a === "share" ? void shareResult(o, src!.matchId, overlay) : home()), wasPaid, stakeUsd);
   const finish = (): void => {
     if (ended || !lastFrame || !receipt) return;
     ended = true;

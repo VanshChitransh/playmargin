@@ -5,6 +5,7 @@
 import { R } from "@margin/core";
 import { centLines, type Outcome } from "../game/receipt";
 import { showStake } from "../stake";
+import { NETWORK } from "../chain/config";
 
 const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
@@ -68,7 +69,10 @@ export function showDeath(root: HTMLElement, d: NonNullable<Outcome["death"]>, a
 }
 
 /** The bell: a receipt whose lines add up to the final number (v8 Cover Story layout). */
-export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "home" | "verify" | "share") => void, paid = false): HTMLElement {
+export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "home" | "verify" | "share") => void, paid = false, stakeUsd = 1): HTMLElement {
+  // Paid rooms show dollars: one entry is 100 game units and costs the stake (P03).
+  const k = paid ? stakeUsd / R.UNITS_PER_USDC : 1;
+  const cur = paid ? "$" : "";
   // Stacked like the v8 poster (SUR / VIVED.): two short lines, giant, ink shadow. A death gets
   // the same weight with a red shadow, so it never needs a rotated stamp over the text below.
   const title =
@@ -87,7 +91,7 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
             : `Popped by ${esc(o.death?.by ?? "the vault")}.`;
   // The tile shows the receipt's own food line, so the stat and the receipt can't disagree (QA-B-11).
   const food = o.lines.find((l) => l.label.startsWith("Food"))?.amount ?? 0;
-  const foodNet = `${food >= 0 ? "+" : "\u2212"}${Math.abs(food).toFixed(1)}`;
+  const foodNet = `${food >= 0 ? "+" : "\u2212"}${cur}${Math.abs(food * k).toFixed(paid ? 2 : 1)}`;
   const judge = location.pathname === "/judge"; // the Judge Run route (index.ts), QA-B-12
   const alive = `${Math.floor(s.aliveS / 60)}:${String(s.aliveS % 60).padStart(2, "0")}`;
   const cell = (label: string, value: string, span: string, cls = ""): string =>
@@ -97,14 +101,14 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
       ${cell("food minus zone", foodNet, "col-span-2 sm:col-span-1")}
       ${cell("time alive", alive, "col-span-2 sm:col-span-1")}
       ${cell("blobs eaten", String(s.blobsEaten), "col-span-2 sm:col-span-1")}
-      ${cell("top rank", `#${s.topRank}`, "col-span-3 sm:col-span-1")}
-      ${cell("peak equity", s.peakEquity.toFixed(0), "col-span-3 sm:col-span-1", "text-[#B97A0F]")}
+      ${cell(dead ? "best while alive" : "top rank", `#${s.topRank}`, "col-span-3 sm:col-span-1")}
+      ${cell("peak equity", paid ? `$${(s.peakEquity * k).toFixed(2)}` : s.peakEquity.toFixed(0), "col-span-3 sm:col-span-1", "text-[#B97A0F]")}
     </div>`;
   const line = (label: string, v: string, neg = false): string =>
     `<div class="flex justify-between gap-6 border-b border-dashed border-ink/25 py-2"><span>${label}</span><span class="num ${neg ? "text-liq" : ""}">${v}</span></div>`;
   // Whole cents that add up to YOU KEEP on screen (QA-E-16): rounding each line alone could miss by a cent or two.
-  const cents = centLines(o.start, o.lines.map((l) => l.amount), o.end);
-  const money = (c: number): string => (Math.abs(c) / 100).toFixed(2);
+  const cents = centLines(o.start * k, o.lines.map((l) => l.amount * k), o.end * k);
+  const money = (c: number): string => cur + (Math.abs(c) / 100).toFixed(2);
   const rows = o.lines.map((l, i) => line(esc(l.label), (cents[i]! >= 0 ? "+" : "\u2212") + money(cents[i]!), cents[i]! < 0)).join("");
   const el = shell(
     root,
@@ -129,13 +133,13 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
         ${stats}
         <div class="sticker relative mx-auto mt-10 max-w-xl px-5 pb-5 pt-6 sm:px-7 lg:rotate-[-1deg]" style="background:${CREAM}">
           ${tape("left:-22px;top:-8px;transform:rotate(-30deg)")}${tape("right:-22px;top:-8px;transform:rotate(30deg)")}
-          <h3 class="flex items-baseline justify-between border-b-[3px] border-ink pb-3 font-display text-2xl">RECEIPT <span class="tag text-muted">where your ${o.start.toFixed(0)} went</span></h3>
-          <div class="font-mono text-sm sm:text-base">${line("Start", money(Math.round(o.start * 100)))}${rows}</div>
+          <h3 class="flex items-baseline justify-between border-b-[3px] border-ink pb-3 font-display text-2xl">RECEIPT <span class="tag text-muted">where your ${paid ? `$${(o.start * k).toFixed(2)}` : o.start.toFixed(0)} went</span></h3>
+          <div class="font-mono text-sm sm:text-base">${line("Start", money(Math.round(o.start * k * 100)))}${rows}</div>
           <div class="sticker mt-4 flex items-center justify-between bg-gold px-4 py-3" style="box-shadow:none">
             <span class="font-display text-2xl">YOU KEEP</span>
-            <span class="font-display text-5xl tabular-nums">${money(Math.round(o.end * 100))}</span>
+            <span class="font-display text-5xl tabular-nums">${money(Math.round(o.end * k * 100))}</span>
           </div>
-          <p class="mt-3 text-sm font-semibold text-muted">${paid ? "Real dollars, paid to your balance when the match settles." : "Practice credits. Never cash, never bought."}</p>
+          <p class="mt-3 text-sm font-semibold text-muted">${paid ? (NETWORK === "testnet" ? "Test dollars (NEAR testnet), paid to your balance when the match settles." : "Real dollars, paid to your balance when the match settles.") : "Practice credits. Never cash, never bought."}</p>
         </div>
       </section>
       <img src="/brand/margin-cat-cutout.svg" alt="" aria-hidden="true" class="pointer-events-none fixed bottom-6 right-10 z-0 hidden w-36 rotate-[8deg] lg:block" />
