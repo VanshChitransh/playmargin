@@ -63,7 +63,7 @@ export const watch: Screen = (root) => {
 
   const showStamp = (word: string, who: string): void => {
     stamp.innerHTML = `<div class="text-center"><div class="stamp sticker inline-block rounded-box ${word === "CASHED OUT" ? "bg-safe text-ink" : "bg-liq text-paper"} px-6 py-2 font-display text-5xl sm:text-6xl">${word}</div>
-      <div class="sticker mt-3 inline-block rounded-field bg-card px-3 py-1 text-sm font-bold text-ink" style="box-shadow:3px 3px 0 var(--color-ink)">${who.replace(/[&<>"']/g, "")}</div></div>`;
+      <div class="sticker mt-3 inline-block rounded-field bg-card px-3 py-1 text-sm font-bold text-ink">${who.replace(/[&<>"']/g, "")}</div></div>`;
     setTimeout(() => stamp.firstElementChild?.remove(), 1400);
   };
 

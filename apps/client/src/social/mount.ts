@@ -13,7 +13,7 @@ export function mountSocialShare(el: HTMLElement, r: ResultPost, account = signe
   if (!on || !account) return;
   el.innerHTML = `<div class="flex flex-wrap items-center gap-3">
     <a data-s=who href="${profileUrl(account)}" target="_blank" rel="noopener" class="flex items-center gap-2 font-bold">
-      <span data-s=av class="grid size-9 place-items-center overflow-hidden rounded-full border-4 border-ink bg-sky font-display">${esc(account[0]?.toUpperCase() ?? "?")}</span>
+      <span data-s=av class="grid size-9 place-items-center overflow-hidden rounded-full border border-grid bg-sky font-display">${esc(account[0]?.toUpperCase() ?? "?")}</span>
       <span data-s=name class="max-w-[15ch] truncate">${esc(account)}</span></a>
     <button data-s=post class="${BTN.card} text-lg">Post to near.social</button>
     <p data-s=msg class="basis-full text-sm" role="status" aria-live="polite"></p></div>`;

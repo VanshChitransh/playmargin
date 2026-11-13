@@ -11,7 +11,7 @@ export interface CertData extends Death {
 }
 
 // Arcade Paper tokens (style.css): the card people share must look like the site.
-const C = { ink: "#1B1A2E", paper: "#FFF6E6", card: "#FFFFFF", liq: "#E5484D", warn: "#FFD43B", agent: "#3BE3FF", muted: "#4A4760", sky: "#7CC8FF", dot: "rgba(27,26,46,.10)" };
+const C = { ink: "#0A0B0D", paper: "#FFFFFF", card: "#FFFFFF", liq: "#E0243F", warn: "#FFD43B", agent: "#3BE3FF", muted: "#5B616E", sky: "#0052FF", dot: "rgba(10,11,13,.06)" };
 const W = 1080;
 const H = 1350;
 
@@ -85,9 +85,9 @@ export async function drawCertificate(d: CertData): Promise<Blob> {
     g.roundRect(70, 52, 96, 96, 24);
     g.stroke();
   }
-  text("MARGIN", 190, 124, "68px 'Lilita One'", C.ink);
+  text("MARGIN", 190, 124, "800 68px Geist", C.ink);
   sticker(W - 70 - 390, 70, 390, 64, C.warn, 32);
-  text("LIQUIDATION CERTIFICATE", W - 70 - 195, 113, "700 24px 'JetBrains Mono'", C.ink, "center");
+  text("LIQUIDATION CERTIFICATE", W - 70 - 195, 113, "700 24px 'Geist Mono'", C.ink, "center");
 
   // Stamp: red ink on white, slightly crooked, sticker shadow.
   g.save();
@@ -104,7 +104,7 @@ export async function drawCertificate(d: CertData): Promise<Blob> {
   g.roundRect(-400, -95, 800, 170, 26);
   g.fill();
   g.stroke();
-  text("LIQUIDATED", 0, 45, "130px 'Lilita One'", C.liq, "center");
+  text("LIQUIDATED", 0, 45, "800 130px Geist", C.liq, "center");
   g.restore();
 
   // Rekt + who did it.
@@ -120,37 +120,37 @@ export async function drawCertificate(d: CertData): Promise<Blob> {
   }
   // Bot names (botnames.ts) carry the robot mark, not an "Agent-" prefix (QA-B-08).
   const agent = d.by.includes("\u{1F916}") || /^(agent|drone)/i.test(d.by);
-  text(d.keeper ? "Closed by" : "Popped by", 410, 530, "600 30px 'JetBrains Mono'", C.muted);
+  text(d.keeper ? "Closed by" : "Popped by", 410, 530, "600 30px 'Geist Mono'", C.muted);
   // The full name stays (a drone's "(liquidator)" is part of the disclosure): shrink the font until it
   // fits the 600 px column right of the rekt tile, never past the card's edge.
   const who = d.keeper ? "THE VAULT" : d.by;
   let px = 76;
-  for (g.font = `${px}px 'Lilita One'`; px > 36 && g.measureText(who).width > W - 70 - 410; px -= 2) g.font = `${px - 2}px 'Lilita One'`;
-  text(who, 410, 612, `${px}px 'Lilita One'`, C.ink);
+  for (g.font = `800 ${px}px Geist`; px > 36 && g.measureText(who).width > W - 70 - 410; px -= 2) g.font = `800 ${px - 2}px Geist`;
+  text(who, 410, 612, `800 ${px}px Geist`, C.ink);
   if (agent) {
     sticker(410, 652, 600, 60, C.agent, 30);
     // True in every room: only paid-room drones have NEAR accounts, free agents and the Judge Run's
     // Drone-1 do not, so the chip says what it is, not where its money lives.
     const drone = /drone|liquidator/i.test(d.by);
-    text(drone ? "an AI liquidator, not a person" : "an AI player, not a person", 710, 692, "600 26px Rubik", C.ink, "center");
+    text(drone ? "an AI liquidator, not a person" : "an AI player, not a person", 710, 692, "600 26px Geist", C.ink, "center");
   }
 
   // Numbers.
   sticker(70, 810, W - 140, 270, C.card);
   const stat = (label: string, value: string, x: number, fill: string = C.ink): void => {
-    text(label, x, 880, "600 26px 'JetBrains Mono'", C.muted, "center");
-    text(value, x, 970, "80px 'Lilita One'", fill, "center");
+    text(label, x, 880, "600 26px 'Geist Mono'", C.muted, "center");
+    text(value, x, 970, "800 80px Geist", fill, "center");
   };
   stat("LEVERAGE", `${d.leverage.toFixed(1)}x`, 240);
   // A drone can pop a blob the instant it goes red: say "<1 s", never a bare "0 s".
   stat("RED FOR", d.redS < 0.5 ? "<1 s" : `${Math.round(d.redS)} s`, W / 2, C.liq);
   stat("GREED", `${greedScore(d.peakLeverage)}/100`, W - 240);
   const hint = d.warnAtS !== null ? `Should have held REPAY at ${clock(R.MATCH_S - d.warnAtS)}.` : "Never saw it coming.";
-  text(hint, W / 2, 1042, "500 34px Rubik", C.ink, "center");
+  text(hint, W / 2, 1042, "500 34px Geist", C.ink, "center");
 
   // Footer: the line + QR to verify.
-  text("Get greedy.", 70, 1212, "80px 'Lilita One'", C.ink);
-  text("Get liquidated.", 70, 1292, "80px 'Lilita One'", C.liq);
+  text("Get greedy.", 70, 1212, "800 80px Geist", C.ink);
+  text("Get liquidated.", 70, 1292, "800 80px Geist", C.liq);
   const qr = encode(verifyUrl(d.matchId), { border: 1 });
   const n = qr.data.length;
   const size = 170;
@@ -160,7 +160,7 @@ export async function drawCertificate(d: CertData): Promise<Blob> {
   sticker(qx - 10, qy - 10, size + 20, size + 20, C.card, 12);
   g.fillStyle = C.ink;
   qr.data.forEach((row, y) => row.forEach((on, x) => on && g.fillRect(qx + x * cell, qy + y * cell, Math.ceil(cell), Math.ceil(cell))));
-  text("scan to verify", qx + size / 2, qy + size + 44, "600 22px 'JetBrains Mono'", C.ink, "center");
+  text("scan to verify", qx + size / 2, qy + size + 44, "600 22px 'Geist Mono'", C.ink, "center");
 
   return new Promise((ok, no) => cv.toBlob((b) => (b ? ok(b) : no(new Error("canvas export failed"))), "image/png"));
 }
@@ -183,7 +183,7 @@ export async function shareCertificate(d: CertData): Promise<void> {
   el.className = "fixed inset-0 z-30 grid place-items-center overflow-y-auto bg-ink/80 p-4";
   el.innerHTML = `<div class="flex w-full max-w-sm flex-col gap-3">
       <img src="${src}" alt="Liquidation Certificate" class="sticker mx-auto max-h-[62vh] w-auto max-w-full rounded-box" />
-      <div class="grid grid-cols-2 gap-3">${b("save", "Save image", "var(--color-warn)")}${canShare ? b("share", "Share", "var(--color-safe)") : b("copy", "Copy link", "#fff")}</div>
+      <div class="grid grid-cols-2 gap-3">${b("save", "Save image", "#fff")}${canShare ? b("share", "Share", "var(--color-cobalt);color:#fff") : b("copy", "Copy link", "#fff")}</div>
       ${canShare ? b("copy", "Copy link", "#fff") : ""}
       ${b("close", "Close", "#fff")}
     </div>`;

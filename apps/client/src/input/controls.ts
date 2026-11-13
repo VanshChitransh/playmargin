@@ -37,7 +37,7 @@ export class Controls {
   constructor(root: HTMLElement, private send: (cmd: InputCmd) => void) {
     // The keys are printed on the buttons themselves.
     const key = (k: string): string =>
-      `<kbd class="mt-1 rounded-md border-2 border-b-4 border-ink bg-card px-1.5 py-0.5 font-sans text-[10px] font-bold leading-none tracking-wider">${k}</kbd>`;
+      `<kbd class="mt-1 rounded-md border-2 border-b-4 border-grid bg-card px-1.5 py-0.5 font-sans text-[10px] font-bold leading-none tracking-wider">${k}</kbd>`;
     const layer = document.createElement("div");
     layer.className = "pointer-events-none fixed inset-0 select-none";
     layer.innerHTML = `

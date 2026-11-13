@@ -76,7 +76,7 @@ export class ArenaRenderer {
     // Canvas text bakes whatever font is loaded at creation: wait for ours (a direct load of
     // /watch drew names in a serif fallback otherwise). Never block on a font that fails.
     await Promise.race([
-      Promise.all(["700 28px Rubik", "30px 'Lilita One'"].map((f) => document.fonts.load(f))).catch(() => {}),
+      Promise.all(["700 28px Geist", "800 30px Geist"].map((f) => document.fonts.load(f))).catch(() => {}),
       new Promise((ok) => setTimeout(ok, 1500)),
     ]);
     await this.app.init({
@@ -93,7 +93,7 @@ export class ArenaRenderer {
     this.world.addChild(this.grid, this.zone, this.foodLayer, this.spikeLayer, this.blobLayer, this.preview, this.fx);
     this.app.stage.addChild(this.world);
     if (opts.fps) {
-      this.fps = new Text({ text: "", style: { fontFamily: ["JetBrains Mono", "monospace"], fontSize: 12, fill: C.muted } });
+      this.fps = new Text({ text: "", style: { fontFamily: ["Geist Mono", "monospace"], fontSize: 12, fill: C.muted } });
       this.fps.position.set(8, 8);
       this.app.stage.addChild(this.fps);
     }

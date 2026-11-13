@@ -14,7 +14,7 @@ import { reducedMotion } from "../render/motion";
 const LB_MS = 1000 / R.LEADERBOARD_HZ;
 const ROW_PX = 30;
 // Arcade Paper: fuel is green (safe to borrow), the empty track is the paper shade, blocked is muted.
-const C = { gold: "#F5B83D", liq: "#E5484D", safe: "#38D96B", track: "#DDD3BE", muted: "#A9A3B8", paper: "#FFF6E6" };
+const C = { gold: "#F5B83D", liq: "#E0243F", safe: "#16C46B", track: "#E4E6EB", muted: "#5B616E", paper: "#FFFFFF" };
 const SPEAKER = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/>`;
 
 
@@ -210,7 +210,7 @@ export class Hud {
         const line = !f.lobby!.host ? "Waiting for the host to start" : ready ? "Everyone in? Start when ready" : "Waiting for friends · send them the link";
         c.innerHTML = `<div class="hud-lobby-top"><div class="outlined font-display text-7xl tabular-nums text-paper">${n}/${R.ROOM_SIZE}</div>
           <div class="mt-1 font-semibold text-ink">${line}</div>
-          ${f.lobby!.host ? `<button data-h=start ${ready ? "" : "disabled"} class="pop pointer-events-auto mt-3 rounded-box px-6 py-3 font-display text-2xl ${ready ? "pop-press cursor-pointer bg-safe text-ink" : "cursor-not-allowed bg-cream text-muted"}">${ready ? "START MATCH" : "START: needs 1 friend"}</button>` : ""}
+          ${f.lobby!.host ? `<button data-h=start ${ready ? "" : "disabled"} class="pop pointer-events-auto mt-3 rounded-box px-6 py-3 font-display text-2xl ${ready ? "pop-press cursor-pointer bg-cobalt text-white" : "cursor-not-allowed bg-cream text-muted"}">${ready ? "START MATCH" : "START: needs 1 friend"}</button>` : ""}
           </div><div class="hud-lobby-hints">${this.hints()}</div>`;
         c.querySelector("[data-h=start]")?.addEventListener("click", (e) => {
           (e.currentTarget as HTMLButtonElement).disabled = true;

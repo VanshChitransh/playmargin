@@ -1,28 +1,29 @@
-// Shared look for the secondary pages (how, cash, verify, 404): the Arcade Paper header
-// (cat on a sky tile + MARGIN, How it works, Judge Run) and the sticker button classes,
-// so every action on every page is a filled button, never an underlined link.
+// Shared look for the secondary pages (how, cash, verify, judges, 404): the same nav as the home
+// page (drafts/d5-geist.html) and pill buttons, so moving between pages never changes the look.
 
-const base = "sticker sticker-press inline-block text-center rounded-box font-display disabled:opacity-50";
-/** Filled sticker buttons, one per meaning: safe green = main action, card = secondary, ink = strong secondary, warn = friend. */
+const base = "sticker-press inline-flex items-center justify-center gap-2 text-center rounded-full font-sans font-semibold transition-colors disabled:opacity-50";
+/** Pill buttons, one per meaning: blue = main action, card = secondary, ink = strong secondary, warn = friend. */
 export const BTN = {
-  go: `${base} bg-safe px-6 py-3 text-xl text-ink`,
-  card: `${base} bg-card px-5 py-3 text-xl text-ink`,
-  ink: `${base} bg-ink px-5 py-3 text-xl text-paper`,
-  warn: `${base} bg-warn px-5 py-3 text-xl text-ink`,
-  small: `${base} bg-card px-3 py-1.5 text-base text-ink`,
-  smallInk: `${base} bg-ink px-3 py-1.5 text-base text-paper`,
+  go: `${base} bg-cobalt px-6 py-3 text-lg text-white hover:bg-cobalt-dark`,
+  card: `${base} border border-grid bg-card px-5 py-3 text-lg text-ink hover:bg-cream`,
+  ink: `${base} bg-ink px-5 py-3 text-lg text-white hover:bg-ink/85`,
+  warn: `${base} bg-warn px-5 py-3 text-lg text-ink`,
+  small: `${base} border border-grid bg-card px-3.5 py-1.5 text-sm text-ink hover:bg-cream`,
+  smallInk: `${base} bg-ink px-3.5 py-1.5 text-sm text-white hover:bg-ink/85`,
 } as const;
 
-/** The page header shared with the home screen. */
+const link = "rounded-full px-4 py-2.5 hover:bg-cream";
+/** The page header, the same as the home nav. */
 export const header = (): string => `
-  <header class="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-4">
-    <a href="/" class="flex items-center gap-3" aria-label="MARGIN home">
-      <span class="sticker grid size-11 shrink-0 place-items-center overflow-hidden rounded-field bg-sky"><img src="/brand/margin-cat-cutout.svg" alt="" class="mt-2 w-9" /></span>
-      <span class="hidden font-display text-3xl text-ink min-[420px]:inline">MARGIN</span>
+  <nav class="flex items-center justify-between gap-3 px-4 py-5 sm:px-12">
+    <a href="/" class="flex items-center gap-2.5 text-[22px] font-extrabold tracking-[-0.02em]" aria-label="MARGIN home">
+      <i class="grid size-[34px] place-items-end overflow-hidden rounded-full bg-cobalt"><img src="/brand/margin-cat-cutout.svg" alt="" class="-mb-[3px] w-full" /></i>
+      <span class="max-[420px]:hidden">MARGIN</span>
     </a>
-    <nav class="flex items-center gap-1.5 whitespace-nowrap sm:gap-3">
-      <a href="/how" class="${BTN.small} max-sm:px-2 max-sm:text-sm">How it works</a>
-      <a href="/judges" class="${BTN.small} max-sm:px-2 max-sm:text-sm" title="Every claim, checked live against NEAR"><span class="max-sm:hidden">For j</span><span class="sm:hidden">J</span>udges</a>
-      <a href="/judge" class="${BTN.smallInk} max-sm:px-2 max-sm:text-sm" title="A seeded 90 s match on normal rules">★ Judge Run</a>
-    </nav>
-  </header>`;
+    <div class="flex items-center gap-1 whitespace-nowrap text-[15px] font-semibold">
+      <a href="/how" class="${link} max-sm:hidden">How it works</a>
+      <a href="/#proof" class="${link} max-sm:hidden">Verify</a>
+      <a href="/cash" class="${link} text-muted max-md:hidden">Play for <span data-stake>$1</span></a>
+      <a href="/judges" class="rounded-full bg-ink px-4 py-2.5 text-white! hover:bg-ink/85">Judging? Start here</a>
+    </div>
+  </nav>`;

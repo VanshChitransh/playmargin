@@ -21,7 +21,7 @@ export class FxLayer extends Container {
   floatText(x: number, y: number, text: string, color: number, zoom: number): void {
     const t = new Text({
       text,
-      style: { fontFamily: ["Lilita One", "system-ui", "sans-serif"], fontSize: JUICE.FLOAT_FONT_PX, fill: color, stroke: { color: C.ink, width: 6, join: "round" } },
+      style: { fontFamily: ["Geist", "system-ui", "sans-serif"], fontWeight: "800", fontSize: JUICE.FLOAT_FONT_PX, fill: color, stroke: { color: C.ink, width: 6, join: "round" } },
     });
     t.anchor.set(0.5);
     t.position.set(x, y);
@@ -50,7 +50,7 @@ export class FxLayer extends Container {
 
   /** A faint "+" that drifts from a pellet into my blob: eating registered. */
   mote(x: number, y: number, tx: number, ty: number, zoom: number): void {
-    const t = new Text({ text: "+", style: { fontFamily: ["Lilita One", "system-ui", "sans-serif"], fontSize: 20, fill: C.paper, stroke: { color: C.ink, width: 4 } } });
+    const t = new Text({ text: "+", style: { fontFamily: ["Geist", "system-ui", "sans-serif"], fontWeight: "800", fontSize: 20, fill: C.paper, stroke: { color: C.ink, width: 4 } } });
     t.anchor.set(0.5);
     t.alpha = 0.7;
     t.scale.set(1 / zoom);

@@ -1,4 +1,4 @@
-/* MARGIN look: "Arcade Paper" (light).
+/* MARGIN look: the home page look (drafts/d5-geist.html): white, Geist, one blue action, hairline cards.
    Green/yellow/red are ring states only, gold is money only, cyan is agents only,
    so a colour on screen always means the same thing. */
 @import "tailwindcss";
@@ -10,28 +10,28 @@
   name: "margin";
   default: true;
   color-scheme: light;
-  --color-base-100: #fff6e6;
-  --color-base-200: #ffefd3;
-  --color-base-300: #f3e2c2;
-  --color-base-content: #1b1a2e;
-  --color-primary: #38d96b;
-  --color-primary-content: #1b1a2e;
+  --color-base-100: #ffffff;
+  --color-base-200: #f4f5f7;
+  --color-base-300: #e4e6eb;
+  --color-base-content: #0a0b0d;
+  --color-primary: #0052ff;
+  --color-primary-content: #ffffff;
   --color-secondary: #7cc8ff;
-  --color-secondary-content: #1b1a2e;
+  --color-secondary-content: #0a0b0d;
   --color-accent: #f5b83d;
-  --color-accent-content: #1b1a2e;
-  --color-neutral: #1b1a2e;
-  --color-neutral-content: #fff6e6;
+  --color-accent-content: #0a0b0d;
+  --color-neutral: #0a0b0d;
+  --color-neutral-content: #ffffff;
   --color-info: #3be3ff;
-  --color-info-content: #1b1a2e;
-  --color-success: #38d96b;
-  --color-success-content: #1b1a2e;
+  --color-info-content: #0a0b0d;
+  --color-success: #16c46b;
+  --color-success-content: #0a0b0d;
   --color-warning: #ffd43b;
-  --color-warning-content: #1b1a2e;
-  --color-error: #e5484d;
-  --color-error-content: #1b1a2e;
+  --color-warning-content: #0a0b0d;
+  --color-error: #e0243f;
+  --color-error-content: #0a0b0d;
   --radius-selector: 1rem;
-  --radius-field: 0.75rem;
+  --radius-field: 0.625rem;
   --radius-box: 1rem;
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
@@ -40,30 +40,30 @@
   --noise: 0;
 }
 
-/* "Arcade Paper" (research/margin/ui/variants/REVAMP-PLAN.md): cream paper, ink outlines, sticker buttons.
-   Names stay the same as the old dark look so no class breaks. navy is now an alias of ink. */
+
+
 @theme {
-  --color-ink: #1b1a2e;
-  --color-navy: #1b1a2e;
-  --color-grid: #f3e2c2;
-  --color-paper: #fff6e6;
-  --color-cream: #ffefd3;
+  --color-ink: #0a0b0d;
+  --color-navy: #0a0b0d;
+  --color-grid: #e4e6eb;
+  --color-paper: #ffffff;
+  --color-cream: #f4f5f7;
   --color-card: #ffffff;
-  --color-muted: #4a4760;
-  --color-safe: #38d96b;
-  --color-safe-dark: #1fa94c;
+  --color-muted: #5b616e;
+  --color-safe: #16c46b;
+  --color-safe-dark: #0f9a52;
   --color-warn: #ffd43b;
-  --color-liq: #e5484d;
+  --color-liq: #e0243f;
   --color-gold: #f5b83d;
   --color-gold-dark: #b97a0f;
   --color-agent: #3be3ff;
-  --color-sky: #7cc8ff;
-  --color-cobalt: #2d4bf0;
-  --color-cobalt-dark: #1a2fb0;
-  --color-tape: rgba(255, 226, 140, 0.82);
-  --font-display: "Lilita One", system-ui, sans-serif;
-  --font-sans: "Rubik", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --color-sky: #0052ff;
+  --color-cobalt: #0052ff;
+  --color-cobalt-dark: #0040c9;
+  --color-tape: transparent;
+  --font-display: Geist, system-ui, sans-serif;
+  --font-sans: Geist, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
 }
 
 html,
@@ -79,18 +79,16 @@ body {
   @apply font-mono tabular-nums;
 }
 
-/* Sticker look from the Fat cat logo (brand/final): thick ink outline, hard offset shadow,
-   no blur and no glow. Every action is a filled sticker button, never an underlined link. */
+/* Cards: hairline border and soft depth, same as the home window. Every action is a filled button. */
 .sticker {
-  border: 4px solid var(--color-ink);
-  box-shadow: 6px 6px 0 var(--color-ink);
+  border: 1px solid var(--color-grid);
+  box-shadow: 0 1px 2px rgb(10 11 13 / 0.04), 0 8px 24px rgb(10 11 13 / 0.06);
 }
 .sticker-press {
   transition: transform 80ms ease, box-shadow 80ms ease;
 }
 .sticker-press:active {
-  transform: translate(4px, 4px);
-  box-shadow: 2px 2px 0 var(--color-ink);
+  transform: translateY(1px);
 }
 .outlined {
   -webkit-text-stroke: 0.14em var(--color-ink);
@@ -107,11 +105,10 @@ body {
 }
 .stamp { animation: stamp 420ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
 
-/* Keyboard users always see where they are: a hard outline in the sticker style, never a glow. */
+/* Keyboard users always see where they are: a blue outline, never a glow. */
 :focus-visible {
-  outline: 3px solid var(--color-ink);
-  outline-offset: 3px;
-  box-shadow: 0 0 0 6px var(--color-paper);
+  outline: 2px solid var(--color-cobalt);
+  outline-offset: 2px;
 }
 @media (prefers-reduced-motion: reduce) {
   .stamp { animation-duration: 1ms; }
@@ -132,25 +129,28 @@ body {
   }
 }
 
-/* Arcade Paper buttons and cards (v1 mockup): thick ink outline, a hard shadow straight down, pressed on tap. */
+/* Cards and buttons: hairline border, soft depth, a 1 px press. */
 .pop {
-  border: 4px solid var(--color-ink);
-  box-shadow: 0 6px 0 var(--color-ink);
+  border: 1px solid var(--color-grid);
+  box-shadow: 0 1px 2px rgb(10 11 13 / 0.04), 0 8px 24px rgb(10 11 13 / 0.06);
 }
 .pop-sm {
-  border: 3px solid var(--color-ink);
-  box-shadow: 0 4px 0 var(--color-ink);
+  border: 1px solid var(--color-grid);
+  box-shadow: 0 1px 2px rgb(10 11 13 / 0.05);
 }
 .pop-press {
   transition: transform 80ms ease, box-shadow 80ms ease;
 }
 .pop-press:active {
-  transform: translateY(4px);
-  box-shadow: 0 2px 0 var(--color-ink);
+  transform: translateY(1px);
 }
-/* Dotted paper behind the home page. */
+/* Plain white page (kept as a class so older screens need no change). */
 .paper-dots {
   background-color: var(--color-paper);
-  background-image: radial-gradient(circle at 1px 1px, rgb(27 26 46 / 0.1) 1.5px, transparent 0);
-  background-size: 28px 28px;
+}
+
+/* Geist is a variable font: display text gets the home headline weight and tight tracking. */
+.font-display {
+  font-weight: 800;
+  letter-spacing: -0.03em;
 }

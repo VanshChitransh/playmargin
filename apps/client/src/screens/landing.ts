@@ -50,6 +50,8 @@ export const landing: Screen = (root) => {
   let stopSections = (): void => {};
   void import("./home/sections").then((m) => {
     if (!left) stopSections = m.mountSections(root);
+    // The other pages' nav links Verify to /#proof.
+    if (!left && location.hash === "#proof") root.querySelector("[data-home-proof]")?.scrollIntoView();
   });
   root.querySelector("[data-proof-link]")!.addEventListener("click", (e) => {
     e.preventDefault();

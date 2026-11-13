@@ -521,7 +521,7 @@ function askName(root: HTMLElement): Promise<void> {
     <p class="mt-1 text-sm font-medium text-muted">Your friends see it in the arena and on the leaderboard.</p>
     <input name=n maxlength=15 autocomplete=nickname placeholder="Player" class="pop-sm mt-4 w-full rounded-xl bg-card px-3 py-2 text-center font-display text-2xl" />
     <p data-why role="status" class="mt-2 hidden text-sm font-bold text-[#B42328]"></p>
-    <button class="pop pop-press mt-5 w-full rounded-2xl bg-safe px-5 py-3 font-display text-2xl">Join room</button></div>`;
+    <button class="pop pop-press mt-5 w-full rounded-2xl bg-cobalt text-white px-5 py-3 font-display text-2xl">Join room</button></div>`;
   root.appendChild(el);
   const input = el.querySelector<HTMLInputElement>("input")!;
   input.focus();
@@ -552,7 +552,7 @@ function refusedCard(root: HTMLElement, why: string, retry = true): void {
     <h2 class="font-display text-4xl">Can't join right now</h2>
     <p data-why class="mt-2 font-medium"></p>
     <div class="mt-5 flex flex-wrap justify-center gap-3">
-      <button data-retry class="pop pop-press rounded-2xl bg-safe px-5 py-3 font-display text-xl">Retry</button>
+      <button data-retry class="pop pop-press rounded-2xl bg-cobalt text-white px-5 py-3 font-display text-xl">Retry</button>
       <button data-off class="pop pop-press rounded-2xl bg-card px-5 py-3 font-display text-xl">Practice offline</button>
       <a href="/" class="pop-sm pop-press basis-full rounded-2xl bg-card px-4 py-2 font-display text-lg">Home</a></div>
     <p class="mt-4 text-xs font-medium text-muted">Offline practice runs the real rules against local bots. Nothing counts.</p></div>`;
@@ -560,9 +560,9 @@ function refusedCard(root: HTMLElement, why: string, retry = true): void {
   const again = el.querySelector<HTMLElement>("[data-retry]")!;
   if (retry) again.addEventListener("click", () => rerender());
   else {
-    // Nothing to retry: practice becomes the one green button.
+    // Nothing to retry: practice becomes the one blue button.
     again.remove();
-    el.querySelector("[data-off]")!.classList.replace("bg-card", "bg-safe");
+    el.querySelector("[data-off]")!.classList.replace("bg-card", "bg-cobalt"); el.querySelector("[data-off]")!.classList.add("text-white");
   }
   el.querySelector("[data-off]")!.addEventListener("click", () => {
     offlineOnPurpose = true;

@@ -32,7 +32,7 @@ export const verify: Screen = (root, { id = "" }) => {
   <div class="min-h-full bg-paper text-ink">
     ${header()}
     <div class="mx-auto max-w-2xl px-4 pb-16 pt-2">
-      <span class="sticker inline-block rounded-field bg-warn px-3 py-1 text-sm font-bold" style="box-shadow:3px 3px 0 var(--color-ink)">Do not trust us. Check.</span>
+      <span class="sticker inline-block rounded-field bg-warn px-3 py-1 text-sm font-bold">Do not trust us. Check.</span>
       <h1 class="mt-3 font-display text-6xl">Verify</h1>
       <p class="mt-2 text-muted">Match <span class="num font-bold">${esc(id)}</span>. Every check runs here in your browser, with the same code the server and the NEAR contract use.</p>
       <div data-v=body class="mt-6 space-y-4"><p class="tag">Loading the match log</p></div>
@@ -84,7 +84,7 @@ function render(body: HTMLElement, d: Loaded, r: Report, note: string, tampered:
   const card = (title: string, c: Check): string => {
     const [icon, bg] = ICON[c.state];
     return `<article class="sticker flex gap-4 rounded-box bg-card p-4">
-      <span class="grid size-10 shrink-0 place-items-center rounded-full border-4 border-ink ${bg} font-display text-xl">${icon}</span>
+      <span class="grid size-10 shrink-0 place-items-center rounded-full border border-grid ${bg} font-display text-xl">${icon}</span>
       <div class="min-w-0"><h2 class="font-display text-2xl">${title}</h2><p class="text-muted">${esc(c.detail)}</p>${badEntry(d.log, c.seq)}</div></article>`;
   };
   const names = new Map<string, string>();
@@ -104,9 +104,9 @@ function render(body: HTMLElement, d: Loaded, r: Report, note: string, tampered:
       : ["bg-safe text-ink", "\u2713", "Honest so far.", "Every hash links and the books balance. The NEAR anchor comes with the next hourly batch."];
   body.innerHTML = `
     <div class="sticker flex items-center gap-4 rounded-box p-4 ${verdict[0]}">
-      <span class="grid size-12 shrink-0 place-items-center rounded-full border-4 border-ink ${bad ? "bg-liq text-paper" : "bg-card text-ink"} font-display text-2xl">${verdict[1]}</span>
+      <span class="grid size-12 shrink-0 place-items-center rounded-full border border-grid ${bad ? "bg-liq text-paper" : "bg-card text-ink"} font-display text-2xl">${verdict[1]}</span>
       <div><p class="font-display text-3xl leading-none">${verdict[2]}</p><p class="mt-1 text-sm">${verdict[3]}</p></div></div>
-    ${note ? `<p class="sticker rounded-field bg-cream px-3 py-2 text-sm font-bold" style="box-shadow:3px 3px 0 var(--color-ink)">${esc(note)}</p>` : ""}
+    ${note ? `<p class="sticker rounded-field bg-cream px-3 py-2 text-sm font-bold">${esc(note)}</p>` : ""}
     ${card("Hash chain", r.chain)}
     ${card("Books balance", r.books)}
     ${card("Anchored on NEAR", r.anchor)}

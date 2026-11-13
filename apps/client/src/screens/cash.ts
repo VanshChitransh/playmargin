@@ -32,7 +32,7 @@ export const cash: Screen = (root) => {
   <div class="min-h-full bg-paper text-ink">
     ${header()}
     <div class="mx-auto max-w-xl px-4 pb-16 pt-2">
-      <span class="sticker inline-block rounded-field bg-gold px-3 py-1 text-sm font-bold" style="box-shadow:3px 3px 0 var(--color-ink)">${NETWORK === "testnet" ? "Test money" : "Real money"}</span>
+      <span class="sticker inline-block rounded-field bg-gold px-3 py-1 text-sm font-bold">${NETWORK === "testnet" ? "Test money" : "Real money"}</span>
       <h1 class="mt-3 font-display text-6xl">Play for <span data-stake>$1</span></h1>
       <p class="mt-2 text-muted">Humans only. Winners split the pot by equity. ${NETWORK === "testnet" ? "<b>Test money for now, nothing real at stake.</b>" : ""}</p>
       <div data-c=body class="mt-6 space-y-4"></div>
@@ -56,7 +56,7 @@ export const cash: Screen = (root) => {
       body.innerHTML = `<form class="sticker rounded-box bg-card p-5">
         <h2 class="font-display text-3xl">Pick your name</h2>
         <p class="mt-1">It is your account name and shows on the leaderboard. Lowercase letters, numbers, - and _.</p>
-        <input name=n required minlength=2 maxlength=40 pattern="[a-z0-9_\\-]+" autocomplete=off class="mt-3 w-full rounded-field border-4 border-ink bg-cream px-3 py-2 num" />
+        <input name=n required minlength=2 maxlength=40 pattern="[a-z0-9_\\-]+" autocomplete=off class="mt-3 w-full rounded-field border border-grid bg-cream px-3 py-2 num" />
         <button class="${BTN.go} mt-3">Create my account</button></form>`;
       const f = body.querySelector("form")!;
       f.addEventListener("submit", (e) => {
@@ -140,7 +140,7 @@ export const cash: Screen = (root) => {
     // Withdraw asks once, inline, with the exact amount: money never moves on a single stray tap.
     on("wd", async () => {
       const box = body.querySelector<HTMLElement>("[data-c=wdbox]")!;
-      box.innerHTML = `<div class="mt-4 flex flex-wrap items-center gap-3 rounded-field border-4 border-ink bg-cream p-3">
+      box.innerHTML = `<div class="mt-4 flex flex-wrap items-center gap-3 rounded-field border border-grid bg-cream p-3">
         <span>Withdraw <b class="tabular-nums">$${usd(bal)}</b> to your own account?</span>
         <button data-c=wdgo class="${BTN.ink} py-2 text-lg">Withdraw $${usd(bal)}</button>
         <button data-c=wdno class="${BTN.small}">Cancel</button></div>`;
@@ -188,7 +188,7 @@ async function addFunds(box: HTMLElement, acc: string, say: Say): Promise<void> 
     box.innerHTML = "";
     return say(`${(e as Error).message}. Try Add funds again in a minute.`, "error");
   }
-  const field = "mt-1 w-full rounded-field border-4 border-ink bg-cream px-3 py-2";
+  const field = "mt-1 w-full rounded-field border border-grid bg-cream px-3 py-2";
   box.innerHTML = `<form class="sticker space-y-3 rounded-box bg-card p-5">
     <div class="flex items-start justify-between"><h2 class="font-display text-3xl">Add funds</h2><button type=button data-close class="${BTN.small}">Close</button></div>
     <p>Pay from any chain. It arrives as dollars in your MARGIN balance.</p>
@@ -221,7 +221,7 @@ async function addFunds(box: HTMLElement, acc: string, say: Say): Promise<void> 
     get.textContent = "Get a new quote";
     if (!r.ok) {
       const badAddress = /refund/i.test(r.reason);
-      q.innerHTML = `<div class="rounded-field border-4 border-ink bg-cream p-4">
+      q.innerHTML = `<div class="rounded-field border border-grid bg-cream p-4">
         <p class="font-display text-xl">${badAddress ? "Check the refund address" : "No price right now"}</p>
         <p class="text-sm">${badAddress ? `That does not look like a ${esc(t.blockchain)} address. Paste the address you would send from.` : /internal|50\d|unavailable|timeout/i.test(r.reason) ? "The price service did not answer." : esc(r.reason)}</p>
         ${badAddress ? "" : `<p class="mt-1 text-xs text-muted">Markets for some coins pause for a minute. Try again, or pick another coin.</p>`}</div>`;

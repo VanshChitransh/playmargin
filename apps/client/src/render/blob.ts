@@ -59,7 +59,7 @@ export class BlobSprite extends Container {
     const name = v.kind === "drone" ? `\u{1F916} ${v.label.replaceAll("\u{1F916}", "").trim()}` : displayName(v);
     this.nameText = new Text({
       text: name,
-      style: { fontFamily: ["Rubik", "system-ui", "sans-serif"], fontSize: 28, fontWeight: "700", fill: 0xffffff, stroke: { color: C.ink, width: 4, join: "round" } },
+      style: { fontFamily: ["Geist", "system-ui", "sans-serif"], fontSize: 28, fontWeight: "700", fill: 0xffffff, stroke: { color: C.ink, width: 4, join: "round" } },
     });
     this.nameText.anchor.set(0.5);
     this.nameW = Math.max(1, this.nameText.width);

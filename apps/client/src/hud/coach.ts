@@ -61,7 +61,7 @@ export function coachMarks(root: HTMLElement, target: (s: "boost" | "repay") => 
     shownAt = lastE;
     el.innerHTML = `<div class="pop absolute flex max-w-60 items-center gap-2 rounded-2xl bg-card px-3 py-2 text-sm text-ink" style="${pos}">
       <span>${text}</span>
-      <i class="absolute -bottom-[11px] right-5 size-4 rotate-45 border-r-4 border-b-4 border-ink bg-card"></i>
+      <i class="absolute -bottom-[11px] right-5 size-4 rotate-45 border-r-4 border-b-4 border-grid bg-card"></i>
       <button data-got class="pop-sm pop-press pointer-events-auto shrink-0 cursor-pointer rounded-lg bg-warn px-2 py-1 font-display text-sm">OK</button></div>`;
     el.querySelector("[data-got]")!.addEventListener("click", () => (boost ? show("repay") : close()));
     el.classList.remove("hidden");
