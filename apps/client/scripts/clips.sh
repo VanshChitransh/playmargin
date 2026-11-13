@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The three "How it works" loops on the #/how page, filmed from real play in offline practice
+# The three "How it works" loops on the /how page, filmed from real play in offline practice
 # (core rules, labelled bots). Nothing is staged or edited beyond trimming:
 #   nitro:      hold BOOST after GO, the blob grows, the fuel ring drains
 #   repay:      borrow to the cap, steer into spikes until the rim turns red, hold REPAY to PAID OFF
@@ -12,7 +12,7 @@ OUT=public/clips
 TMP="$(mktemp -d)"
 mkdir -p "$OUT"
 S="clips-$$"
-URL="http://localhost:1234/?local&view=1100#/play"
+URL="http://localhost:1234/play?local&view=1100"
 ab() { agent-browser --session "$S" "$@"; }
 trap 'ab close >/dev/null 2>&1 || true' EXIT
 press() { ab eval "dispatchEvent(new KeyboardEvent('$1',{code:'$2'}))" >/dev/null; }
@@ -42,7 +42,7 @@ go_red() {
 }
 
 ab set viewport 640 640 >/dev/null
-ab open "http://localhost:1234/#/" >/dev/null
+ab open "http://localhost:1234/" >/dev/null
 ab eval 'localStorage.setItem("margin.coached","1"); localStorage.setItem("margin.muted","1")' >/dev/null
 
 for CLIP in "${@:-nitro repay liquidated}"; do for C in $CLIP; do

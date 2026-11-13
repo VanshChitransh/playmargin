@@ -69,7 +69,7 @@ async function column(net: Net, src: string): Promise<Column> {
     if (t?.status === "ok" && t.method === "anchor") anchors++;
   }
   // Agent (drone) wallets, straight from NEAR whatever DB was given (QA-E-14): bounties are paid into the
-  // contract's own balance (balance_of, what #/judges reads); anything withdrawn sits in the USDC token.
+  // contract's own balance (balance_of, what /judges reads); anything withdrawn sits in the USDC token.
   let droneInGame = 0n;
   let droneWallet = 0n;
   let drones = 0;

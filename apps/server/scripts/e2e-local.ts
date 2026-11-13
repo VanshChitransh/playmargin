@@ -64,7 +64,7 @@ rooms[0]!.onStateChange((st: Wire) => {
   if (typeof f === "number") fuelSeen = true;
   if (typeof f === "number" && f < 0.99) fuelDropped = true;
 });
-// Spectator (#/watch): once LIVE, /api/watch must hand out a seat in this locked room with no blob.
+// Spectator (/watch): once LIVE, /api/watch must hand out a seat in this locked room with no blob.
 const watch = { joined: false, sawEvents: 0, gotMe: false, blobs: 0, humans: 0 };
 const spectate = (async () => {
   while (!phases.includes("LIVE")) await new Promise((r) => setTimeout(r, 200));

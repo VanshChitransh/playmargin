@@ -91,7 +91,7 @@ export class MatchRoom extends Room {
   /** Guest users holding a seat here (claimed in onAuth): one seat per guest, so a second tab or a
    *  reload during late join can't double-charge or seat the same user twice. */
   private guests = new Set<string>();
-  /** Watch-only clients (#/watch): full state and events, no blob, no charge, no DB row, no input. */
+  /** Watch-only clients (/watch): full state and events, no blob, no charge, no DB row, no input. */
   private spectators = new Set<string>();
   /** Paid accounts this room holds in seatedAccounts; released on leave before GO and on dispose. */
   private accounts = new Set<string>();

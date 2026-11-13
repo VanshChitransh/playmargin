@@ -4,13 +4,13 @@
 // protocol, so nothing to install.
 //
 //   node scripts/perf.mjs [url] [seconds] [cpuRate] [headless 0|1]
-//   default: http://localhost:1234/?local#/play 12 4 1
+//   default: http://localhost:1234/play?local 12 4 1
 import { spawn } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const [url = "http://localhost:1234/?local#/play", secs = "12", rate = "4", headless = "1"] = process.argv.slice(2);
+const [url = "http://localhost:1234/play?local", secs = "12", rate = "4", headless = "1"] = process.argv.slice(2);
 const CHROME = process.env.CHROME ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const port = 9300 + Math.floor(Math.random() * 500);
 const args = [`--remote-debugging-port=${port}`, `--user-data-dir=${mkdtempSync(join(tmpdir(), "perf-"))}`, "--window-size=1280,800", "--no-first-run", "about:blank"];

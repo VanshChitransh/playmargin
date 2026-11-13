@@ -42,9 +42,9 @@ const SAMPLE = () => {
   // Installed clocks keep running in real time: pause at once, so time only moves in runFor.
   await page.clock.install({ time: Number(CLOCK) })
   await page.clock.pauseAt(Number(CLOCK) + 1000)
-  await page.goto(`${BASE}/#/`)
+  await page.goto(`${BASE}/`)
   await page.evaluate(() => { localStorage.setItem('margin.coached', '1'); localStorage.setItem('margin.muted', '1') })
-  await page.goto(`${BASE}/?local&view=700#/play`)
+  await page.goto(`${BASE}/play?local&view=700`)
   // Display only: hide the HUD chrome a 326 px card cannot read (leaderboard, clock, pills, hint
   // labels). Gameplay, the blobs, the floats and the red margin-call frame are untouched.
   await page.addStyleTag({ content: '.hud-timer,.hud-lb,[data-h=mute],[data-h=banner],[data-h=tap],[data-h=call],[data-h=center],.tag.fixed{display:none!important}' })

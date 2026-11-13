@@ -100,7 +100,7 @@ export function stats(db: Db) {
   const one = <T>(sql: string): T => db.prepare(sql).get() as T;
   const { users } = one<{ users: number }>(`SELECT COUNT(*) AS users FROM users u WHERE ${REAL_USER}`);
   const { players } = one<{ players: number }>(`SELECT COUNT(DISTINCT user_id) AS players FROM (${REAL_SEATS})`);
-  // Only matches a real human played: agents-only #/watch rooms, test runs and Judge Runs are not traction.
+  // Only matches a real human played: agents-only /watch rooms, test runs and Judge Runs are not traction.
   const { matches } = one<{ matches: number }>(
     `SELECT COUNT(*) AS matches FROM matches m WHERE m.status = 'settled' AND m.id IN (SELECT match_id FROM (${REAL_SEATS}))`,
   );
@@ -168,7 +168,7 @@ export function mountApi(app: Application, db: () => Db): void {
     const r = matchProof(db(), req.params.id);
     return r ? void res.json(r) : void res.status(404).json({ error: "unknown match" });
   });
-  // Spectate (#/watch): a seat reservation in the busiest public free room, even one that is LIVE and
+  // Spectate (/watch): a seat reservation in the busiest public free room, even one that is LIVE and
   // locked; with none, a fresh agents-only room. Client: sdk.consumeSeatReservation(reservation).
   app.get("/api/watch", async (req, res) => {
     if (!watchLimit.allow(req.get("x-real-ip") ?? req.socket.remoteAddress ?? "unknown")) return void res.status(429).json({ error: "slow down" });

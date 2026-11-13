@@ -109,7 +109,7 @@ async function play(strategy: string, o: { w: number; h: number; cpu?: number; m
   const browser = await chromium.launch({ executablePath: CHROME, headless: true, args: ["--use-angle=metal", "--enable-gpu"] });
   const { page, ctx, consoleLog } = await newPage(browser, { ...o, guest: `qa-${strategy}-${Date.now()}` });
   if (o.cpu) await (await ctx.newCDPSession(page)).send("Emulation.setCPUThrottlingRate", { rate: o.cpu });
-  await page.goto(`${env.web}/#/play`);
+  await page.goto(`${env.web}/play`);
   await sleep(1500);
   const sdk = new Client(env.api.replace("http", "ws"));
   let spec: Room | null = null;
@@ -120,8 +120,8 @@ async function play(strategy: string, o: { w: number; h: number; cpu?: number; m
     else await sleep(500);
   }
   if (!spec) throw new Error("could not spectate the player's room");
-  // Film the same room from #/watch with S3's recorder (30 s mp4), in parallel.
-  if (record) procs.push(spawn("bash", ["scripts/record.sh", "30", join(dir, "watch.mp4"), `${env.web}/?clean=1#/watch`], { cwd: join(ROOT, "apps/client"), stdio: "ignore" }));
+  // Film the same room from /watch with S3's recorder (30 s mp4), in parallel.
+  if (record) procs.push(spawn("bash", ["scripts/record.sh", "30", join(dir, "watch.mp4"), `${env.web}/watch?clean=1`], { cwd: join(ROOT, "apps/client"), stdio: "ignore" }));
   // Every game event the room broadcasts, by type (pops = liquidations seen, clutchSave, spikeHit...).
   const evCounts: Record<string, number> = {};
   spec.onMessage("ev", (e: { type: string }) => void (evCounts[e.type] = (evCounts[e.type] ?? 0) + 1));
@@ -272,7 +272,7 @@ async function survival(n: number) {
     await sleep(i * 30_000);
     const guest = `qa-surv-${i}-${Date.now()}`;
     const { page, ctx } = await newPage(browser, { w: 1280, h: 800, guest });
-    await page.goto(`${env.web}/#/play`);
+    await page.goto(`${env.web}/play`);
     // No spectator here (rooms run in parallel): steer with the canvas centre toward a slowly turning heading.
     let a = Math.random() * 6.28;
     for (let k = 0; k < 1150; k++) {
@@ -306,12 +306,12 @@ async function edges() {
   // Two tabs, same guest: the second must be refused with a clear message, the first plays on.
   const g = `qa-twotab-${Date.now()}`;
   const t1 = await newPage(browser, { w: 1280, h: 800, guest: g });
-  await t1.page.goto(`${env.web}/#/play`);
+  await t1.page.goto(`${env.web}/play`);
   await sleep(1500);
   const t2 = await t1.ctx.newPage();
   const t2log: string[] = [];
   t2.on("console", (m) => t2log.push(m.text().slice(0, 160)));
-  await t2.goto(`${env.web}/#/play`);
+  await t2.goto(`${env.web}/play`);
   await sleep(3000);
   await t2.screenshot({ path: join(OUT, "edge-two-tabs-second.png") });
   out.twoTabs = { secondTabText: await text(t2), secondTabConsole: t2log.filter((l) => /already|offline|unreach/i.test(l)).slice(0, 3) };
@@ -319,7 +319,7 @@ async function edges() {
   // Late join: a second guest 5 s after GO lands in the same LIVE room.
   await sleep(14_000);
   const late = await newPage(browser, { w: 1280, h: 800, guest: `qa-late-${Date.now()}` });
-  await late.page.goto(`${env.web}/#/play`);
+  await late.page.goto(`${env.web}/play`);
   await sleep(4000);
   const rooms = (await (await fetch(`${env.api}/health`)).json()) as { rooms: number };
   await late.page.screenshot({ path: join(OUT, "edge-late-join.png") });
@@ -377,7 +377,7 @@ async function edges() {
   const { id } = w.prepare("SELECT id FROM users WHERE guest_key = ?").get(poor) as { id: string };
   w.prepare("INSERT INTO credits_ledger (user_id, delta, reason, match_id, at) VALUES (?, ?, 'qa drain', NULL, ?)").run(id, -950_000_000, Date.now());
   const pp = await newPage(browser, { w: 1280, h: 800, guest: poor });
-  await pp.page.goto(`${env.web}/#/play`);
+  await pp.page.goto(`${env.web}/play`);
   await sleep(4000);
   await pp.page.screenshot({ path: join(OUT, "edge-no-credits.png") });
   out.noCredits = { text: await text(pp.page), console: pp.consoleLog.filter((l) => /credit|offline|unreach/i.test(l)).slice(0, 3) };
@@ -403,7 +403,7 @@ async function walls(o: { w: number; h: number }) {
   // Join one at a time: the server labels humans "Player N" in join order, so N maps to a page.
   for (const role of roles) {
     const pg = await newPage(browser, { ...o, guest: `qa-wall-${role}-${Date.now()}` });
-    await pg.page.goto(`${env.web}/#/play`);
+    await pg.page.goto(`${env.web}/play`);
     pages.push({ ...pg, role, label: `Player ${pages.length + 1}` });
     for (let i = 0; i < 20; i++) {
       if (!spec && ((await (await fetch(`${env.api}/health`)).json()) as { rooms: number }).rooms >= 1) spec = await sdk.consumeSeatReservation(await (await fetch(`${env.api}/api/watch`)).json());

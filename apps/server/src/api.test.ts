@@ -33,7 +33,7 @@ describe("read api", () => {
     addMatchPlayer(db, { matchId: "j", userId: judgeGuest, blobId: "y", entry: 100 * U });
     finishMatch(db, "j", { status: "settled", head: "h5", payouts: new Map() });
     saveEvents(db, "j", [pop("drone-1", 0)]);
-    // An agents-only room (#/watch with nobody playing) is not traction: no match, no pops.
+    // An agents-only room (/watch with nobody playing) is not traction: no match, no pops.
     createMatch(db, { id: "bots", mode: "free", seed: 3, pot: 1200 * U });
     finishMatch(db, "bots", { status: "settled", head: "h3", payouts: new Map() });
     saveEvents(db, "bots", [pop("agent-1", 0)]);

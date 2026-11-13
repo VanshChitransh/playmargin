@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # Record real gameplay for the demo video and trailer: headless Chrome (agent-browser) captures
-# #/watch, the director camera on a live match, for N seconds, then ffmpeg encodes an H.264 mp4
+# /watch, the director camera on a live match, for N seconds, then ffmpeg encodes an H.264 mp4
 # at 60 fps. Nothing is staged: it films whatever the bots and agents actually do.
 #
 #   npm run record -w @margin/client -- [seconds] [out.mp4] [url]
-#   defaults: 60 s, footage/watch-<time>.mp4, http://localhost:1234/?clean=1#/watch (needs npm run dev)
+#   defaults: 60 s, footage/watch-<time>.mp4, http://localhost:1234/watch?clean=1 (needs npm run dev)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 SECS="${1:-60}"
 OUT="${2:-footage/watch-$(date +%Y%m%d-%H%M%S).mp4}"
-URL="${3:-http://localhost:1234/?clean=1#/watch}"
+URL="${3:-http://localhost:1234/watch?clean=1}"
 SESSION="record-$$"
 RAW="$(mktemp -d)/raw.webm"
 mkdir -p "$(dirname "$OUT")"
