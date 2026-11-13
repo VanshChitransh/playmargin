@@ -59,7 +59,7 @@ export class ArenaRenderer {
   held = false;
   private nitro = new NitroFeel();
   private lastDraw = 0;
-  /** Spectator camera: where to look when there is no player blob (#/watch). */
+  /** Spectator camera: where to look when there is no player blob (/watch). */
   director?: (f: Frame, tS: number) => Shot | null;
   private cam: Shot | null = null;
   /** Boost camera: extra zoom-out (0..1 of BOOST_ZOOM_OUT), lead and kick offsets in screen px. */
@@ -74,7 +74,7 @@ export class ArenaRenderer {
 
   async mount(root: HTMLElement, source: FrameSource, opts: { fps?: boolean; fit?: HTMLElement; view?: number } = {}): Promise<void> {
     // Canvas text bakes whatever font is loaded at creation: wait for ours (a direct load of
-    // #/watch drew names in a serif fallback otherwise). Never block on a font that fails.
+    // /watch drew names in a serif fallback otherwise). Never block on a font that fails.
     await Promise.race([
       Promise.all(["700 28px Rubik", "30px 'Lilita One'"].map((f) => document.fonts.load(f))).catch(() => {}),
       new Promise((ok) => setTimeout(ok, 1500)),

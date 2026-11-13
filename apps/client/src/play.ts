@@ -1,6 +1,6 @@
-// #/play: joins a live free match, or, if no server answers in 2.5 s (or ?local is set),
+// /play: joins a live free match, or, if no server answers in 2.5 s (or ?local is set),
 // runs offline practice on the real rules with local bots. Either way the same renderer,
-// HUD, receipt and end screens run on top. Open /?fps#/play to see the frame rate.
+// HUD, receipt and end screens run on top. Open /play?fps to see the frame rate.
 import { R, nameProblem, type GameEventMsg, type InputCmd, type JoinOpts, type LogEntry } from "@margin/core";
 import type { Frame } from "./game/frame";
 import { LocalMatch } from "./game/local";
@@ -16,10 +16,11 @@ import { Controls } from "./input/controls";
 import { playerName, setPlayerName } from "./player/name";
 import { ENDPOINT, MatchConnection, guestKey } from "./net/client";
 import { joinFailWords } from "./net/refusal";
+import { track } from "./analytics/track";
 import { seat } from "./net/seat";
 import { ArenaRenderer } from "./render/arena";
 import { Director } from "./render/director";
-import { rerender, type Screen } from "./router";
+import { rerender, type Screen, navigate } from "./router";
 import { showAborted, showDeath, showResults } from "./screens/overlays";
 import { setLocalLog } from "./screens/verify";
 import { C } from "./render/colors";
@@ -49,7 +50,7 @@ const ALREADY_RETRY_MS = 1500;
  *  pretending and show the can't-join card. The server sends state every tick, so 5 s is a real stall. */
 const STALL_MS = 5000;
 
-/** A paid seat handed over by #/cash after the ticket is bought; used once. */
+/** A paid seat handed over by /cash after the ticket is bought; used once. */
 // A function, so every join attempt signs a fresh one-use proof (valid 60 s).
 let paidSeat: (() => JoinOpts) | null = null;
 export const setPaidSeat = (o: () => JoinOpts): void => void (paidSeat = o);
@@ -121,6 +122,7 @@ export const play: Screen = (root, params) => {
   let receipt: Receipt | null = null;
   let overlay: HTMLElement | null = null;
   let ended = false;
+  let died = false;
   let last = performance.now();
   let lastFrame: Frame | null = null;
 
@@ -288,16 +290,21 @@ export const play: Screen = (root, params) => {
   };
 
   const wasPaid = paidSeat !== null;
-  // A paid rematch needs a new ticket, so it goes back through #/cash.
-  const again = (): void => (wasPaid ? void (location.hash = "#/cash") : rerender());
-  const home = (): void => void (location.hash = "#/");
+  // A paid rematch needs a new ticket, so it goes back through /cash.
+  const again = (): void => {
+    track("play_again");
+    if (wasPaid) navigate("/cash");
+    else rerender();
+  };
+  const home = (): void => navigate("/");
   const toVerify = async (): Promise<void> => {
     if (src instanceof LocalMatch) setLocalLog(await src.log());
-    location.hash = `#/verify/${encodeURIComponent(src?.matchId ?? "")}`;
+    navigate(`/verify/${encodeURIComponent(src?.matchId ?? "")}`);
   };
   const finish = (): void => {
     if (ended || !lastFrame || !receipt) return;
     ended = true;
+    if (!died) track("match_finished"); // a death already counted it when its card showed
     const o = receipt.outcome(lastFrame.blobs);
     overlay?.remove();
     // A beat after the bell so the last pop or cash-out is seen before the receipt covers it. In
@@ -318,6 +325,20 @@ export const play: Screen = (root, params) => {
     });
   };
 
+  // Anonymous funnel (S5 analytics): GO reached once, and a friend arriving in my private lobby.
+  let wentLive = false;
+  let humans = 0;
+  const funnel = (f: Frame): void => {
+    if (!wentLive && f.match.phase === "LIVE") {
+      wentLive = true;
+      track("warmup_done");
+    }
+    if (code && f.match.phase !== "LIVE") {
+      const n = f.blobs.filter((b) => b.kind === "human").length;
+      if (humans === 1 && n >= 2) track("friend_joined");
+      humans = n;
+    }
+  };
   const draw = (now: number): Frame | null => {
     const f = src?.frameAt(now) ?? null;
     const dt = (now - last) / 1000;
@@ -326,6 +347,7 @@ export const play: Screen = (root, params) => {
     lastFrame = f;
     hud.update(f, now);
     showLoanCost(f);
+    funnel(f);
     nitroSound(f);
     zoneSting(f, now);
     if (repayHeld) {
@@ -412,6 +434,8 @@ export const play: Screen = (root, params) => {
       juice(e, s.me);
       if ((e.type === "pop" || e.type === "eat") && e.victim === s.me && !ended) {
         const death = receipt!.outcome(lastFrame?.blobs ?? []).death!;
+        died = true;
+        track("match_finished");
         overlay = showDeath(root, death, (a) => {
           if (a === "again") return again();
           if (a === "share") return void shareCertificate({ ...death, matchId: s.matchId });
@@ -530,7 +554,7 @@ function refusedCard(root: HTMLElement, why: string, retry = true): void {
     <div class="mt-5 flex flex-wrap justify-center gap-3">
       <button data-retry class="pop pop-press rounded-2xl bg-safe px-5 py-3 font-display text-xl">Retry</button>
       <button data-off class="pop pop-press rounded-2xl bg-card px-5 py-3 font-display text-xl">Practice offline</button>
-      <a href="#/" class="pop-sm pop-press basis-full rounded-2xl bg-card px-4 py-2 font-display text-lg">Home</a></div>
+      <a href="/" class="pop-sm pop-press basis-full rounded-2xl bg-card px-4 py-2 font-display text-lg">Home</a></div>
     <p class="mt-4 text-xs font-medium text-muted">Offline practice runs the real rules against local bots. Nothing counts.</p></div>`;
   el.querySelector("[data-why]")!.textContent = why;
   const again = el.querySelector<HTMLElement>("[data-retry]")!;
@@ -543,7 +567,7 @@ function refusedCard(root: HTMLElement, why: string, retry = true): void {
   el.querySelector("[data-off]")!.addEventListener("click", () => {
     offlineOnPurpose = true;
     if (retry) rerender();
-    else location.hash = "#/play";
+    else navigate("/play");
   });
   root.appendChild(el);
 }

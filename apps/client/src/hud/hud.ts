@@ -33,7 +33,7 @@ export class Hud {
   private wasDry = false;
 
   private coach: Coach;
-  /** #/watch: a spectator sees who is in the arena and when it starts, never player tips. */
+  /** /watch: a spectator sees who is in the arena and when it starts, never player tips. */
   private spectator: boolean;
   held = false;
   /** Offline practice against local bots: never word it like a real lobby. */

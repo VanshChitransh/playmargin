@@ -1,16 +1,22 @@
+// Path router: old hash links map to clean paths, and unknown paths fall to the 404 route.
 import { describe, expect, it } from "vitest";
-import { match } from "./router";
+import { legacyPath, match, pickRoute } from "./router";
 
-describe("match", () => {
-  it("matches static and param routes", () => {
-    expect(match("/", "/")).toEqual({});
-    expect(match("/play", "/play")).toEqual({});
-    expect(match("/verify/:id", "/verify/m-42")).toEqual({ id: "m-42" });
-    expect(match("/r/:code", "/r/AB%20C")).toEqual({ code: "AB C" });
+describe("router", () => {
+  it("rewrites old hash links to clean paths, keeping the query", () => {
+    expect(legacyPath("#/verify/abc", "")).toBe("/verify/abc");
+    expect(legacyPath("#/stats", "?key=k")).toBe("/stats?key=k");
+    expect(legacyPath("#/r/ABCD?x=1", "?y=2")).toBe("/r/ABCD?x=1");
+    expect(legacyPath("", "")).toBeNull();
+    expect(legacyPath("#top", "")).toBeNull();
   });
-  it("rejects wrong shapes and empty params", () => {
-    expect(match("/play", "/judge")).toBeNull();
-    expect(match("/verify/:id", "/verify/")).toBeNull();
-    expect(match("/verify/:id", "/verify/a/b")).toBeNull();
+
+  it("picks the first matching route, else 404", () => {
+    const routes = ["/", "/verify/:id", "/r/:code", "*"];
+    expect(pickRoute(routes, "/verify/m%201")).toEqual({ key: "/verify/:id", params: { id: "m 1" } });
+    expect(pickRoute(routes, "/r/ABCD").params.code).toBe("ABCD");
+    expect(pickRoute(routes, "/nope").key).toBe("*");
+    expect(pickRoute(routes, "/verify/").key).toBe("*");
+    expect(match("/", "/")).toEqual({});
   });
 });
