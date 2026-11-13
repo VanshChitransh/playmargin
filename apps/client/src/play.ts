@@ -546,19 +546,17 @@ function askName(root: HTMLElement): Promise<void> {
   root.appendChild(el);
   const input = el.querySelector<HTMLInputElement>("input")!;
   input.focus();
+  // Warn while typing, as on the home page, so one click on Join always joins (F05).
+  const why = el.querySelector<HTMLElement>("[data-why]")!;
+  input.addEventListener("input", () => {
+    const problem = input.value.trim() ? nameProblem(input.value) : null;
+    why.textContent = problem ?? "";
+    why.classList.toggle("hidden", !problem);
+  });
   return new Promise((done) =>
     el.addEventListener("submit", (e) => {
       e.preventDefault();
-      // A typed name the rules change or refuse: show why once, with the cleaned name in the box.
-      const problem = input.value.trim() ? nameProblem(input.value) : null;
-      const why = el.querySelector<HTMLElement>("[data-why]")!;
-      if (problem && why.textContent !== problem) {
-        input.value = setPlayerName(input.value) ?? "";
-        why.textContent = problem;
-        why.classList.remove("hidden");
-        return;
-      }
-      setPlayerName(input.value);
+      setPlayerName(input.value); // keeps the cleaned name, the warning already said what changes
       el.remove();
       done();
     }),

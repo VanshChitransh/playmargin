@@ -98,7 +98,9 @@ export class BlobSprite extends Container {
     // Pressed on a wall it follows the outline's centre.
     const c = !this.mem.n ? { x: 0, y: 0, mean: v.radius } : this.mem.centre();
     const inner = Math.min(v.radius, c.mean);
-    const ns = Math.max(Math.min((inner * 0.5) / 28, (inner * 1.6) / this.nameW), JUICE.NAME_MIN_PX / zoom / 28);
+    // The on-screen floor may spill a little, but never past 2.4 radius: 15 wide letters ran 3x the blob (F11).
+    const floor = Math.min(JUICE.NAME_MIN_PX / zoom / 28, (inner * 2.4) / this.nameW);
+    const ns = Math.max(Math.min((inner * 0.5) / 28, (inner * 1.6) / this.nameW), floor);
     this.nameText.scale.set(ns);
     this.warnSign.scale.set(k);
     this.nameText.position.set(c.x, c.y);
