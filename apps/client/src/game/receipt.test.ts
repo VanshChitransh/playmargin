@@ -49,6 +49,14 @@ describe("Receipt", () => {
     const s = r.outcome([me, big]).stats;
     expect(s).toMatchObject({ foodEaten: 1, blobsEaten: 1, topRank: 2, peakEquity: 90, aliveS: 1 });
   });
+  it("never records #1 for a tie at GO: ties count against you (F01)", () => {
+    const r = new Receipt("me");
+    const all = [b("me", 80), b("a", 80), b("c", 80)];
+    r.frame(all, "LOW", 0, 0.5, undefined, 0); // GO: everyone at 80
+    r.frame([b("me", 70), b("a", 90), b("c", 85)], "LOW", 500, 0.5, undefined, 1);
+    r.frame([b("me", 88), b("a", 90), b("c", 85)], "LOW", 1000, 0.5, undefined, 2);
+    expect(r.outcome([b("me", 88), b("a", 90), b("c", 85)]).stats.topRank).toBe(2);
+  });
   it("counts my saves and clutch saves from the server event", () => {
     const r = new Receipt("me");
     r.event({ type: "clutchSave", blob: "me", clutch: false });

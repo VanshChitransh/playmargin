@@ -97,7 +97,9 @@ export class Receipt {
       this.aliveFrom ??= elapsedS;
       this.stats.aliveS = elapsedS - this.aliveFrom;
       this.stats.peakEquity = Math.max(this.stats.peakEquity, me.equity);
-      const rank = blobs.filter((b) => b.kind !== "drone" && b.state === "alive" && b.equity > me.equity).length + 1;
+      // Ties count against you: at GO everyone sits at 80, and nobody has led just by being tied (F01).
+      const mine = Math.round(me.equity);
+      const rank = blobs.filter((b) => b.id !== me.id && b.kind !== "drone" && b.state !== "popped" && Math.round(b.equity) >= mine).length + 1;
       this.stats.topRank = this.stats.topRank ? Math.min(this.stats.topRank, rank) : rank;
     }
     this.interest += interestPerS(me.owe, tier, rateBps) * dtS;
