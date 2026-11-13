@@ -40,7 +40,7 @@ export const landing: Screen = (root) => {
         <p class="h-label"><i data-live></i>Real gameplay · 🤖 bots on the real rules</p>
         <p class="h-keys"><span><kbd>Space</kbd>boost</span><span><kbd>R</kbd>repay</span><span><kbd>E</kbd>cash out</span></p>
       </div>
-      <div class="h-stage"><video data-hero class="h-arena" muted loop playsinline autoplay preload="auto" poster="/home/hero-poster.jpg" aria-label="Bots borrow to grow, go red and get popped"><source src="/home/hero-loop.mp4" type="video/mp4" /></video><div data-feed class="h-feed" aria-hidden="true"></div></div>
+      <div class="h-stage"><video data-hero class="h-arena" muted loop playsinline autoplay preload="auto" poster="/home/hero-poster.jpg" aria-label="A player eats, borrows to grow with BOOST, then repays the loan"><source src="/home/hero-loop.mp4" type="video/mp4" /></video><div data-feed class="h-feed" aria-hidden="true"></div></div>
     </section>
     <div data-home-story></div><div data-home-proof></div><div data-home-footer></div>
   </div>`;
@@ -86,15 +86,14 @@ export const landing: Screen = (root) => {
 };
 
 type Tone = "gold" | "warn" | "liq";
-/** What happens on screen in hero-loop.mp4 (22 s), at the second it shows. Re-time if the loop is re-cut. */
+/** What happens on screen in hero-loop.mp4 (19.7 s, one take from GO, your own camera), at the second
+ *  it shows. Re-time if the loop is re-cut. */
 export const HERO_CUES: ReadonlyArray<{ at: number; text: string; tone: Tone }> = [
-  { at: 4.9, text: "Liquid Lola 🤖 borrows from the vault", tone: "gold" },
-  { at: 8.1, text: "Dip Buyer 🤖 borrows from the vault", tone: "gold" },
-  { at: 10.0, text: "Dip Buyer 🤖 is in the red", tone: "warn" },
-  { at: 11.1, text: "Nitro Nina 🤖 is in the red", tone: "warn" },
-  { at: 13.4, text: "Diamond Dani 🤖 popped Nitro Nina", tone: "liq" },
-  { at: 14.1, text: "Moon Boy 🤖 is in the red", tone: "warn" },
-  { at: 19.0, text: "The zone is closing in", tone: "warn" },
+  { at: 0.4, text: "GO! You start at 80 and eat to grow", tone: "gold" },
+  { at: 7.7, text: "You hold BOOST: a loan from the vault", tone: "gold" },
+  { at: 9.4, text: "You owe 147, interest ticks every second", tone: "warn" },
+  { at: 16.7, text: "You hold REPAY", tone: "gold" },
+  { at: 17.6, text: "Paid off. Debt 0, equity 118", tone: "gold" },
 ];
 
 /** Cues crossed when the clock moves from `from` to `to` (a loop restart counts from 0). */
