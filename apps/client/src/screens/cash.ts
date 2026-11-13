@@ -77,6 +77,7 @@ export const cash: Screen = (root) => {
       body.innerHTML = `<article class="sticker rounded-box bg-card p-5">
         <h2 class="font-display text-3xl">Sign in to play for money</h2>
         <p class="mt-1">Winnings land in your own account, not ours. Practice stays free with no sign-in.</p>
+        ${NETWORK === "testnet" ? `<p class="mt-2 text-sm text-muted">Paid play runs on NEAR testnet: sign in with a testnet account in <a class="link" href="https://wallet.meteorwallet.app" target="_blank" rel="noopener">Meteor</a> or <a class="link" href="https://wallet.intear.tech" target="_blank" rel="noopener">Intear</a>.</p>` : ""}
         <div class="mt-4 flex flex-wrap gap-3">${EMAIL_LOGIN ? `<button data-c=email class="${BTN.go}">Log in with email</button>` : ""}
         <button data-c=signin class="${EMAIL_LOGIN ? BTN.card : BTN.go}">${EMAIL_LOGIN ? "Other sign-in options" : "Sign in"}</button>
         <a href="/play" class="${BTN.card}">Practice free</a></div></article>`;
@@ -238,7 +239,7 @@ async function addFunds(box: HTMLElement, acc: string, say: Say): Promise<void> 
       <div class="font-display text-3xl text-gold">+$<span class="tabular-nums">${esc(Number(r.quote.amountOutFormatted).toFixed(2))}</span></div>
       <div class="text-sm">At least <span class="num">$${min}</span>, about <span class="num">${Number(r.quote.timeEstimate) || "?"}</span> s</div>
       ${r.dry || !r.quote.depositAddress
-        ? `<p class="tag mt-2 text-paper/70">Preview price. Deposits open when mainnet goes live.</p>`
+        ? `<p class="tag mt-2 text-paper/70"><b class="text-gold">DRY RUN:</b> a real 1-Click quote, no money moves on testnet.</p>`
         : `<p class="mt-2">Send exactly that amount to</p><p class="num break-all font-bold">${esc(r.quote.depositAddress)}</p>
            <p data-st class="tag mt-2 animate-pulse text-gold">${STATE_WORDS.waiting}</p>`}
     </div>`;
