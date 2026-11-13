@@ -104,16 +104,31 @@ export function cuesBetween(from: number, to: number): typeof HERO_CUES[number][
 
 /** The feed follows the video clock, so each line lands with the moment it names. Newest 3 shown. */
 function feedOnVideo(video: HTMLVideoElement, el: HTMLElement): void {
+  const row = (c: (typeof HERO_CUES)[number]): HTMLElement => {
+    const r = document.createElement("div");
+    r.className = c.tone;
+    const dot = document.createElement("b");
+    dot.textContent = "● ";
+    r.append(dot, c.text);
+    return r;
+  };
   let last = 0;
+  let still = false;
+  // A video that never plays (Reduce motion, Low Power Mode or blocked autoplay) still shows the story.
+  const showStill = (): void => {
+    if (!video.paused || video.currentTime > 0) return;
+    still = true;
+    el.replaceChildren(...HERO_CUES.slice(-3).map(row));
+  };
+  setTimeout(showStill, 1200);
   video.addEventListener("timeupdate", () => {
     const now = video.currentTime;
+    if (still && now > 0) {
+      still = false;
+      el.replaceChildren();
+    }
     for (const c of cuesBetween(last, now)) {
-      const row = document.createElement("div");
-      row.className = c.tone;
-      const dot = document.createElement("b");
-      dot.textContent = "● ";
-      row.append(dot, c.text);
-      el.append(row);
+      el.append(row(c));
       while (el.children.length > 3) el.firstElementChild!.remove();
     }
     last = now;
