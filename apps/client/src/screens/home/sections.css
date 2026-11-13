@@ -84,6 +84,8 @@
 .home .hc-track i{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:99px;background:var(--safe);transition:width .25s,background .4s}
 .home .hc-line{position:absolute;left:16.7%;top:-4px;bottom:-4px;width:2px;background:var(--liq);border-radius:2px}
 @media (prefers-reduced-motion:reduce){.home .hc-toast,.home .hc-stamp,.home .hc-track i{transition:none}}
+/* Short laptop screens (1280x720): the pinned step list must fit 100vh or it spills over the next section (F02). */
+@media (max-height:820px){.home .how-left{padding:3vh 40px}.home .how-h2{font-size:42px;margin-top:8px}.home .how-lead{margin-top:8px}.home .how-steps{margin-top:14px}.home .how-steps button{padding:9px 4px}.home .hs{font-size:13px}}
 .home .trust{background:var(--ink);color:#fff;padding:130px 0;border-radius:40px 40px 0 0}
 .home .trust .kicker{color:#7DA2FF}
 .home .trust .head p{color:var(--inkmuted)}
