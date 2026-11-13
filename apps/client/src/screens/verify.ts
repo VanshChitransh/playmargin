@@ -107,6 +107,8 @@ function render(body: HTMLElement, d: Loaded, r: Report, note: string, tampered:
       ? ["bg-warn text-ink", "?", "Legacy log, rules version unproven.", "It balances under the old rules, but only NEAR holding the same fingerprint can prove it is a real match from before 11 Nov."]
       : r.anchor.state === "ok"
       ? ["bg-safe text-ink", "\u2713", "Honest match.", "Every hash links, the books balance to the millionth, and NEAR holds the same fingerprint."]
+      : d.claim?.matchId.startsWith("u-")
+      ? ["bg-safe text-ink", "\u2713", "Honest log.", "Every hash links and the books balance. US server matches are not anchored on NEAR, so this check is the proof."]
       : ["bg-safe text-ink", "\u2713", "Honest so far.", "Every hash links and the books balance. The NEAR anchor comes with the next hourly batch."];
   body.innerHTML = `
     <div class="sticker flex items-center gap-4 rounded-box p-4 ${verdict[0]}">
