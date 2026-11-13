@@ -42,7 +42,7 @@ export const landing: Screen = (root) => {
         <p class="h-label"><i data-live></i>Real gameplay · 🤖 bots on the real rules</p>
         <p class="h-keys"><span><kbd>Space</kbd>boost</span><span><kbd>R</kbd>repay</span><span><kbd>E</kbd>cash out</span></p>
       </div>
-      <div class="h-stage"><video data-hero class="h-arena" muted loop playsinline autoplay preload="auto" poster="/home/hero-poster.jpg" aria-label="Bots borrow to grow, go red and get popped"><source src="/home/hero-loop.mp4" type="video/mp4" /></video></div>
+      <div class="h-stage"><video data-hero class="h-arena" muted loop playsinline autoplay preload="auto" poster="/home/hero-poster.jpg" aria-label="Bots borrow to grow, go red and get popped"><source src="/home/hero-loop.mp4" type="video/mp4" /></video><div data-feed class="h-feed" aria-hidden="true"></div></div>
     </section>
     <div data-home-story></div><div data-home-proof></div><div data-home-footer></div>
   </div>`;
@@ -66,6 +66,7 @@ export const landing: Screen = (root) => {
     video.removeAttribute("autoplay");
     video.pause();
   }
+  feedOnVideo(video, root.querySelector<HTMLElement>("[data-feed]")!);
   // Phones and tablets: no play box (one card says MARGIN plays on a laptop). The footage is a
   // plain video, so it plays there too.
   if (!laptopCapable()) {
@@ -92,3 +93,39 @@ export const landing: Screen = (root) => {
   root.querySelector("[data-challenge]")!.addEventListener("click", () => navigate(`/r/${newRoomCode()}`));
   return cleanup;
 };
+
+type Tone = "gold" | "warn" | "liq";
+/** What happens on screen in hero-loop.mp4 (22 s), at the second it shows. Re-time if the loop is re-cut. */
+export const HERO_CUES: ReadonlyArray<{ at: number; text: string; tone: Tone }> = [
+  { at: 4.9, text: "Liquid Lola 🤖 borrows from the vault", tone: "gold" },
+  { at: 8.1, text: "Dip Buyer 🤖 borrows from the vault", tone: "gold" },
+  { at: 10.0, text: "Dip Buyer 🤖 is in the red", tone: "warn" },
+  { at: 11.1, text: "Nitro Nina 🤖 is in the red", tone: "warn" },
+  { at: 13.4, text: "Diamond Dani 🤖 popped Nitro Nina", tone: "liq" },
+  { at: 14.1, text: "Moon Boy 🤖 is in the red", tone: "warn" },
+  { at: 19.0, text: "The zone is closing in", tone: "warn" },
+];
+
+/** Cues crossed when the clock moves from `from` to `to` (a loop restart counts from 0). */
+export function cuesBetween(from: number, to: number): typeof HERO_CUES[number][] {
+  const lo = to < from ? -1 : from;
+  return HERO_CUES.filter((c) => c.at > lo && c.at <= to);
+}
+
+/** The feed follows the video clock, so each line lands with the moment it names. Newest 3 shown. */
+function feedOnVideo(video: HTMLVideoElement, el: HTMLElement): void {
+  let last = 0;
+  video.addEventListener("timeupdate", () => {
+    const now = video.currentTime;
+    for (const c of cuesBetween(last, now)) {
+      const row = document.createElement("div");
+      row.className = c.tone;
+      const dot = document.createElement("b");
+      dot.textContent = "● ";
+      row.append(dot, c.text);
+      el.append(row);
+      while (el.children.length > 3) el.firstElementChild!.remove();
+    }
+    last = now;
+  });
+}
