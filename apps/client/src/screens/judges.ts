@@ -8,7 +8,7 @@ import { ARCHIVAL, rpcUrls } from "../chain/rpc";
 import { LocalMatch } from "../game/local";
 import { ENDPOINT } from "../net/client";
 import type { Screen } from "../router";
-import { BTN, header } from "./chrome";
+import { BTN, footerSlot, header, mountSiteFooter } from "./chrome";
 import { anchorVerdict, configVerdict, count, firstCall, droneVerdict, relayVerdict, sessionKeyVerdict, settleVerdict, type RawTx, type State, type Verdict } from "../judges/claims";
 
 // Old txs fall out of regular RPC nodes after about 2.5 days, so archival nodes go first (same list as /verify).
@@ -171,12 +171,13 @@ const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeA
 
 export const judges: Screen = (root) => {
   root.innerHTML = `<div class="paper-dots min-h-dvh text-ink">${header()}
-    <main class="mx-auto max-w-4xl px-4 pb-16">
+    <main class="mx-auto max-w-4xl px-4 pb-24 pt-10">
       <h1 class="font-display text-4xl sm:text-5xl">For judges: every claim, checked live</h1>
       <p class="mt-2 max-w-2xl font-medium text-muted">Each card below runs in your browser now, reading NEAR ${NETWORK} directly (contract <b class="text-ink">${CONTRACT_ID}</b>), not our server. OK means the check passed, NONE YET means it has not happened yet, and we say so.</p>
       <button data-j=again class="${BTN.small} mt-4">Run all checks again</button>
       <ol data-j=list class="mt-6 grid gap-4"></ol>
-    </main></div>`;
+    </main>${footerSlot}</div>`;
+  const stopFooter = mountSiteFooter(root);
   const list = root.querySelector<HTMLElement>("[data-j=list]")!;
   let gone = false;
   const run = (): void => {
@@ -204,5 +205,8 @@ export const judges: Screen = (root) => {
   const target = location.hash ? document.getElementById(location.hash.slice(1)) : null;
   if (target) target.scrollIntoView({ block: "start" });
   else window.scrollTo(0, 0);
-  return () => void (gone = true);
+  return () => {
+    gone = true;
+    stopFooter();
+  };
 };

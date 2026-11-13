@@ -48,8 +48,13 @@ export const watch: Screen = (root) => {
   const hud = clean ? null : new Hud(root, { boost: dummy(), repay: dummy(), cashout: dummy() }, () => {}, { coach: false, spectator: true });
   const label = document.createElement("div");
   label.className = "sticker pointer-events-none fixed bottom-3 left-3 rounded-field bg-card px-3 py-1 text-sm font-bold text-ink";
-  label.style.boxShadow = "3px 3px 0 var(--color-ink)";
   if (!clean) root.appendChild(label);
+  // Spectators always have a way out (QA Q15); hidden in the clean recording view.
+  const home = document.createElement("a");
+  home.href = "/";
+  home.textContent = "Home";
+  home.className = "sticker fixed bottom-3 right-3 z-10 rounded-full bg-card px-4 py-1.5 text-sm font-semibold text-ink";
+  if (!clean) root.appendChild(home);
   const stamp = document.createElement("div");
   stamp.className = "pointer-events-none fixed inset-x-0 top-[28%] z-10 grid place-items-center";
   root.appendChild(stamp);

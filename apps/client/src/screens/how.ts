@@ -8,7 +8,7 @@ import { header } from "./chrome";
 export const how: Screen = (root) => {
   window.scrollTo(0, 0);
   root.innerHTML = `
-  <div class="home">
+  <div class="home how-page">
     ${header()}
     <div data-home-story></div>
     <section class="h-top" style="padding:24px 24px 120px">

@@ -9,7 +9,7 @@ import { runChecks, type Check, type Report } from "../verify/checks";
 import { EXPLORER } from "../chain/config";
 import { txFunctionCall, viewOnChain } from "../chain/rpc";
 import { anchorOnNear, type AnchorClaim } from "./verifyNear";
-import { BTN, header } from "./chrome";
+import { BTN, footerSlot, header, mountSiteFooter } from "./chrome";
 
 /** The offline match log, handed over in memory from the results screen. */
 let localLog: LogEntry[] | null = null;
@@ -31,7 +31,7 @@ export const verify: Screen = (root, { id = "" }) => {
   root.innerHTML = `
   <div class="min-h-full bg-paper text-ink">
     ${header()}
-    <div class="mx-auto max-w-2xl px-4 pb-16 pt-2">
+    <div class="mx-auto max-w-2xl px-4 pb-24 pt-10">
       <span class="sticker inline-block rounded-field bg-warn px-3 py-1 text-sm font-bold">Do not trust us. Check.</span>
       <h1 class="mt-3 font-display text-6xl">Verify</h1>
       <p class="mt-2 text-muted">Match <span class="num font-bold">${esc(id)}</span>. Every check runs here in your browser, with the same code the server and the NEAR contract use.</p>
@@ -39,7 +39,9 @@ export const verify: Screen = (root, { id = "" }) => {
       <label class="${BTN.card} mt-8 cursor-pointer text-lg">
         Check a log file<input data-v=file type="file" accept="application/json,.json" class="hidden" /></label>
     </div>
+    ${footerSlot}
   </div>`;
+  const stopFooter = mountSiteFooter(root);
   const body = root.querySelector<HTMLElement>("[data-v=body]")!;
 
   const show = async (d: Loaded, note = "", real?: Loaded): Promise<void> => {
@@ -78,6 +80,7 @@ export const verify: Screen = (root, { id = "" }) => {
       .then(([d, p]) => show({ ...d, claim: { mode: p.mode, matchId: id, anchor: p.anchor ? { hour: p.anchor.hour, proof: p.anchor.proof, tx: p.anchor.tx } : null } }))
       .catch(() => (body.innerHTML = `<p>Could not load this match from the server. You can still check a log file.</p>`));
   }
+  return stopFooter;
 };
 
 function render(body: HTMLElement, d: Loaded, r: Report, note: string, tampered: boolean): void {

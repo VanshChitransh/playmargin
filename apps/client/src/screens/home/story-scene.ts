@@ -57,6 +57,7 @@ export const TOAST: Toast[] = [
 
 /** A lead-in notification shown until the step's own event lands at `at` seconds. */
 export const LEAD: Record<number, Toast & { at: number }> = {
+  1: { at: 1.5, clk: "0:18", ico: "↑", c: "#E0A21B", t1: "Holding Space", t2: "The vault lends while you hold." },
   2: { at: 1.9, clk: "0:24", ico: "→", c: "#0052FF", t1: "Chasing 🤖 Dip Buyer", t2: "Bigger eats smaller. Close in." },
   3: { at: 1.2, clk: "0:51", ico: "%", c: "#E0A21B", t1: "Interest ticking", t2: "The vault charges every second." },
   4: { at: 2.3, clk: "1:02", ico: "!", c: "#E0243F", t1: "Red. Any touch pops you", t2: "🤖 Bear Bjorn is closing in." },
@@ -89,7 +90,8 @@ export function scene(s: number, te: number): Scene {
     o.d = lerp(0, 120, k);
     o.me.x = lerp(-40, 70, ez(te / 1.8));
     o.lines = te > 0.2 && te < 1.8;
-    if (te > 0.5) o.floats.push({ t: "+120 borrowed", c: "#B07A00", a: cl((3.6 - te) / 0.5), up: (te - 0.5) * 10 });
+    // Only once the loan has fully landed, so the float, toast and DEBT agree (QA Q09).
+    if (te > 1.5) o.floats.push({ t: "+120 borrowed", c: "#B07A00", a: cl((3.6 - te) / 0.5), up: (te - 1.5) * 10 });
   }
   if (s === 2) {
     o.d = 120;

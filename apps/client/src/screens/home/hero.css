@@ -337,3 +337,8 @@
     height: 300px;
   }
 }
+
+/* /how is the story alone: no hero above it, so no gap under the nav (QA Q11). */
+.home.how-page .how {
+  margin-top: 0;
+}

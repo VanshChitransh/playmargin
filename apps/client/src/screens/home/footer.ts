@@ -1,6 +1,8 @@
 // Footer inside the dark proof block: the judges' desk line, links, and the giant MARGIN wordmark
 // drawn as a dot grid that little blobs roam and eat (eaten dots regrow, so the word always reads,
 // a blob 1.15x wider pops a smaller one). The loop only runs while the wordmark is on screen.
+import "./hero.css";
+import "./sections.css";
 import { VERIFY_EXAMPLE } from "./proof";
 
 const REPO = "https://github.com/VanshChitransh/playmargin";

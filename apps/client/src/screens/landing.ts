@@ -38,7 +38,7 @@ export const landing: Screen = (root) => {
     </header>
     <section class="h-window" aria-label="Real MARGIN gameplay">
       <div class="h-bar">
-        <p class="h-label"><i data-live></i>Real gameplay · 🤖 bots on the real rules</p>
+        <p class="h-label">Recorded gameplay · 🤖 bots on the real rules</p>
         <p class="h-keys"><span><kbd>Space</kbd>boost</span><span><kbd>R</kbd>repay</span><span><kbd>E</kbd>cash out</span></p>
       </div>
       <div class="h-stage"><video data-hero class="h-arena" muted loop playsinline autoplay preload="auto" poster="/home/hero-poster.jpg" aria-label="A player eats, borrows to grow with BOOST, then repays the loan"><source src="/home/hero-loop.mp4" type="video/mp4" /></video><div data-feed class="h-feed" aria-hidden="true"></div></div>

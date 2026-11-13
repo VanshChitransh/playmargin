@@ -11,7 +11,7 @@ import { setPaidSeat } from "../play";
 import type { Screen } from "../router";
 import { navigate } from "../router";
 import type { JoinOpts } from "@margin/core";
-import { BTN, header } from "./chrome";
+import { BTN, footerSlot, header, mountSiteFooter } from "./chrome";
 
 const STEP: Record<PaidStep, string> = { "quick-play": "Turning on quick play", ticket: "Buying ticket", ready: "Joining" };
 const usd = (base: bigint): string => (Number(base) / 1e6).toFixed(2);
@@ -31,14 +31,16 @@ export const cash: Screen = (root) => {
   root.innerHTML = `
   <div class="min-h-full bg-paper text-ink">
     ${header()}
-    <div class="mx-auto max-w-xl px-4 pb-16 pt-2">
+    <div class="mx-auto max-w-xl px-4 pb-24 pt-10">
       <span class="sticker inline-block rounded-field bg-gold px-3 py-1 text-sm font-bold">${NETWORK === "testnet" ? "Test money" : "Real money"}</span>
       <h1 class="mt-3 font-display text-6xl">Play for <span data-stake>$1</span></h1>
       <p class="mt-2 text-muted">Humans only. Winners split the pot by equity. ${NETWORK === "testnet" ? "<b>Test money for now, nothing real at stake.</b>" : ""}</p>
       <div data-c=body class="mt-6 space-y-4"></div>
       <div data-c=msg class="mt-4" role="status" aria-live="polite"></div>
     </div>
+    ${footerSlot}
   </div>`;
+  const stopFooter = mountSiteFooter(root);
   void showStake(root).then((l) => (stake = l)); // later renders read stake, this fills what is already drawn
   const body = root.querySelector<HTMLElement>("[data-c=body]")!;
   const msg = root.querySelector<HTMLElement>("[data-c=msg]")!;
@@ -175,7 +177,10 @@ export const cash: Screen = (root) => {
       return draw();
     })
     .catch((e: Error) => say(`Email login: ${e.message}`, "error"));
-  return off;
+  return () => {
+    off();
+    stopFooter();
+  };
 };
 
 /** Add funds from any chain: token, amount, refund address, then a dry quote with the guaranteed minimum. */

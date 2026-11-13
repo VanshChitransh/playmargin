@@ -330,7 +330,19 @@ export const play: Screen = (root, params) => {
   // Anonymous funnel (S5 analytics): GO reached once, and a friend arriving in my private lobby.
   let wentLive = false;
   let humans = 0;
+  let chip: HTMLElement | null = null;
+  let cashedNote: HTMLElement | null = null;
   const funnel = (f: Frame): void => {
+    // The invite chip is for the lobby: once the match is live it would sit over the arena (Q12).
+    chip?.classList.toggle("hidden", f.match.phase === "LIVE" || f.match.phase === "ENDED");
+    // Cashed out before the bell: say so until the receipt comes, the blob is gone from the arena (Q13).
+    if (!cashedNote && f.match.phase === "LIVE" && f.blobs.find((b) => b.id === f.me)?.state === "cashed") {
+      cashedNote = document.createElement("p");
+      cashedNote.className = "pop-sm pointer-events-none fixed left-1/2 top-24 z-10 -translate-x-1/2 rounded-full bg-card px-5 py-2.5 font-semibold text-ink";
+      cashedNote.textContent = "Cashed out. Your receipt comes at the bell.";
+      root.appendChild(cashedNote);
+    }
+    if (f.match.phase === "ENDED") cashedNote?.remove();
     if (!wentLive && f.match.phase === "LIVE") {
       wentLive = true;
       track("warmup_done");
@@ -410,7 +422,7 @@ export const play: Screen = (root, params) => {
       status.innerHTML = `Judge Run: a 90 s scenario on a published seed, normal money rules. Here the agents only hunt red blobs, so the lesson is your own loan: hold BOOST, go red, and <span class="whitespace-nowrap">Drone-1</span> liquidates you. Will you?`;
       status.className = "pop-sm pointer-events-none fixed bottom-3 left-3 z-10 max-w-[min(44rem,calc(100vw-340px))] rounded-xl bg-card px-3 py-2 text-sm font-semibold leading-snug text-ink";
     }
-    if (code && !(s instanceof LocalMatch)) roomChip(root, code);
+    if (code && !(s instanceof LocalMatch)) chip = roomChip(root, code);
     receipt = new Receipt(s.me);
     if (import.meta.env.DEV) (window as unknown as { __receipt: Receipt }).__receipt = receipt;
     if (s instanceof MatchConnection) {
@@ -468,7 +480,7 @@ export const play: Screen = (root, params) => {
 };
 
 /** Private room: the code stays on screen with one tap to send the link to a friend. */
-function roomChip(root: HTMLElement, code: string): void {
+function roomChip(root: HTMLElement, code: string): HTMLElement {
   const b = document.createElement("button");
   // Phones: the controls fill the bottom right, so the chip moves up under the clock, left of the board.
   b.className =
@@ -482,6 +494,7 @@ function roomChip(root: HTMLElement, code: string): void {
     void shareRoom(code).then((r) => label(r === "copied" ? "Link copied" : r === "shared" ? "Sent" : r === "cancelled" ? "Invite a friend" : "Copy failed")),
   );
   root.appendChild(b);
+  return b;
 }
 
 /** Share from the results screen: the certificate after a liquidation, else a one-line brag + verify link. */

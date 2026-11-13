@@ -139,7 +139,10 @@ export async function drawCertificate(d: CertData): Promise<Blob> {
   sticker(70, 810, W - 140, 270, C.card);
   const stat = (label: string, value: string, x: number, fill: string = C.ink): void => {
     text(label, x, 880, "600 26px 'Geist Mono'", C.muted, "center");
-    text(value, x, 970, "800 80px Geist", fill, "center");
+    // Shrink to fit a third of the box with padding: "100/100" touched the border at 80 px (QA Q14).
+    let px = 80;
+    for (g.font = `800 ${px}px Geist`; px > 40 && g.measureText(value).width > (W - 140) / 3 - 60; px -= 4) g.font = `800 ${px - 4}px Geist`;
+    text(value, x, 970, `800 ${px}px Geist`, fill, "center");
   };
   stat("LEVERAGE", `${d.leverage.toFixed(1)}x`, 240);
   // A drone can pop a blob the instant it goes red: say "<1 s", never a bare "0 s".

@@ -28,3 +28,20 @@ export const header = (): string => `
       <a href="/judges" class="rounded-full bg-ink px-4 py-2.5 text-white! hover:bg-ink/85">Judging? Start here</a>
     </div>
   </nav>`;
+
+/** Slot for the home page's big MARGIN footer, so every page ends the same way (QA Q16). */
+export const footerSlot = `<div class="home" style="min-height:0"><div data-home-footer></div></div>`;
+
+/** Mount the footer into root's slot (lazy, so the page paints first); returns its cleanup. */
+export function mountSiteFooter(root: HTMLElement): () => void {
+  let left = false;
+  let stop = (): void => {};
+  void import("./home/footer").then((m) => {
+    const box = root.querySelector<HTMLElement>("[data-home-footer]");
+    if (!left && box) stop = m.mountFooter(box);
+  });
+  return () => {
+    left = true;
+    stop();
+  };
+}
