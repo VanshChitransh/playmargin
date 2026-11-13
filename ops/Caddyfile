@@ -1,7 +1,14 @@
-# Caddy terminates TLS (automatic Let's Encrypt) and proxies HTTP + WebSocket to Colyseus.
+# Live config (EC2, since 13 Nov): api.playmargin.fun is DNS-only (grey cloud), players hit Caddy directly.
+# Caddy terminates TLS and proxies HTTP + WebSocket to Colyseus. HTTP redirects to HTTPS.
 # Install: sudo cp ops/Caddyfile /etc/caddy/Caddyfile && sudo systemctl reload caddy
-# DNS first: an A record api.playmargin.fun -> droplet IP (Cloudflare proxy OFF so Caddy can get a cert).
+# The cert comes from Let's Encrypt via DNS-01 (caddy-dns/cloudflare, token in /etc/caddy/cf.env), so it
+# renews whether or not the record is proxied. With no proxy in front, the client IP is the TCP peer
+# ({remote_host}): no header from the client is believed. Orange cloud instead? Use ops/Caddyfile.cloudflare.
 api.playmargin.fun {
+	tls {
+		dns cloudflare {env.CF_API_TOKEN}
+		resolvers 1.1.1.1
+	}
 	encode gzip
 	# Relayer (S4, services/relayer): https://api.playmargin.fun/relay/<route> -> localhost:3030/<route>.
 	# Client: VITE_RELAYER_URL=https://api.playmargin.fun/relay. It rate-limits by X-Forwarded-For: set it here.

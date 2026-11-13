@@ -10,8 +10,8 @@ Caddy and systemd files get their first real check in step 7 below.
 | `relayer.env.example` | Relayer env. Goes to `/etc/margin/relayer.env`, root:margin, chmod 640. |
 | `margin-server.service` | Game server unit. Stop = SIGTERM = drain: LIVE matches finish and settle first. `Restart=always`. |
 | `margin-relayer.service` | Relayer unit (S4's `services/relayer`). Stateless, `Restart=always`. |
-| `Caddyfile` | TLS for `api.playmargin.fun`: game WebSocket + API, and the relayer at `/relay/*`. |
-| `Caddyfile.cloudflare` | EC2 mode: same routes behind Cloudflare's proxy, DNS-01 cert, real client IP from CF-Connecting-IP. |
+| `Caddyfile` | Live (EC2, grey cloud): TLS for `api.playmargin.fun` via DNS-01, game WebSocket + API, and the relayer at `/relay/*`. Client IP = the TCP peer. |
+| `Caddyfile.cloudflare` | Rollback only: same routes behind Cloudflare's proxy (orange cloud), real client IP from CF-Connecting-IP. |
 | `deploy.sh` | Laptop to droplet: new release dir, `npm ci`, tests, flip `current`, restart both, health check. |
 
 ## Deploy day
@@ -120,8 +120,13 @@ the droplet layout above: `setup.sh`, the two systemd units, `/etc/margin/{env,r
 `/var/lib/margin/margin.sqlite`, releases in `/opt/margin/releases`. Deploy with
 `DEPLOY_HOST=ubuntu@15.207.255.76 ./ops/deploy.sh` (it uses sudo on the box).
 
-DNS: `api` is an A record to the Elastic IP with Cloudflare's proxy ON (orange cloud). Two things differ from the
-droplet Caddyfile, both in `Caddyfile.cloudflare`:
+DNS: `api` is an A record to the Elastic IP, **DNS only (grey cloud) since 13 Nov 18:2x UTC**, TTL 60, no AAAA
+(the box is IPv4 only). Players reach Caddy directly, which cut the in-game ping about tenfold (table below). The
+live config is `Caddyfile`: DNS-01 cert, HTTP redirects to HTTPS, and `X-Real-IP` / `X-Forwarded-For` are
+`{remote_host}`, so no header a client sends is believed. The IP is public and there is no Cloudflare DDoS shield;
+the server's own per-IP join, seat and API limits are the only guard.
+
+Orange cloud mode (13 Nov until the flip, kept as the rollback) used `Caddyfile.cloudflare`, which differs in:
 
 | What | Why |
 |---|---|
@@ -133,7 +138,7 @@ droplet Caddyfile, both in `Caddyfile.cloudflare`:
 # one time on the box (after setup.sh)
 sudo caddy add-package github.com/caddy-dns/cloudflare
 printf '[Service]\nEnvironmentFile=/etc/caddy/cf.env\n' | sudo tee /etc/systemd/system/caddy.service.d/cf.conf
-sudo cp Caddyfile.cloudflare /etc/caddy/Caddyfile && sudo systemctl daemon-reload && sudo systemctl restart caddy
+sudo cp Caddyfile /etc/caddy/Caddyfile && sudo systemctl daemon-reload && sudo systemctl restart caddy
 # test before any DNS change: pin the name to the box, the cert must verify without -k
 curl --resolve api.playmargin.fun:443:15.207.255.76 https://api.playmargin.fun/health
 ```
@@ -151,11 +156,20 @@ commented out, so two servers never signed for the same settler account at once.
 **Rollback:** PATCH `api` back to `CNAME <tunnel-id>.cfargotunnel.com`, copy the box DB back to
 `~/margin-prod/margin.db` the same way, `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/fun.playmargin.tunnel.plist`.
 
-**Latency (13 Nov, from Bengaluru, median of 50 in-game pings):** about 170 to 240 ms through Cloudflare against
-66 to 71 ms direct to the IP. The WSS handshake takes about 800 ms via Cloudflare and 225 ms direct. Indian traffic
-enters Cloudflare at Singapore (`colo=SIN`) and comes back to Mumbai. Switching the proxy off (grey cloud) gives the
-direct numbers, but then Caddy needs HTTP-01 or keeps DNS-01, `trusted_proxies` must go (or every client could
-send its own CF-Connecting-IP), and the IP becomes public.
+**Latency (13 Nov, from Bengaluru, median of 50 in-game pings and 10 WSS handshakes):** Indian traffic entered
+Cloudflare at Singapore (`colo=SIN`) and came back to Mumbai.
+
+| Path | In-game ping | WSS handshake |
+|---|---|---|
+| Orange cloud, just before the flip | 362 ms (p90 638) | 938 ms |
+| Grey cloud, after the flip | 34 to 37 ms (p90 38) | 121 ms |
+
+**Grey cloud flip (done 13 Nov):** `/health` rooms 0, PATCH `api` to `proxied: false, ttl: 60`, wait for any match
+still running, then install `Caddyfile` and `systemctl reload caddy` (a reload can cut open WebSockets, so never
+with a LIVE room). Order matters: DNS first, because the direct config redirects port 80, which an orange cloud
+Flexible zone would loop on. Resolvers held the old Cloudflare answers for about 5 min.
+**Rollback to orange:** `sudo cp /etc/caddy/Caddyfile.cloudflare.bak /etc/caddy/Caddyfile` (same as
+`ops/Caddyfile.cloudflare`), `systemctl reload caddy`, then PATCH `api` back to `proxied: true`.
 
 ## Tunnel mode (no droplet: api.playmargin.fun served from a Mac, testnet)
 
