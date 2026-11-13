@@ -6,6 +6,7 @@ import type { Screen } from "../router";
 import { navigate } from "../router";
 import { newRoomCode } from "../net/room-code";
 import { showStake } from "../stake";
+import { VERIFY_EXAMPLE } from "./home/proof";
 import { nameProblem } from "@margin/core";
 import { playerName, setPlayerName, signedInAccount } from "../player/name";
 
@@ -16,7 +17,7 @@ export const landing: Screen = (root) => {
       <a href="/" class="h-brand" aria-label="MARGIN home"><i><img src="/brand/margin-cat-cutout.svg" alt="" /></i>MARGIN</a>
       <div class="h-links">
         <a href="/how">How it works</a>
-        <a href="#proof" data-proof-link>Verify</a>
+        <a href="${VERIFY_EXAMPLE}" title="A real settled match, checked in your browser">Verify</a>
         <a href="/cash" class="h-quiet">Play for <span data-stake>$1</span></a>
         <a href="/judges" class="h-judge">Judging? Start here</a>
       </div>
@@ -48,12 +49,8 @@ export const landing: Screen = (root) => {
   let stopSections = (): void => {};
   void import("./home/sections").then((m) => {
     if (!left) stopSections = m.mountSections(root);
-    // The other pages' nav links Verify to /#proof.
+    // Old links to /#proof still land on the proof block.
     if (!left && location.hash === "#proof") root.querySelector("[data-home-proof]")?.scrollIntoView();
-  });
-  root.querySelector("[data-proof-link]")!.addEventListener("click", (e) => {
-    e.preventDefault();
-    root.querySelector("[data-home-proof]")?.scrollIntoView({ behavior: "smooth" });
   });
   void showStake(root);
   const cleanup = (): void => {
