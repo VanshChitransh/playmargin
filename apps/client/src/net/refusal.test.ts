@@ -9,7 +9,8 @@ describe("join refusals in game words", () => {
   it("names the known refusals", () => {
     expect(refusalWords("not enough credits")).toMatch(/credits/);
     expect(refusalWords("all arenas are full, try again in a minute")).toMatch(/busy/);
-    expect(refusalWords("too many joins")).toMatch(/busy/);
+    expect(refusalWords("too many joins, slow down")).toMatch(/your network/);
+    expect(refusalWords("HTTP 429")).toMatch(/your network/);
   });
   it("explains a server that is restarting (503, empty JSON body)", () => {
     expect(refusalWords("Unexpected end of JSON input")).toMatch(/restarting for an update/);
