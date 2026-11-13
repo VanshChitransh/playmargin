@@ -1,0 +1,337 @@
+/* Home hero (drafts/d5-geist.html): Geist, white page, one blue action, the live arena in a framed
+   window. Scoped under .home so the other screens keep their own look. */
+.home {
+  --h-soft: #f4f5f7;
+  --h-line: #e4e6eb;
+  --h-text: #0a0b0d;
+  --h-muted: #5b616e;
+  --h-blue: #0052ff;
+  --h-safe: #16c46b;
+  --h-liq: #e0243f;
+  --h-gold: #e0a21b;
+  min-height: 100dvh;
+  background: #fff;
+  color: var(--h-text);
+  font: 500 16px/1.5 Geist, system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+.home a {
+  color: inherit;
+  text-decoration: none;
+}
+.home kbd {
+  display: inline-block;
+  font: 500 12px/1 "Geist Mono", ui-monospace, monospace;
+  background: #fff;
+  border: 1px solid var(--h-line);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  padding: 4px 7px;
+  color: var(--h-text);
+  vertical-align: 2px;
+}
+.home :focus-visible {
+  outline: 2px solid var(--h-blue);
+  outline-offset: 2px;
+}
+
+.h-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 48px;
+}
+.h-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 800 22px Geist, sans-serif;
+  letter-spacing: -0.02em;
+}
+.h-brand i {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--h-blue);
+  display: grid;
+  place-items: end center;
+  overflow: hidden;
+}
+.h-brand img {
+  width: 100%;
+  margin-bottom: -3px;
+}
+.h-links {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-weight: 600;
+  font-size: 15px;
+}
+.h-links a {
+  padding: 10px 16px;
+  border-radius: 999px;
+}
+.h-links a:hover {
+  background: var(--h-soft);
+}
+.h-links .h-quiet {
+  color: var(--h-muted);
+}
+.h-links .h-judge {
+  background: var(--h-text);
+  color: #fff;
+}
+.h-links .h-judge:hover {
+  background: #2a2d33;
+}
+
+.h-top {
+  text-align: center;
+  padding: 34px 24px 0;
+}
+.h-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  background: var(--h-soft);
+  border-radius: 999px;
+  padding: 6px 14px;
+}
+.h-eyebrow i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--h-safe);
+  animation: h-blink 1.6s infinite;
+}
+.h-top h1 {
+  font: 800 92px/0.95 Geist, sans-serif;
+  letter-spacing: -0.05em;
+  margin-top: 18px;
+}
+.h-top h1 span {
+  color: var(--h-liq);
+}
+.h-sub {
+  margin: 18px auto 0;
+  font-size: 21px;
+  color: var(--h-muted);
+  max-width: 640px;
+}
+.h-sub b {
+  color: var(--h-text);
+}
+.h-play {
+  margin: 28px auto 0;
+  display: flex;
+  gap: 8px;
+  width: min(560px, 100%);
+  padding: 6px;
+  border: 1px solid var(--h-line);
+  border-radius: 999px;
+  box-shadow: 0 10px 40px rgba(10, 11, 13, 0.08);
+  background: #fff;
+}
+.h-play input {
+  flex: 1;
+  min-width: 0;
+  height: 50px;
+  border: 0;
+  font: 600 17px Geist, sans-serif;
+  padding: 0 18px;
+  outline: none;
+  background: transparent;
+  color: var(--h-text);
+}
+.h-play input::placeholder {
+  color: #8a8f99;
+}
+.h-play .h-inv,
+.h-play .h-go {
+  display: grid;
+  place-items: center;
+  height: 50px;
+  border: 0;
+  border-radius: 999px;
+  font: 700 16px Geist, sans-serif;
+  cursor: pointer;
+}
+.h-play .h-inv {
+  background: var(--h-soft);
+  color: var(--h-text);
+  padding: 0 18px;
+}
+.h-play .h-inv:hover {
+  background: #e9eaee;
+}
+.h-play .h-go {
+  background: var(--h-blue);
+  color: #fff;
+  padding: 0 28px;
+}
+.h-play .h-go:hover {
+  background: #0047de;
+}
+.h-why {
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #b42328;
+}
+.h-micro {
+  margin-top: 10px;
+  font-size: 14px;
+  color: var(--h-muted);
+}
+.h-laptop {
+  margin: 28px auto 0;
+  max-width: 560px;
+  text-align: left;
+}
+
+/* The arena: a framed window (Linear style product shot), the top bar holds the label and keys. */
+.h-window {
+  position: relative;
+  margin: 26px auto 0;
+  width: calc(100% - 96px);
+  max-width: 1344px;
+  height: clamp(380px, calc(100vh - 402px), 680px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #dcdfe5;
+  border-radius: 24px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(10, 11, 13, 0.04), 0 24px 60px -12px rgba(10, 11, 13, 0.12);
+}
+.h-bar {
+  flex: none;
+  height: 46px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 18px;
+  background: #fff;
+  border-bottom: 1px solid var(--h-line);
+}
+.h-label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-weight: 700;
+  font-size: 14px;
+}
+.h-label i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--h-liq);
+  animation: h-blink 1s infinite;
+}
+.h-keys {
+  display: flex;
+  gap: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--h-muted);
+}
+.h-keys kbd {
+  margin-right: 6px;
+}
+.h-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: #f2f7fb;
+}
+.h-arena,
+.h-arena img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.h-feed {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+.h-feed div {
+  background: #fff;
+  border: 1px solid var(--h-line);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 4px 16px rgba(10, 11, 13, 0.08);
+  width: max-content;
+  transform-origin: left center;
+  transition: transform 0.3s, color 0.3s;
+  animation: h-in 0.35s;
+}
+.h-feed div:nth-last-child(2) {
+  color: var(--h-muted);
+  transform: scale(0.96);
+}
+.h-feed div:nth-last-child(3) {
+  color: #9aa0ac;
+  transform: scale(0.92);
+}
+.h-feed div b {
+  color: #9aa0ac;
+}
+.h-feed .liq b {
+  color: var(--h-liq);
+}
+.h-feed .gold b {
+  color: var(--h-gold);
+}
+.h-feed .safe b {
+  color: var(--h-safe);
+}
+.h-feed .warn b {
+  color: #c98f12;
+}
+@keyframes h-blink {
+  50% {
+    opacity: 0.3;
+  }
+}
+@keyframes h-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+@media (max-width: 760px) {
+  .h-nav {
+    padding: 16px;
+  }
+  .h-links .h-quiet,
+  .h-links a[data-proof-link] {
+    display: none;
+  }
+  .h-top h1 {
+    font-size: 48px;
+  }
+  .h-window {
+    width: calc(100% - 32px);
+    height: 300px;
+  }
+}

@@ -1,113 +1,84 @@
-// playmargin.fun landing ("Arcade Paper", research/margin/ui/variants/v1). The hero IS the game: a bots-only
-// match on the real rules runs in a paper frame, so a judge sees BOOST, red rings and pops before reading a word
-// (inspiration.md section 3: live mini arena + one CTA, crypto invisible above the fold).
+// playmargin.fun home (research/margin/ui/drafts/d5-geist.html, Vansh's pick on 13 Nov). One centred
+// headline and a pill play box, then the real engine running bots in a framed window, with a feed of
+// its real events. The story, proof and footer sections mount from ./home/sections.
+import "./home/hero.css";
+import type { BlobView, GameEventMsg } from "@margin/core";
 import type { Screen } from "../router";
 import { navigate } from "../router";
 import { laptopCapable } from "../device";
 import { laptopCardHtml, wireLaptopCard } from "./laptop";
 import { newRoomCode } from "../net/room-code";
-import { ENDPOINT } from "../net/endpoint";
 import { showStake } from "../stake";
 import { nameProblem } from "@margin/core";
 import { playerName, setPlayerName, signedInAccount } from "../player/name";
+import type { BlobLookup } from "./hero";
 
 export const landing: Screen = (root) => {
   root.innerHTML = `
-  <div class="paper-dots flex min-h-dvh flex-col overflow-x-hidden text-ink">
-    <header class="mx-auto flex w-full max-w-[88rem] items-center justify-between gap-3 px-4 pt-5 pb-2 xl:px-16 xl:pt-8">
-      <a href="/" aria-label="MARGIN home" class="flex items-center gap-3">
-        <span class="pop flex size-12 items-end justify-center overflow-hidden rounded-2xl bg-sky xl:size-15"><img src="/brand/margin-cat-cutout.svg" alt="" class="-mb-1.5 w-[105%]" /></span>
-        <span class="hidden font-display text-3xl tracking-wide min-[420px]:inline xl:text-4xl">MARGIN</span>
-      </a>
-      <nav class="flex items-center gap-1.5 whitespace-nowrap sm:gap-3">
-        <a href="/how" class="pop-sm pop-press rounded-xl bg-card px-2 py-2 text-sm font-bold sm:px-5 sm:py-3 sm:text-base">How it works</a>
-        <a href="/judges" class="pop-sm pop-press rounded-xl bg-card px-2 py-2 text-sm font-bold text-ink sm:px-5 sm:py-3 sm:text-base" title="Every claim, checked live against NEAR"><span class="max-md:hidden">For j</span><span class="md:hidden">J</span>udges</a>
-        <a href="/judge" class="pop-sm pop-press rounded-xl bg-ink max-[400px]:hidden px-2 py-2 text-sm font-bold text-card sm:px-5 sm:py-3 sm:text-base" title="A seeded 90 s match on normal rules"><span class="text-warn">&#9733;</span> Judge Run</a>
-      </nav>
+  <div class="home">
+    <nav class="h-nav">
+      <a href="/" class="h-brand" aria-label="MARGIN home"><i><img src="/brand/margin-cat-cutout.svg" alt="" /></i>MARGIN</a>
+      <div class="h-links">
+        <a href="/how">How it works</a>
+        <a href="#proof" data-proof-link>Verify</a>
+        <a href="/cash" class="h-quiet">Play for <span data-stake>$1</span></a>
+        <a href="/judges" class="h-judge">Judging? Start here</a>
+      </div>
+    </nav>
+    <header class="h-top">
+      <p class="h-eyebrow"><i></i>Live on NEAR</p>
+      <h1>Get greedy. <span>Get liquidated.</span></h1>
+      <p class="h-sub">agar.io, but your size is a loan. <b>Owe too much, you're food.</b></p>
+      <div data-ctas>
+        <div class="h-play">
+          <input data-name maxlength="15" autocomplete="nickname" aria-label="Your name" placeholder="Your name" />
+          <button type="button" data-challenge data-track="challenge_link_created" class="h-inv">Invite</button>
+          <a href="/play" data-track="practice_click" class="h-go">Play free</a>
+        </div>
+        <p data-name-why role="status" class="h-why" hidden></p>
+        <p class="h-micro">No wallet. No sign-up. 90 seconds.</p>
+      </div>
     </header>
-    <main class="mx-auto grid w-full max-w-[88rem] flex-1 items-center gap-12 px-4 pt-4 pb-8 lg:grid-cols-[1fr_1fr] xl:gap-16 xl:px-16">
-      <section class="min-w-0">
-        <p class="pop-sm inline-block rounded-full bg-warn px-4 py-2 text-sm font-bold">The lending market is the arena</p>
-        <h1 class="mt-4 font-display text-6xl leading-[0.9] min-[400px]:text-7xl sm:text-8xl xl:text-[7.6rem]"><span class="whitespace-nowrap">Get greedy.</span>
-          <span class="mt-3 block text-3xl text-muted xl:text-[2.75rem]">(then get <em class="pop-sm ml-1 inline-block -rotate-2 rounded-xl bg-liq px-3 pb-1.5 not-italic text-card">liquidated.</em>)</span>
-        </h1>
-        <p class="mt-5 max-w-xl text-lg font-medium text-muted xl:text-[1.3rem] xl:leading-relaxed">A 90-second arena where <b class="font-bold text-ink">BOOST is a loan.</b> Borrow to grow, hunt the ones who went red, cash out before the vault pops you.</p>
-        <div data-ctas class="mt-5 flex flex-wrap items-center gap-4">
-          <a href="/play" data-track="practice_click" class="pop pop-press flex h-16 items-center gap-3 rounded-2xl bg-safe px-7 font-display text-2xl xl:h-[4.75rem] xl:text-3xl">&#9654; Practice free</a>
-          <a href="/cash" class="pop pop-press flex h-16 items-center rounded-2xl bg-ink px-6 font-display text-2xl text-card xl:h-[4.75rem]">Play for&nbsp;<span data-stake>$1</span></a>
-        </div>
-        <div data-play-only class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-          <button data-challenge data-track="challenge_link_created" class="pop pop-press flex h-14 shrink-0 items-center gap-2.5 rounded-2xl bg-warn px-5 font-display text-xl xl:text-[1.375rem]">
-            <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>Challenge a friend</button>
-          <p class="text-sm font-semibold leading-snug text-muted"><b class="block text-base text-ink">Private room link</b>Send it, they join your match.</p>
-        </div>
-        <div data-play-only class="mt-5 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm font-semibold text-muted">
-          <label class="flex items-center gap-2"><span class="shrink-0">Your name</span>
-            <input data-name maxlength=15 autocomplete=nickname class="pop-sm w-40 rounded-lg bg-card px-2 py-1 font-display text-lg text-ink placeholder:text-ink/40" /></label>
-          <p data-name-why role="status" class="hidden basis-full text-sm font-bold text-[#B42328]"></p>
-          <span class="flex items-center gap-2"><span class="size-2.5 rounded-full border-2 border-ink bg-safe"></span>No wallet. No sign-up.</span>
-          <span>Mouse steers, hold <kbd class="pop-sm rounded-md bg-card px-1.5 text-xs font-bold">Space</kbd> = BOOST</span>
-        </div>
-      </section>
-      <section class="relative min-w-0 lg:pl-6">
-        <img src="/brand/margin-cat-cutout.svg" alt="" class="pointer-events-none absolute -top-14 -left-2 z-10 w-24 -rotate-12 drop-shadow-[5px_6px_0_var(--color-ink)] sm:w-32 lg:-top-20 lg:-left-6 xl:w-40" />
-        <div class="pop overflow-hidden rounded-[1.6rem] bg-card shadow-[12px_12px_0_var(--color-ink)] lg:rotate-[1.5deg]">
-          <div class="flex h-11 items-center gap-2.5 border-b-4 border-ink bg-cream px-4">
-            <i class="size-3.5 rounded-full border-[2.5px] border-ink bg-card"></i><i class="size-3.5 rounded-full border-[2.5px] border-ink bg-card"></i><i class="size-3.5 rounded-full border-[2.5px] border-ink bg-card"></i>
-            <span data-live class="ml-auto flex items-center gap-2 text-sm font-bold"><span class="size-3 rounded-full border-2 border-ink bg-liq"></span>LIVE</span>
-          </div>
-          <div data-hero class="relative aspect-[4/3] w-full overflow-hidden bg-[#eef6ff]"></div>
-        </div>
-        <span data-hero-caption class="pop-sm absolute -right-1 -bottom-6 z-10 -rotate-3 rounded-full bg-warn px-4 py-2 text-sm font-bold xl:-right-4 xl:text-base">Live: bots playing on the real rules</span>
-      </section>
-    </main>
-    <div data-proof class="mx-auto mb-8 hidden w-full max-w-[88rem] grid-cols-1 gap-4 px-4 sm:grid-cols-3 xl:px-16"></div>
+    <section class="h-window" aria-label="Live match: bots playing on the real rules">
+      <div class="h-bar">
+        <p class="h-label"><i data-live></i>Live on NEAR · humans and 🤖 bots, same rules</p>
+        <p class="h-keys"><span><kbd>Space</kbd>boost</span><span><kbd>R</kbd>repay</span><span><kbd>E</kbd>cash out</span></p>
+      </div>
+      <div class="h-stage"><div data-hero class="h-arena"></div><div data-feed class="h-feed" aria-live="off"></div></div>
+    </section>
+    <div data-home-story></div><div data-home-proof></div><div data-home-footer></div>
   </div>`;
-  // Phones and tablets: no play buttons and no live arena (the renderer is what broke on a real
-  // phone). One card says MARGIN plays on a laptop, the hero is a still of real gameplay.
-  const canPlay = laptopCapable();
-  if (!canPlay) {
-    const ctas = root.querySelector<HTMLElement>("[data-ctas]")!;
-    ctas.outerHTML = `<div data-laptop class="mt-5">${laptopCardHtml()}</div>`;
-    wireLaptopCard(root.querySelector<HTMLElement>("[data-laptop]")!);
-    root.querySelectorAll("[data-play-only]").forEach((e) => e.remove());
-    root.querySelector<HTMLElement>("[data-hero]")!.innerHTML = `<img src="/brand/hero-still.jpg" alt="A real MARGIN match: blobs, food and spikes on the paper grid" class="size-full object-cover" />`;
-    root.querySelector<HTMLElement>("[data-hero-caption]")!.textContent = "Real gameplay, on a laptop";
-    root.querySelector("[data-live]")?.remove(); // a still image is not live
-  }
+  let left = false;
+  let stop = (): void => {};
+  let stopSections = (): void => {};
+  void import("./home/sections").then((m) => {
+    if (!left) stopSections = m.mountSections(root);
+  });
+  root.querySelector("[data-proof-link]")!.addEventListener("click", (e) => {
+    e.preventDefault();
+    root.querySelector("[data-home-proof]")?.scrollIntoView({ behavior: "smooth" });
+  });
   void showStake(root);
-
-  // A private room is just a fresh code: the first one in creates it, the friend's link joins it.
-  // Proof strip: real counts from the server, a number that is still 0 is left out, never padded.
-  void fetch(`${ENDPOINT}/api/stats`)
-    .then((r) => (r.ok ? (r.json() as Promise<{ matches: number; players: number; agentPops: number }>) : null))
-    .then((s) => {
-      if (!s) return;
-      // Real counts only: a number that is still 0 is left out, never padded.
-      const cards = (
-        [
-          [s.matches, "match played", "matches played", "on the real rules", ""],
-          [s.players, "player", "players", "in the arena", ""],
-          [s.agentPops, "liquidation", "liquidations", "by AI agents", "text-liq"],
-        ] as const
-      ).filter(([n]) => n > 0);
-      const el = root.querySelector<HTMLElement>("[data-proof]");
-      if (!el || !cards.length) return;
-      el.innerHTML = cards
-        .map(
-          ([n, one, many, sub, cls]) =>
-            `<div class="pop flex items-center gap-4 rounded-2xl bg-card px-5 py-3.5"><span class="font-display text-5xl ${cls}">${n.toLocaleString()}</span><span class="text-base font-semibold leading-tight text-muted"><b class="block text-ink">${n === 1 ? one : many}</b>${sub}</span></div>`,
-        )
-        .join("");
-      el.classList.replace("hidden", "grid");
-    })
-    .catch(() => {});
-  // A phone has no name field, no friend button and no live arena to wire.
-  if (!canPlay) return;
+  const cleanup = (): void => {
+    left = true;
+    stop();
+    stopSections();
+  };
+  // Phones and tablets: no play box and no live arena (the renderer is what broke on a real
+  // phone). One card says MARGIN plays on a laptop, the window shows a still of real gameplay.
+  if (!laptopCapable()) {
+    const ctas = root.querySelector<HTMLElement>("[data-ctas]")!;
+    ctas.outerHTML = `<div data-laptop class="h-laptop">${laptopCardHtml()}</div>`;
+    wireLaptopCard(root.querySelector<HTMLElement>("[data-laptop]")!);
+    root.querySelector<HTMLElement>("[data-hero]")!.innerHTML = `<img src="/brand/hero-still.jpg" alt="A real MARGIN match: blobs, food and spikes on the grid" />`;
+    root.querySelector("[data-live]")?.remove(); // a still image is not live
+    root.querySelector(".h-keys")?.remove();
+    return cleanup;
+  }
   // Mini Militia style: the name is set here once and used in practice, public and private rooms.
   const name = root.querySelector<HTMLInputElement>("[data-name]")!;
   name.value = playerName() ?? "";
-  name.placeholder = signedInAccount() ?? "Player";
+  name.placeholder = signedInAccount() ?? "Your name";
   // Never blank a name silently: say why the rules changed or refused it (QA-B-09).
   const why = root.querySelector<HTMLElement>("[data-name-why]")!;
   name.addEventListener("change", () => {
@@ -115,23 +86,93 @@ export const landing: Screen = (root) => {
     const problem = name.value.trim() ? nameProblem(name.value) : null;
     name.value = setPlayerName(name.value) ?? "";
     why.textContent = problem ?? "";
-    why.classList.toggle("hidden", !problem);
+    why.hidden = !problem;
   });
+  // A private room is just a fresh code: the first one in creates it, the friend's link joins it.
   root.querySelector("[data-challenge]")!.addEventListener("click", () => navigate(`/r/${newRoomCode()}`));
-  // The live arena (pixi + the game engine) loads after first paint, so a phone can tap the
-  // buttons at once instead of waiting for the engine (QA-B-16).
+  const feed = feedOf(root.querySelector<HTMLElement>("[data-feed]")!);
+  // The live arena (pixi + the game engine) loads after first paint, so the buttons answer at once.
   const box = root.querySelector<HTMLElement>("[data-hero]")!;
-  let left = false;
-  let stop = (): void => {};
   const idle = (f: () => void): void => void ("requestIdleCallback" in window ? requestIdleCallback(f, { timeout: 1500 }) : setTimeout(f, 300));
   idle(() => {
     if (left) return;
     void import("./hero").then(({ mountHero }) => {
-      if (!left) stop = mountHero(box);
+      if (!left) stop = mountHero(box, feed.push);
     });
   });
   return () => {
-    left = true;
-    stop();
+    feed.stop();
+    cleanup();
   };
 };
+
+type Tone = "gold" | "safe" | "warn" | "liq" | "";
+const RANK: Record<Tone, number> = { liq: 3, warn: 2, safe: 2, "": 2, gold: 1 };
+const FEED_MS = 1200;
+// A pop is the loudest line: at most one every 8 s so the feed shows the whole game, not just deaths.
+const POP_GAP_MS = 8000;
+
+/** The live feed: real engine events, one new line per 1.2 s at most, the 3 newest on screen. */
+function feedOf(el: HTMLElement): { push: (e: GameEventMsg, blob: BlobLookup) => void; stop: () => void } {
+  let next: { text: string; tone: Tone } | null = null;
+  let lastPop = -POP_GAP_MS;
+  const show = (): void => {
+    if (!next) return;
+    const row = document.createElement("div");
+    row.className = next.tone;
+    const dot = document.createElement("b");
+    dot.textContent = "● ";
+    row.append(dot, next.text);
+    el.append(row);
+    while (el.children.length > 3) el.firstElementChild!.remove();
+    next = null;
+  };
+  const timer = setInterval(show, FEED_MS);
+  return {
+    push: (e, blob) => {
+      const line = feedLine(e, blob);
+      if (!line) return;
+      if (line.tone === "liq") {
+        if (performance.now() - lastPop < POP_GAP_MS) return;
+        lastPop = performance.now();
+      }
+      // Bots borrow almost every second, so a boost only takes an empty slot: any other event outranks it.
+      if (next && RANK[line.tone] < RANK[next.tone]) return;
+      if (line.text === el.lastElementChild?.textContent?.slice(2)) return;
+      next = line;
+    },
+    stop: () => clearInterval(timer),
+  };
+}
+
+const who = (b: BlobView | undefined): string => (b ? (b.kind === "agent" ? `${b.label} 🤖` : b.label) : "A blob");
+
+/** One feed line for a real engine event (null: not worth a line). */
+export function feedLine(e: GameEventMsg, blob: BlobLookup): { text: string; tone: Tone } | null {
+  switch (e.type) {
+    case "boost": {
+      const b = blob(e.blob);
+      // Leverage = mass / equity, and mass = owe + equity in display units.
+      const x = b && b.equity > 0 ? (b.owe + b.equity) / b.equity : 0;
+      return { text: x >= 1.1 ? `${who(b)} boosts to ${Math.min(2.5, x).toFixed(1)}x` : `${who(b)} borrows from the vault`, tone: "gold" };
+    }
+    case "repay": {
+      const b = blob(e.blob);
+      return { text: b && b.owe < 0.5 ? `${who(b)} paid off the loan` : `${who(b)} repays the vault`, tone: "safe" };
+    }
+    case "spikeHit":
+      return { text: `${who(blob(e.blob))} hit a spike. -${Math.round(e.damage)}`, tone: "warn" };
+    case "eat":
+      return { text: `${who(blob(e.by))} ate ${blob(e.victim)?.label ?? "a blob"}`, tone: "" };
+    case "pop":
+      return e.keeper || !e.by
+        ? { text: `The vault popped ${blob(e.victim)?.label ?? "a blob"}`, tone: "liq" }
+        : { text: `${who(blob(e.by))} popped ${blob(e.victim)?.label ?? "a blob"}. +8% bounty`, tone: "liq" };
+    case "cashoutStart":
+      return { text: `${who(blob(e.blob))} is cashing out`, tone: "safe" };
+    case "cashedOut":
+      return { text: `${who(blob(e.blob))} cashed out ${Math.round(e.amount)}`, tone: "safe" };
+    default:
+      return null;
+  }
+}
