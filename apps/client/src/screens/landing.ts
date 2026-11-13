@@ -22,6 +22,7 @@ export const landing: Screen = (root) => {
         <a href="/judges" class="h-judge">Judging? Start here</a>
       </div>
     </nav>
+    <main>
     <header class="h-top">
       <p class="h-eyebrow"><i></i>Live on NEAR testnet</p>
       <h1>Get greedy. <span>Get liquidated.</span></h1>
@@ -43,7 +44,9 @@ export const landing: Screen = (root) => {
       </div>
       <div class="h-stage"><video data-hero class="h-arena" muted loop playsinline autoplay preload="auto" poster="/home/hero-poster.jpg" aria-label="A player eats, borrows to grow with BOOST, then repays the loan"><source src="/home/hero-loop.mp4" type="video/mp4" /></video><div data-feed class="h-feed" aria-hidden="true"></div></div>
     </section>
-    <div data-home-story></div><div data-home-proof></div><div data-home-footer></div>
+    <div data-home-story></div><div data-home-proof></div>
+    </main>
+    <div data-home-footer></div>
   </div>`;
   let left = false;
   let stopSections = (): void => {};

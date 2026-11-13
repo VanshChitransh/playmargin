@@ -31,14 +31,14 @@ export const verify: Screen = (root, { id = "" }) => {
   root.innerHTML = `
   <div class="min-h-full bg-paper text-ink">
     ${header()}
-    <div class="mx-auto max-w-2xl px-4 pb-24 pt-10">
+    <main class="mx-auto max-w-2xl px-4 pb-24 pt-10">
       <span class="sticker inline-block rounded-field bg-warn px-3 py-1 text-sm font-bold">Do not trust us. Check.</span>
       <h1 class="mt-3 font-display text-6xl">Verify</h1>
       <p class="mt-2 text-muted">Match <span class="num font-bold">${esc(id)}</span>. Every check runs here in your browser, with the same code the server and the NEAR contract use.</p>
       <div data-v=body class="mt-6 space-y-4"><p class="tag">Loading the match log</p></div>
       <label class="${BTN.card} mt-8 cursor-pointer text-lg">
         Check a log file<input data-v=file type="file" accept="application/json,.json" class="hidden" /></label>
-    </div>
+    </main>
     ${footerSlot}
   </div>`;
   const stopFooter = mountSiteFooter(root);

@@ -183,7 +183,7 @@ export async function shareCertificate(d: CertData): Promise<void> {
   const b = (act: string, label: string, fill: string): string =>
     `<button data-act="${act}" class="sticker sticker-press h-12 rounded-box px-4 font-display text-lg text-ink" style="background:${fill}">${label}</button>`;
   const el = document.createElement("div");
-  el.className = "fixed inset-0 z-30 grid place-items-center overflow-y-auto bg-ink/80 p-4";
+  el.className = "fixed inset-0 z-30 grid place-items-center overflow-y-auto bg-ink p-4";
   el.innerHTML = `<div class="flex w-full max-w-sm flex-col gap-3">
       <img src="${src}" alt="Liquidation Certificate" class="sticker mx-auto max-h-[62vh] w-auto max-w-full rounded-box" />
       <div class="grid grid-cols-2 gap-3">${b("save", "Save image", "#fff")}${canShare ? b("share", "Share", "var(--color-cobalt);color:#fff") : b("copy", "Copy link", "#fff")}</div>

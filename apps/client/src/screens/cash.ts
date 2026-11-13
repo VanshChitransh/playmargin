@@ -31,13 +31,13 @@ export const cash: Screen = (root) => {
   root.innerHTML = `
   <div class="min-h-full bg-paper text-ink">
     ${header()}
-    <div class="mx-auto max-w-xl px-4 pb-24 pt-10">
+    <main class="mx-auto max-w-xl px-4 pb-24 pt-10">
       <span class="sticker inline-block rounded-field bg-gold px-3 py-1 text-sm font-bold">${NETWORK === "testnet" ? "Test money" : "Real money"}</span>
       <h1 class="mt-3 font-display text-6xl">Play for <span data-stake>$1</span></h1>
       <p class="mt-2 text-muted">Humans only. Winners split the pot by equity. ${NETWORK === "testnet" ? "<b>Test money for now, nothing real at stake.</b>" : ""}</p>
       <div data-c=body class="mt-6 space-y-4"></div>
       <div data-c=msg class="mt-4" role="status" aria-live="polite"></div>
-    </div>
+    </main>
     ${footerSlot}
   </div>`;
   const stopFooter = mountSiteFooter(root);
