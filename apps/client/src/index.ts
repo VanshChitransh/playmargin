@@ -9,6 +9,7 @@ import { unlockAudioOnGesture } from "./audio";
 // Eager: installs the data-track click listener on first import (S5 analytics, anonymous, opt-out aware).
 import { trackView } from "./analytics/track";
 import { laptopCapable } from "./device";
+import { markTeamFromUrl } from "./team";
 import type { Screen } from "./router";
 import { laptopOnly, mountPhoneBanner } from "./screens/laptop";
 
@@ -42,3 +43,5 @@ const routes: Record<string, Screen> = {
 if (isAuthCallback()) void runAuthCallback(app);
 // Private funnel numbers (S5), read only.
 else startRouter(app, { ...routes, "/stats": lazy(() => import("./screens/stats").then((m) => m.stats)) }, trackView);
+// After the router's first view, so the analytics id exists to send along.
+markTeamFromUrl();

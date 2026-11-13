@@ -24,6 +24,8 @@ export VITE_SERVER_URL="${VITE_SERVER_URL:-https://api.playmargin.fun}"
 export VITE_RELAYER_URL="${VITE_RELAYER_URL:-https://api.playmargin.fun/relay}"
 # Email login stays off until NEAR approves the Auth0 app (set VITE_NEAR_AUTH=1 and the client id then).
 export VITE_NEAR_AUTH="${VITE_NEAR_AUTH:-0}"
+# Second free-only game server (US East); free play picks the faster one, paid stays on the first.
+export VITE_US_SERVER_URL="${VITE_US_SERVER_URL:-https://us.api.playmargin.fun}"
 
 echo "building client: network=$NET contract=$CONTRACT server=$VITE_SERVER_URL relayer=$VITE_RELAYER_URL"
 npm run build -w apps/client

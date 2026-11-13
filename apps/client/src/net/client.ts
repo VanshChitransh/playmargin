@@ -2,6 +2,7 @@
 // patch into a plain Frame snapshot, and exposes my private "owe" and the event stream.
 // The server is the only authority: money, eats and pops are decided there. Only MY blob's
 // position is predicted from my own input (predict.ts), so steering answers this frame.
+import { HOME, freeRegion, roomRegion, serverFor, type Region } from "./region";
 import { seat, type SeatTarget } from "./seat";
 import { Client, type Room } from "@colyseus/sdk";
 import { R, TICK_MS, type BlobView, type GameEventMsg, type InputCmd, type JoinOpts, type MatchView, type Phase, type RateTier, type Ring } from "@margin/core";
@@ -64,7 +65,10 @@ export class MatchConnection {
   async join(opts: JoinOpts, judge = false): Promise<void> {
     // Server rooms: "judge" = the seeded Judge Run, "private" = filtered by roomCode, else "match".
     const name = judge ? "judge" : opts.roomCode ? "private" : "match";
-    this.wire(await new Client(ENDPOINT).joinOrCreate(name, opts), judge ? "judge" : (opts.roomCode ?? "play"));
+    // Paid always runs at home (the only box with a settler); a private room where its link says; free
+    // play on whichever server answered fastest.
+    this.server = opts.mode === "paid" ? HOME : opts.roomCode ? roomRegion() : await freeRegion();
+    this.wire(await new Client(this.server.url).joinOrCreate(name, opts), judge ? "judge" : (opts.roomCode ?? "play"));
   }
 
   /** Private room host: start the match now (the server ignores it from anyone else). */
@@ -81,7 +85,9 @@ export class MatchConnection {
     const token = seat.get(target);
     if (!token) return false;
     try {
-      this.wire(await new Client(ENDPOINT).reconnect(token), target);
+      // The seat token starts with its room id, and a US room id starts with "u-".
+      this.server = serverFor(token.split(":")[0]);
+      this.wire(await new Client(this.server.url).reconnect(token), target);
       return true;
     } catch {
       seat.clear(); // the match is over or the hold expired: join fresh
@@ -140,6 +146,9 @@ export class MatchConnection {
     this.room.onMessage("aborted", (m: { reason?: string }) => this.onAborted?.(m.reason ?? ""));
     this.room.onMessage("commander", (m: { rationale: string | null }) => this.onCommander?.(m.rationale));
   }
+
+  /** The server this seat is on (shown in the lobby, so the choice is honest). */
+  server: Region = HOME;
 
   /** The server uses the room id as the match id in the log and on chain. */
   get matchId(): string {
@@ -245,13 +254,4 @@ export class MatchConnection {
   }
 }
 
-/** Stable per-browser guest key; storage can be blocked (private mode), so fall back to memory. */
-export function guestKey(): string {
-  try {
-    const k = localStorage.getItem("margin.guest") ?? crypto.randomUUID();
-    localStorage.setItem("margin.guest", k);
-    return k;
-  } catch {
-    return crypto.randomUUID();
-  }
-}
+export { guestKey } from "./guest";
