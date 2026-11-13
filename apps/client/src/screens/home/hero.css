@@ -148,6 +148,14 @@
   background: transparent;
   color: var(--h-text);
 }
+/* Typing a name: the round pill shows focus, not a square outline cut inside it. */
+.h-play input:focus-visible {
+  outline: none;
+}
+.h-play:has(input:focus-visible) {
+  border-color: var(--h-blue);
+  box-shadow: 0 0 0 3px rgb(0 82 255 / 0.15), 0 10px 40px rgba(10, 11, 13, 0.08);
+}
 .h-play input::placeholder {
   color: #8a8f99;
 }
