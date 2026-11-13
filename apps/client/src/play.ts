@@ -301,6 +301,8 @@ export const play: Screen = (root, params) => {
     if (src instanceof LocalMatch) setLocalLog(await src.log());
     navigate(`/verify/${encodeURIComponent(src?.matchId ?? "")}`);
   };
+  const results = (o: ReturnType<Receipt["outcome"]>): HTMLElement =>
+    showResults(root, o, (a) => (a === "again" ? again() : a === "verify" ? void toVerify() : a === "share" ? void shareResult(o, src!.matchId, overlay) : home()), wasPaid);
   const finish = (): void => {
     if (ended || !lastFrame || !receipt) return;
     ended = true;
@@ -318,7 +320,7 @@ export const play: Screen = (root, params) => {
     void Promise.all([Promise.race([fromLog, wait]), beat]).then(([r]) => {
       if (left) return;
       if (r) mergeLog(o, r);
-      overlay = showResults(root, o, (a) => (a === "again" ? again() : a === "verify" ? void toVerify() : a === "share" ? void shareResult(o, src!.matchId, overlay) : home()), wasPaid);
+      overlay = results(o);
       // near.social post block (S2): a no-op on testnet or signed out, and until overlays has the slot.
       const slot = overlay.querySelector<HTMLElement>("[data-social]");
       if (slot && src) mountSocialShare(slot, { survived: o.kind !== "popped", rank: o.rank, of: o.of, kept: o.end.toFixed(2), verifyUrl: verifyUrl(src.matchId) });
@@ -440,7 +442,8 @@ export const play: Screen = (root, params) => {
           if (a === "again") return again();
           if (a === "share") return void shareCertificate({ ...death, matchId: s.matchId });
           overlay?.remove();
-          overlay = null;
+          // See receipt: the live estimate now; the bell (finish) swaps in the log-checked one.
+          overlay = a === "receipt" ? results(receipt!.outcome(lastFrame?.blobs ?? [])) : null;
         });
       }
       if (e.type === "matchEnd") finish();

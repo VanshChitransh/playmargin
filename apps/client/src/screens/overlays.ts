@@ -33,10 +33,10 @@ const BIG = "h-[72px] w-full !justify-between px-6 text-2xl";
 const icon = (d: string): string =>
   `<svg viewBox="0 0 24 24" class="h-7 w-7 shrink-0" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
 const chip = (act: string, text: string): string =>
-  `<button data-act="${act}" class="sticker-press rounded-field border border-grid bg-white px-4 py-2.5 font-sans text-base font-bold text-ink">${text}</button>`;
+  `<button data-act="${act}" class="sticker-press rounded-field border-[3px] border-ink bg-white px-4 py-2.5 font-sans text-base font-bold text-ink" style="box-shadow:3px 3px 0 var(--color-ink)">${text}</button>`;
 
 /** The pop moment. Returns the element so the caller can remove it when Watch is pressed. */
-export function showDeath(root: HTMLElement, d: NonNullable<Outcome["death"]>, act: (a: "watch" | "again" | "share") => void): HTMLElement {
+export function showDeath(root: HTMLElement, d: NonNullable<Outcome["death"]>, act: (a: "watch" | "again" | "share" | "receipt") => void): HTMLElement {
   const why = d.eaten ? `eaten by ${esc(d.by)}` : d.keeper ? "VAULT CLOSED YOUR LOAN" : `popped by ${esc(d.by)}`;
   // The unit sits outside the mono span: a mono space reads as a double space next to the number.
   const redS = Math.max(1, Math.round(d.redS));
@@ -57,6 +57,7 @@ export function showDeath(root: HTMLElement, d: NonNullable<Outcome["death"]>, a
         <p class="mt-4 text-lg font-semibold">${greed}</p>
         <p class="mt-1 text-sm text-muted">${d.eaten ? "A blob 15% bigger eats you on touch. Run, or grow first." : "Hold REPAY earlier, or run before you go red."}</p>
         <div class="mt-6 grid grid-cols-2 gap-4">${btn("again", "Play again", "var(--color-cobalt)")}${btn("watch", "Watch", CARD)}</div>
+        <div class="mt-4">${btn("receipt", "See receipt", CARD, "h-14 w-full px-4 text-lg")}</div>
         ${d.eaten ? "" : `<div class="mt-4">${btn("share", "Get your Liquidation Certificate", "var(--color-warn)", "h-14 w-full px-4 text-lg")}</div>`}
       </div>
     </div>`,
@@ -118,7 +119,7 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
           <span class="pb-1 font-display text-4xl">${dead ? `at ${alive}` : `/${o.of}`}<small class="tag block text-warn">${dead ? "no rank when popped" : "final rank"}</small></span>
         </div>
         <div class="mt-10 grid max-w-[360px] gap-4">
-          ${btn("again", `Play again${icon("M3 12a9 9 0 1 0 3-6.7M3 4v5h5")}`, "var(--color-cobalt)", BIG)}
+          ${btn("again", `Play again${icon("M3 12a9 9 0 1 0 3-6.7M3 4v5h5")}`, "var(--color-safe)", BIG)}
           ${btn("share", `${o.death && !o.death.eaten ? "Get your Certificate" : "Share"}${icon("M7 17 17 7M8 7h9v9")}`, CARD, BIG)}
         </div>
         <div class="mt-6 flex gap-3">${chip("verify", "Verify this match")}${chip("home", "Home")}</div>
@@ -126,9 +127,9 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
       </section>
       <section class="relative z-10 flex-1 px-4 py-8 sm:px-10 lg:py-12 lg:pl-6"><!-- above the cat: YOU KEEP is never hidden (QA-E-07) -->
         ${stats}
-        <div class="sticker relative mx-auto mt-10 max-w-xl px-5 pb-5 pt-6 sm:px-7" style="background:${CREAM}">
+        <div class="sticker relative mx-auto mt-10 max-w-xl px-5 pb-5 pt-6 sm:px-7 lg:rotate-[-1deg]" style="background:${CREAM}">
           ${tape("left:-22px;top:-8px;transform:rotate(-30deg)")}${tape("right:-22px;top:-8px;transform:rotate(30deg)")}
-          <h3 class="flex items-baseline justify-between border-b border-grid pb-3 font-display text-2xl">RECEIPT <span class="tag text-muted">where your ${o.start.toFixed(0)} went</span></h3>
+          <h3 class="flex items-baseline justify-between border-b-[3px] border-ink pb-3 font-display text-2xl">RECEIPT <span class="tag text-muted">where your ${o.start.toFixed(0)} went</span></h3>
           <div class="font-mono text-sm sm:text-base">${line("Start", money(Math.round(o.start * 100)))}${rows}</div>
           <div class="sticker mt-4 flex items-center justify-between bg-gold px-4 py-3" style="box-shadow:none">
             <span class="font-display text-2xl">YOU KEEP</span>
@@ -137,9 +138,9 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
           <p class="mt-3 text-sm font-semibold text-muted">${paid ? "Real dollars, paid to your balance when the match settles." : "Practice credits. Never cash, never bought."}</p>
         </div>
       </section>
-      <img src="/brand/margin-cat-cutout.svg" alt="" aria-hidden="true" class="pointer-events-none fixed bottom-6 right-10 z-0 hidden w-36 lg:block" />
+      <img src="/brand/margin-cat-cutout.svg" alt="" aria-hidden="true" class="pointer-events-none fixed bottom-6 right-10 z-0 hidden w-36 rotate-[8deg] lg:block" />
     </div>`,
-    "backdrop-blur-sm",
+    "backdrop-blur-sm arcade",
   );
   wire(el, act);
   if (paid) void showStake(el);
