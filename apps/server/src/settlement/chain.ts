@@ -30,14 +30,18 @@ const TRIES = 4;
 export class Chain {
   private readonly clients: Near[];
 
-  constructor(readonly cfg: ChainConfig) {
+  /** backoffMs: first wait between RPC attempts, doubling each time (tests pass 0, no network waits). */
+  constructor(
+    readonly cfg: ChainConfig,
+    private readonly backoffMs = 1000,
+  ) {
     this.clients = cfg.rpcUrls.map(
       (rpcUrl) =>
         new Near({
           network: { rpcUrl, networkId: cfg.network },
           privateKey: cfg.privateKey as PrivateKey,
           defaultSignerId: cfg.settlerId,
-          retryConfig: { maxRetries: 1 },
+          retryConfig: { maxRetries: 1, initialDelayMs: backoffMs },
         }),
     );
   }
@@ -51,7 +55,7 @@ export class Chain {
       } catch (err) {
         if (err instanceof FunctionCallError) throw err;
         last = err;
-        await sleep(1000 * 2 ** i);
+        if (i < TRIES - 1) await sleep(this.backoffMs * 2 ** i); // no wait after the last try: just throw
       }
     }
     throw last;

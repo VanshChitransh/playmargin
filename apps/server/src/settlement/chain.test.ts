@@ -36,7 +36,8 @@ afterAll(() => rpc.close());
 
 const DEAD = "http://127.0.0.1:1"; // nothing listens: connection refused
 const chain = (rpcUrls: string[]) =>
-  new Chain({ network: "testnet", contractId: "margin.testnet", settlerId: "settler.testnet", privateKey: settler.secretKey, rpcUrls });
+  // Backoff 0: the test checks the fallback behaviour, not the waits, so it is fast on any machine.
+  new Chain({ network: "testnet", contractId: "margin.testnet", settlerId: "settler.testnet", privateKey: settler.secretKey, rpcUrls }, 0);
 
 describe("Chain.accessKey with a dead first RPC", () => {
   it("finds a real key through the fallback (was null before the fix)", async () => {
@@ -50,7 +51,7 @@ describe("Chain.accessKey with a dead first RPC", () => {
   });
   it("throws when every RPC is unreachable, never a false 'unknown key'", async () => {
     await expect(chain([DEAD]).accessKey("p.testnet", known)).rejects.toThrow();
-  }, 20_000);
+  });
 });
 
 describe("chainConfigFromEnv RPC order (QA-D-02)", () => {
