@@ -120,4 +120,18 @@ describe("receiptFromLog", () => {
     expect(dead.rank).toBeNull();
     expect(receiptFromLog(entries, "s1")!.rank).toBe(1);
   });
+  it("ranks by what each player keeps after the bell share, not the pre-share order (QA Q04)", () => {
+    const entries = [
+      { type: "JOIN", tick: 0, data: { player: { id: "a", label: "A", kind: "human", accountId: null } } },
+      { type: "JOIN", tick: 0, data: { player: { id: "b", label: "B", kind: "human", accountId: null } } },
+      { type: "CHARGE", tick: 1, data: { blob: "a", entry: M(80) } },
+      { type: "CHARGE", tick: 1, data: { blob: "b", entry: M(80) } },
+      { type: "CASHOUT", tick: 4500, data: { blob: "a", amount: M(38.37) } },
+      { type: "CASHOUT", tick: 5400, data: { blob: "b", amount: M(30) } },
+      { type: "CASHOUT", tick: 5400, data: { blob: "b", amount: M(18.03) } },
+      { type: "MATCH_END", tick: 5400, data: { tick: 5400, finalMasses: { a: M(38.37), b: M(48.03) }, dust: 0, toVault: 0, ranking: ["a", "b"] } },
+    ].map((e, seq) => ({ ...e, seq, prevHash: "", hash: "" }) as LogEntry);
+    expect(receiptFromLog(entries, "b")!.rank).toBe(1);
+    expect(receiptFromLog(entries, "a")!.rank).toBe(2);
+  });
 });

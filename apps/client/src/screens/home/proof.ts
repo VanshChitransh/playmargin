@@ -20,7 +20,7 @@ const EVENTS: PendingLog[] = [
   { tick: 1500, type: "REPAY", data: { blob: "nina", amount: 40 * U } },
   { tick: 2700, type: "CASHOUT", data: { blob: "nina", amount: 131_590_000 } },
 ];
-const NAME: Record<string, string> = { nina: "Nitro Nina", ape: "Ape Strong" };
+const NAME: Record<string, string> = { nina: "🤖 Nitro Nina", ape: "🤖 Ape Strong" }; // bots, so they wear 🤖 like everywhere else
 const TAMPER_SEQ = 5;
 
 /** One readable line per entry: what happened and the amount it moved. */
@@ -56,7 +56,7 @@ const html = `<section class="trust" id="proof" aria-label="Proof"><div class="w
         <div class="rows" data-rows></div>
         <div class="lf"><div class="lstat" data-status role="status"><i></i>Checking the chain</div><button class="tamper" data-tamper>Fake a payout</button></div>
       </div>
-      <p class="note" data-note>Play the cheater: the button quietly raises Nitro Nina's bounty from 8 to 80 after the match. The same check our Verify page runs will catch it.</p>
+      <p class="note" data-note>Play the cheater: the button quietly raises 🤖 Nitro Nina's bounty from 8 to 80 after the match. The same check our Verify page runs will catch it.</p>
     </div>
   </div>
 </div></section>`;

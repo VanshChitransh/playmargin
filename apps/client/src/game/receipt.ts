@@ -298,7 +298,10 @@ export function receiptFromLog(log: readonly LogEntry[], me: string): LogReceipt
   // A CASHOUT before the bell tick is a channelled cash-out; at the bell every survivor gets one.
   const kind: Outcome["kind"] = fate ? "popped" : outAt !== null && outAt < endTick ? "cashed" : "survived";
   const aliveS = Math.round(((outAt ?? endTick) - chargedAt) / R.TICK_HZ);
-  const ranking = (log.at(-1) as Extract<LogEntry, { type: "MATCH_END" }>).data.ranking;
+  // Final rank is by what each player keeps (payout after the bell share), the order the bell
+  // leaderboard shows. MATCH_END.ranking is taken before the share, so it can disagree (QA Q04).
+  const end = (log.at(-1) as Extract<LogEntry, { type: "MATCH_END" }>).data;
+  const ranking = [...end.ranking].sort((x, y) => (end.finalMasses[y] ?? 0) - (end.finalMasses[x] ?? 0)); // stable: ties keep the bell order
   const at = ranking.indexOf(me);
   return { start, end: paid, lines, kind, fate, aliveS, blobsEaten, rank: kind === "popped" || at < 0 ? null : at + 1 };
 }
@@ -315,7 +318,11 @@ export function mergeLog(o: Outcome, r: LogReceipt): Outcome {
   o.kind = r.kind;
   o.death = r.fate ? { leverage: 0, redS: 0, peakLeverage: 1, warnAtS: null, ...o.death, ...r.fate } : undefined;
   o.stats = { ...o.stats, aliveS: r.aliveS, blobsEaten: r.blobsEaten };
-  if (r.rank !== null) o.rank = r.rank;
+  if (r.rank !== null) {
+    o.rank = r.rank;
+    // The best rank held can never be worse than the final one.
+    o.stats.topRank = Math.min(o.stats.topRank || r.rank, r.rank);
+  }
   return o;
 }
 
