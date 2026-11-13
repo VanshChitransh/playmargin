@@ -22,7 +22,7 @@ const app = document.getElementById("app")!;
 // The game, chain and verify code load on first visit; the home page stays light (QA-B-16).
 // MARGIN plays on a laptop: on a phone or tablet only the game itself (practice, $1, Judge Run, a
 // room link) shows the "plays on a laptop" card, and its code never downloads there. Every other page
-// is readable, under a slim banner (Q18).
+// is readable, under a slim banner (Q18). Watch is gated too: it runs the renderer that blacked out a real phone.
 const laptop = (s: Screen): Screen => (root, p) => (laptopCapable() ? s(root, p) : laptopOnly(root, p));
 if (!laptopCapable()) mountPhoneBanner();
 const play = lazy(() => import("./play").then((m) => m.play));
@@ -32,7 +32,7 @@ const routes: Record<string, Screen> = {
   "/how": how,
   "/play": laptop(play),
   "/cash": laptop(lazy(() => import("./screens/cash").then((m) => m.cash))),
-  "/watch": lazy(() => import("./screens/watch").then((m) => m.watch)),
+  "/watch": laptop(lazy(() => import("./screens/watch").then((m) => m.watch))),
   "/judge": laptop(judge),
   "/verify/:id": lazy(() => import("./screens/verify").then((m) => m.verify)),
   "/judges": lazy(() => import("./screens/judges").then((m) => m.judges)),
