@@ -183,6 +183,9 @@ A second game server so players in the Americas are not 200+ ms from Mumbai. Mon
 | NEAR anchor | hourly Merkle root | none: the contract keeps ONE free-match anchor slot whose seq (the hour) must increase, so a second box anchoring the same hour is refused. Verify shows hash chain + books for `u-` matches |
 | DB | `/var/lib/margin/margin.sqlite` | its own, same path |
 
+After EVERY deploy (either box), run `./ops/smoke-browser.sh`: a real Chrome joins Play free and a
+private room on both boxes from playmargin.fun. curl cannot see CORS breaks (the 13 Nov P0).
+
 Same release and the same files: `DEPLOY_HOST=ubuntu@54.146.83.204 ./ops/deploy.sh`, `ops/Caddyfile` with
 `MARGIN_HOST=us.api.playmargin.fun` in `/etc/caddy/cf.env` (the cert is DNS-01 like Mumbai). DNS: `us.api` A
 record, DNS only. The client (`apps/client`, region picker) pings both `/health` and joins the faster for free
