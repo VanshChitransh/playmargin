@@ -106,6 +106,7 @@
 .home .row .h{font:500 12px 'Geist Mono';color:var(--inkmuted)}
 .home .row .ok{width:18px;height:18px;border-radius:50%;background:rgba(22,196,107,.16);color:var(--safe);font-size:11px;display:grid;place-items:center}
 .home .row.bad{background:rgba(224,36,63,.12)}
+.home .row s{margin-right:6px;color:#8a8f99}
 .home .row.bad .amt{color:#FF6B81}
 .home .row.bad .ok,.home .row.after .ok{background:rgba(224,36,63,.18);color:#FF6B81}
 .home .row.after{opacity:.55}

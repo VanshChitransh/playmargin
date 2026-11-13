@@ -1,6 +1,8 @@
 // Footer inside the dark proof block: the judges' desk line, links, and the giant MARGIN wordmark
 // drawn as a dot grid that little blobs roam and eat (eaten dots regrow, so the word always reads,
 // a blob 1.15x wider pops a smaller one). The loop only runs while the wordmark is on screen.
+import { VERIFY_EXAMPLE } from "./proof";
+
 const REPO = "https://github.com/VanshChitransh/playmargin";
 const COLORS = ["#0052FF", "#9B51E0", "#F2994A", "#EB5DA4", "#16C46B"];
 const FULL = "#F4F5F7";
@@ -18,7 +20,7 @@ const html = `<footer class="foot">
   <p class="ask">Judging MARGIN? Start with the <a href="/judges">judges' desk</a>.</p>
   <div class="fmid">
     <span class="flogo"><img src="/brand/margin-cat-cutout.svg" alt="" /></span>
-    <nav class="flinks" aria-label="Footer"><a href="/how">How it works</a><a href="/judges">Verify a match</a><a href="/judge">Judge Run</a><a href="${REPO}" target="_blank" rel="noopener">GitHub</a><a href="https://x.com/playmargin" target="_blank" rel="noopener">@playmargin</a></nav>
+    <nav class="flinks" aria-label="Footer"><a href="/how">How it works</a><a href="${VERIFY_EXAMPLE}">Verify a match</a><a href="/judge">Judge Run</a><a href="${REPO}" target="_blank" rel="noopener">GitHub</a><a href="https://x.com/playmargin" target="_blank" rel="noopener">@playmargin</a></nav>
     <p class="copy">Built on NEAR for the NEAR Hackathon 2026. Open source, MIT.</p>
   </div>
   <canvas class="word" aria-hidden="true"></canvas><p class="word-text" aria-hidden="true">MARGIN</p>

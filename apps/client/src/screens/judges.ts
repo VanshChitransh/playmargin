@@ -180,7 +180,7 @@ export const judges: Screen = (root) => {
   let gone = false;
   const run = (): void => {
     list.innerHTML = claims
-      .map((c, i) => `<li class="pop rounded-2xl bg-card p-4 sm:p-5">
+      .map((c, i) => `<li id="claim-${i + 1}" class="pop scroll-mt-6 rounded-2xl bg-card p-4 sm:p-5">
         <div class="flex items-start justify-between gap-3"><h2 class="font-display text-xl sm:text-2xl">${i + 1}. ${c.title}</h2><span data-j=badge-${i} class="shrink-0">${BADGE.run}</span></div>
         <p class="mt-1 text-sm text-muted">${c.how}</p>
         <p data-j=detail-${i} class="mt-3 font-semibold">Checking...</p>
@@ -198,5 +198,10 @@ export const judges: Screen = (root) => {
   };
   root.querySelector("[data-j=again]")!.addEventListener("click", run);
   run();
+  // Links land on one card (/judges#claim-4 from the home proof rows), else at the top: the
+  // router keeps the scroll of the page you came from.
+  const target = location.hash ? document.getElementById(location.hash.slice(1)) : null;
+  if (target) target.scrollIntoView({ block: "start" });
+  else window.scrollTo(0, 0);
   return () => void (gone = true);
 };
