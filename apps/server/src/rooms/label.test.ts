@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LABEL_MAX, displayLabel } from "./label";
+import { withLabels } from "./MatchRoom";
 
 describe("displayLabel", () => {
   it("keeps short names and trims spaces", () => {
@@ -27,5 +28,13 @@ describe("uniqueLabel", () => {
     const long = uniqueLabel("playingmargin.testnet", ["playingmargin.…"]);
     expect(long).toBe("playingmargin 2");
     expect([...long].length).toBeLessThanOrEqual(LABEL_MAX);
+  });
+});
+
+describe("withLabels (F14)", () => {
+  it("shows names, not raw ids, longest id first, in one pass", () => {
+    const blobs = new Map([["agent-1", { label: "Agent-1" }], ["agent-10", { label: "Agent-10" }], ["Xy_9a", { label: "agent-1 fan" }]]);
+    expect(withLabels("agent-10 chases Xy_9a while agent-1 waits", { blobs })).toBe("Agent-10 chases agent-1 fan while Agent-1 waits");
+    expect(withLabels(null, { blobs })).toBeNull();
   });
 });

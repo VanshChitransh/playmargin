@@ -1,6 +1,6 @@
 // Colyseus entry. The monitor is mounted only when MONITOR_PASS is set, so a
 // fresh deploy never ships the boilerplate's admin/admin login.
-import { defineServer, defineRoom, monitor } from "colyseus";
+import { defineServer, defineRoom, matchMaker, monitor } from "colyseus";
 import { listen } from "@colyseus/tools";
 import basicAuth from "express-basic-auth";
 
@@ -33,6 +33,15 @@ const server = defineServer({
     }
   },
 });
+
+// B09: Colyseus reflects ANY origin with credentials. We use no cookies: allow only our site, its
+// Pages previews and a local dev client, and never send credentials.
+const ORIGIN_OK = /^(https:\/\/(www\.)?playmargin\.fun|https:\/\/([a-z0-9-]+\.)?playmargin\.pages\.dev|http:\/\/(localhost|127\.0\.0\.1)(:\d+)?)$/;
+delete (matchMaker.controller.DEFAULT_CORS_HEADERS as Record<string, string>)["Access-Control-Allow-Credentials"];
+matchMaker.controller.getCorsHeaders = (headers: Headers) => {
+  const origin = headers.get("origin") ?? "";
+  return { "Access-Control-Allow-Origin": ORIGIN_OK.test(origin) ? origin : "https://playmargin.fun", Vary: "Origin" };
+};
 
 // SIGTERM: Colyseus locks every room and waits for them to close; drain also blocks new rooms.
 server.onBeforeShutdown(() => {

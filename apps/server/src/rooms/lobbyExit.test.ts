@@ -37,7 +37,7 @@ const until = async (ok: () => boolean, ms = 8000) => {
   for (const t0 = Date.now(); !ok() && Date.now() - t0 < ms; ) await sleep(50);
   return ok();
 };
-const paid = (accountId: string) => ({ mode: "paid", join: { accountId } });
+const paid = (accountId: string) => ({ mode: "paid", join: { accountId, signature: "mocked: admitPaid is stubbed" } });
 
 beforeAll(async () => void (await server.listen(PORT)));
 // Not awaited: a graceful stop waits out the B01 room's whole LIVE match, and the worker ends anyway.
@@ -89,4 +89,22 @@ describe("leaving before GO is free", () => {
     expect(bal("host")).toBe(bal("stay"));
     for (const r of [host, a]) await r.leave(true);
   }, 15_000);
+});
+
+describe("one open seat per guest (F04, B02)", () => {
+  it("a second tab is refused in any room while the first is open, and allowed once it closes", async () => {
+    const key = "lobbyexit-twotabs-0123456789";
+    const first = await new Client(url).joinOrCreate("private", { mode: "free", roomCode: "TABA", guestKey: key });
+    first.onMessage("*", () => {});
+    await expect(new Client(url).joinOrCreate("private", { mode: "free", roomCode: "TABB", guestKey: key })).rejects.toThrow(/another tab/);
+    await first.leave(true);
+    await sleep(200);
+    const again = await new Client(url).joinOrCreate("private", { mode: "free", roomCode: "TABB", guestKey: key });
+    again.onMessage("*", () => {});
+    await again.leave(true);
+  });
+
+  it("B03: an unsigned paid matchmake call opens no room", async () => {
+    await expect(new Client(url).joinOrCreate("match", { mode: "paid" })).rejects.toThrow(/must be signed/);
+  });
 });
