@@ -3,7 +3,6 @@
 import "./home/hero.css";
 import type { Screen } from "../router";
 import { showStake } from "../stake";
-import { laptopCapable } from "../device";
 import { header } from "./chrome";
 
 export const how: Screen = (root) => {
@@ -15,9 +14,7 @@ export const how: Screen = (root) => {
     <section class="h-top" style="padding:24px 24px 120px">
       <h2 style="font:800 clamp(40px,6vw,64px)/1 Geist,sans-serif;letter-spacing:-0.05em">Your turn.</h2>
       <p class="h-sub">One match is 90 seconds. No wallet, no sign-up.</p>
-      ${laptopCapable()
-        ? `<div class="h-play" style="width:auto;display:inline-flex"><a href="/cash" class="h-inv" style="white-space:nowrap">Play for <span data-stake>$1</span></a><a href="/play" data-track="practice_click" class="h-go">Play free</a></div>`
-        : `<p class="h-micro">MARGIN plays on a laptop: mouse and keyboard.</p>`}
+      <div class="h-play" style="width:auto;display:inline-flex"><a href="/cash" class="h-inv" style="white-space:nowrap">Play for <span data-stake>$1</span></a><a href="/play" data-track="practice_click" class="h-go">Play free</a></div>
     </section>
     <div data-home-footer></div>
   </div>`;

@@ -4,8 +4,6 @@
 import "./home/hero.css";
 import type { Screen } from "../router";
 import { navigate } from "../router";
-import { laptopCapable } from "../device";
-import { laptopCardHtml, wireLaptopCard } from "./laptop";
 import { newRoomCode } from "../net/room-code";
 import { showStake } from "../stake";
 import { nameProblem } from "@margin/core";
@@ -69,15 +67,6 @@ export const landing: Screen = (root) => {
     video.pause();
   }
   feedOnVideo(video, root.querySelector<HTMLElement>("[data-feed]")!);
-  // Phones and tablets: no play box (one card says MARGIN plays on a laptop). The footage is a
-  // plain video, so it plays there too.
-  if (!laptopCapable()) {
-    const ctas = root.querySelector<HTMLElement>("[data-ctas]")!;
-    ctas.outerHTML = `<div data-laptop class="h-laptop">${laptopCardHtml()}</div>`;
-    wireLaptopCard(root.querySelector<HTMLElement>("[data-laptop]")!);
-    root.querySelector(".h-keys")?.remove();
-    return cleanup;
-  }
   // Mini Militia style: the name is set here once and used in practice, public and private rooms.
   const name = root.querySelector<HTMLInputElement>("[data-name]")!;
   name.value = playerName() ?? "";

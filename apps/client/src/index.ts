@@ -20,23 +20,24 @@ void globalThis.caches?.keys().then((keys) => keys.filter((k) => /^(workbox|marg
 
 const app = document.getElementById("app")!;
 // The game, chain and verify code load on first visit; the home page stays light (QA-B-16).
-// Phones and tablets get the "plays on a laptop" card on game routes; how and verify stay open.
+// MARGIN is laptop only: a phone or tablet gets the "plays on a laptop" page on every route, and a
+// lazy route never downloads its code there. Only the private /stats stays open (read on a phone).
 const laptop = (s: Screen): Screen => (root, p) => (laptopCapable() ? s(root, p) : laptopOnly(root, p));
-const play = laptop(lazy(() => import("./play").then((m) => m.play)));
-const judge = laptop(lazy(() => import("./play").then((m) => (root, p) => m.play(root, { ...p, judge: "1" }))));
-if (isAuthCallback()) void runAuthCallback(app);
-else startRouter(app, {
+const play = lazy(() => import("./play").then((m) => m.play));
+const judge = lazy(() => import("./play").then((m) => (root, p) => m.play(root, { ...p, judge: "1" })));
+const routes: Record<string, Screen> = {
   "/": landing,
   "/how": how,
   "/play": play,
-  "/cash": laptop(lazy(() => import("./screens/cash").then((m) => m.cash))),
-  "/watch": laptop(lazy(() => import("./screens/watch").then((m) => m.watch))),
+  "/cash": lazy(() => import("./screens/cash").then((m) => m.cash)),
+  "/watch": lazy(() => import("./screens/watch").then((m) => m.watch)),
   "/judge": judge,
   "/verify/:id": lazy(() => import("./screens/verify").then((m) => m.verify)),
-  // Read only, so phones may open it too (like verify).
   "/judges": lazy(() => import("./screens/judges").then((m) => m.judges)),
   "/r/:code": play,
-  // Private funnel numbers (S5), read only, no laptop guard.
-  "/stats": lazy(() => import("./screens/stats").then((m) => m.stats)),
   "*": notFound,
-}, trackView);
+};
+const gated = Object.fromEntries(Object.entries(routes).map(([path, s]) => [path, laptop(s)]));
+if (isAuthCallback()) void runAuthCallback(app);
+// Private funnel numbers (S5), read only, no laptop guard.
+else startRouter(app, { ...gated, "/stats": lazy(() => import("./screens/stats").then((m) => m.stats)) }, trackView);

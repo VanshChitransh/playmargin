@@ -188,11 +188,6 @@
   font-size: 14px;
   color: var(--h-muted);
 }
-.h-laptop {
-  margin: 28px auto 0;
-  max-width: 560px;
-  text-align: left;
-}
 
 /* The arena: a framed window (Linear style product shot), the top bar holds the label and keys. */
 .h-window {
