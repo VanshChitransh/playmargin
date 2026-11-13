@@ -475,7 +475,7 @@ export class Hud {
     const c = this.q("cmd");
     // The clamp sits on an inner span: clamped on the padded box, half a 4th line peeked out below.
     const t = c.querySelector("span") ?? c.appendChild(document.createElement("span"));
-    t.textContent = text ? `Commander: ${text}` : "";
+    t.textContent = text ? `🤖 Commander: ${text}` : "";
     c.classList.toggle("hidden", !text);
     c.style.display = text ? "" : "none"; // belt and braces: no display rule can beat this
   }

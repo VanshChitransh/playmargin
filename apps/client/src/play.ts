@@ -436,7 +436,8 @@ export const play: Screen = (root, params) => {
         refusedCard(root, "Lost the connection to the match server.");
       }, 1000);
     }
-    s.onCommander = (r) => hud.commander(r);
+    // The AI commander only plans for agents: in a room with none (two friends) it stays silent (Q03).
+    s.onCommander = (r) => hud.commander(lastFrame?.blobs.some((b) => b.kind !== "human") ? r : null);
     s.onAborted = (reason) => {
       ended = true;
       overlay?.remove();
