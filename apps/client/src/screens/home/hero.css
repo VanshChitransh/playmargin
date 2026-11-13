@@ -257,51 +257,6 @@
   height: 100%;
   object-fit: cover;
 }
-.h-feed {
-  position: absolute;
-  left: 16px;
-  bottom: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  pointer-events: none;
-}
-.h-feed div {
-  background: #fff;
-  border: 1px solid var(--h-line);
-  border-radius: 999px;
-  padding: 6px 14px;
-  font-size: 14px;
-  font-weight: 600;
-  box-shadow: 0 4px 16px rgba(10, 11, 13, 0.08);
-  width: max-content;
-  transform-origin: left center;
-  transition: transform 0.3s, color 0.3s;
-  animation: h-in 0.35s;
-}
-.h-feed div:nth-last-child(2) {
-  color: var(--h-muted);
-  transform: scale(0.96);
-}
-.h-feed div:nth-last-child(3) {
-  color: #9aa0ac;
-  transform: scale(0.92);
-}
-.h-feed div b {
-  color: #9aa0ac;
-}
-.h-feed .liq b {
-  color: var(--h-liq);
-}
-.h-feed .gold b {
-  color: var(--h-gold);
-}
-.h-feed .safe b {
-  color: var(--h-safe);
-}
-.h-feed .warn b {
-  color: #c98f12;
-}
 @keyframes h-blink {
   50% {
     opacity: 0.3;

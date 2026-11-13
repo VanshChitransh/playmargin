@@ -1,8 +1,7 @@
 // playmargin.fun home (research/margin/ui/drafts/d5-geist.html, Vansh's pick on 13 Nov). One centred
-// headline and a pill play box, then the real engine running bots in a framed window, with a feed of
-// its real events. The story, proof and footer sections mount from ./home/sections.
+// headline and a pill play box, then a framed window looping real gameplay: footage of the engine
+// (bots on the real rules) cut to the best moments. The story, proof and footer mount from ./home/sections.
 import "./home/hero.css";
-import type { BlobView, GameEventMsg } from "@margin/core";
 import type { Screen } from "../router";
 import { navigate } from "../router";
 import { laptopCapable } from "../device";
@@ -11,7 +10,6 @@ import { newRoomCode } from "../net/room-code";
 import { showStake } from "../stake";
 import { nameProblem } from "@margin/core";
 import { playerName, setPlayerName, signedInAccount } from "../player/name";
-import type { BlobLookup } from "./hero";
 
 export const landing: Screen = (root) => {
   root.innerHTML = `
@@ -39,17 +37,16 @@ export const landing: Screen = (root) => {
         <p class="h-micro">No wallet. No sign-up. 90 seconds.</p>
       </div>
     </header>
-    <section class="h-window" aria-label="Live match: bots playing on the real rules">
+    <section class="h-window" aria-label="Real MARGIN gameplay">
       <div class="h-bar">
-        <p class="h-label"><i data-live></i>Bots match in your browser · 🤖 same rules as yours</p>
+        <p class="h-label"><i data-live></i>Real gameplay · 🤖 bots on the real rules</p>
         <p class="h-keys"><span><kbd>Space</kbd>boost</span><span><kbd>R</kbd>repay</span><span><kbd>E</kbd>cash out</span></p>
       </div>
-      <div class="h-stage"><div data-hero class="h-arena"></div><div data-feed class="h-feed" aria-live="off"></div></div>
+      <div class="h-stage"><video data-hero class="h-arena" muted loop playsinline autoplay preload="auto" poster="/home/hero-poster.jpg" aria-label="Bots borrow to grow, go red and get popped"><source src="/home/hero-loop.webm" type="video/webm" /><source src="/home/hero-loop.mp4" type="video/mp4" /></video></div>
     </section>
     <div data-home-story></div><div data-home-proof></div><div data-home-footer></div>
   </div>`;
   let left = false;
-  let stop = (): void => {};
   let stopSections = (): void => {};
   void import("./home/sections").then((m) => {
     if (!left) stopSections = m.mountSections(root);
@@ -61,17 +58,20 @@ export const landing: Screen = (root) => {
   void showStake(root);
   const cleanup = (): void => {
     left = true;
-    stop();
     stopSections();
   };
-  // Phones and tablets: no play box and no live arena (the renderer is what broke on a real
-  // phone). One card says MARGIN plays on a laptop, the window shows a still of real gameplay.
+  // Reduced motion: the poster frame instead of a moving loop.
+  const video = root.querySelector<HTMLVideoElement>("[data-hero]")!;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    video.removeAttribute("autoplay");
+    video.pause();
+  }
+  // Phones and tablets: no play box (one card says MARGIN plays on a laptop). The footage is a
+  // plain video, so it plays there too.
   if (!laptopCapable()) {
     const ctas = root.querySelector<HTMLElement>("[data-ctas]")!;
     ctas.outerHTML = `<div data-laptop class="h-laptop">${laptopCardHtml()}</div>`;
     wireLaptopCard(root.querySelector<HTMLElement>("[data-laptop]")!);
-    root.querySelector<HTMLElement>("[data-hero]")!.innerHTML = `<img src="/brand/hero-still.jpg" alt="A real MARGIN match: blobs, food and spikes on the grid" />`;
-    root.querySelector("[data-live]")?.remove(); // a still image is not live
     root.querySelector(".h-keys")?.remove();
     return cleanup;
   }
@@ -90,89 +90,5 @@ export const landing: Screen = (root) => {
   });
   // A private room is just a fresh code: the first one in creates it, the friend's link joins it.
   root.querySelector("[data-challenge]")!.addEventListener("click", () => navigate(`/r/${newRoomCode()}`));
-  const feed = feedOf(root.querySelector<HTMLElement>("[data-feed]")!);
-  // The live arena (pixi + the game engine) loads after first paint, so the buttons answer at once.
-  const box = root.querySelector<HTMLElement>("[data-hero]")!;
-  const idle = (f: () => void): void => void ("requestIdleCallback" in window ? requestIdleCallback(f, { timeout: 1500 }) : setTimeout(f, 300));
-  idle(() => {
-    if (left) return;
-    void import("./hero").then(({ mountHero }) => {
-      if (!left) stop = mountHero(box, feed.push);
-    });
-  });
-  return () => {
-    feed.stop();
-    cleanup();
-  };
+  return cleanup;
 };
-
-type Tone = "gold" | "safe" | "warn" | "liq" | "";
-const RANK: Record<Tone, number> = { liq: 3, warn: 2, safe: 2, "": 2, gold: 1 };
-const FEED_MS = 1200;
-// A pop is the loudest line: at most one every 8 s so the feed shows the whole game, not just deaths.
-const POP_GAP_MS = 8000;
-
-/** The live feed: real engine events, one new line per 1.2 s at most, the 3 newest on screen. */
-function feedOf(el: HTMLElement): { push: (e: GameEventMsg, blob: BlobLookup) => void; stop: () => void } {
-  let next: { text: string; tone: Tone } | null = null;
-  let lastPop = -POP_GAP_MS;
-  const show = (): void => {
-    if (!next) return;
-    const row = document.createElement("div");
-    row.className = next.tone;
-    const dot = document.createElement("b");
-    dot.textContent = "● ";
-    row.append(dot, next.text);
-    el.append(row);
-    while (el.children.length > 3) el.firstElementChild!.remove();
-    next = null;
-  };
-  const timer = setInterval(show, FEED_MS);
-  return {
-    push: (e, blob) => {
-      const line = feedLine(e, blob);
-      if (!line) return;
-      if (line.tone === "liq") {
-        if (performance.now() - lastPop < POP_GAP_MS) return;
-        lastPop = performance.now();
-      }
-      // Bots borrow almost every second, so a boost only takes an empty slot: any other event outranks it.
-      if (next && RANK[line.tone] < RANK[next.tone]) return;
-      if (line.text === el.lastElementChild?.textContent?.slice(2)) return;
-      next = line;
-    },
-    stop: () => clearInterval(timer),
-  };
-}
-
-const who = (b: BlobView | undefined): string => (b ? (b.kind === "agent" ? `${b.label} 🤖` : b.label) : "A blob");
-
-/** One feed line for a real engine event (null: not worth a line). */
-export function feedLine(e: GameEventMsg, blob: BlobLookup): { text: string; tone: Tone } | null {
-  switch (e.type) {
-    case "boost": {
-      const b = blob(e.blob);
-      // Leverage = mass / equity, and mass = owe + equity in display units.
-      const x = b && b.equity > 0 ? (b.owe + b.equity) / b.equity : 0;
-      return { text: x >= 1.1 ? `${who(b)} boosts to ${Math.min(2.5, x).toFixed(1)}x` : `${who(b)} borrows from the vault`, tone: "gold" };
-    }
-    case "repay": {
-      const b = blob(e.blob);
-      return { text: b && b.owe < 0.5 ? `${who(b)} paid off the loan` : `${who(b)} repays the vault`, tone: "safe" };
-    }
-    case "spikeHit":
-      return { text: `${who(blob(e.blob))} hit a spike. -${Math.round(e.damage)}`, tone: "warn" };
-    case "eat":
-      return { text: `${who(blob(e.by))} ate ${blob(e.victim)?.label ?? "a blob"}`, tone: "" };
-    case "pop":
-      return e.keeper || !e.by
-        ? { text: `The vault popped ${blob(e.victim)?.label ?? "a blob"}`, tone: "liq" }
-        : { text: `${who(blob(e.by))} popped ${blob(e.victim)?.label ?? "a blob"}. +8% bounty`, tone: "liq" };
-    case "cashoutStart":
-      return { text: `${who(blob(e.blob))} is cashing out`, tone: "safe" };
-    case "cashedOut":
-      return { text: `${who(blob(e.blob))} cashed out ${Math.round(e.amount)}`, tone: "safe" };
-    default:
-      return null;
-  }
-}
