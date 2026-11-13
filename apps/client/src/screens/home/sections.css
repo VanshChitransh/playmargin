@@ -1,0 +1,133 @@
+/* Home sections below the hero (How it plays, the proof block, the footer), ported from
+   research/margin/ui/drafts/how.css and trust.css. Every rule is scoped under .home so nothing
+   leaks into the game or the other screens. */
+/* overflow clip, not hidden: hidden makes .home a scroll box and the pinned story stops sticking */
+.home.home{overflow-x:clip}
+.home{--bg:#FFFFFF;--soft:#F4F5F7;--line:#E4E6EB;--text:#0A0B0D;--muted:#5B616E;--blue:#0052FF;--safe:#16C46B;--warn:#E8B500;--liq:#E0243F;--gold:#E0A21B;--ink:#0A0B0D;--ink2:#14161A;--inkline:#262A31;--inkmuted:#9AA0AC}
+.home .how,.home .trust,.home .foot{font-family:Geist,system-ui,sans-serif;font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+.home :where(.how,.trust,.foot) *{box-sizing:border-box}
+.home :where(.how,.trust,.foot) :where(h2,p,ol){margin:0}
+.home .wrap{max-width:1344px;margin:0 auto;padding:0 48px}
+.home kbd{display:inline-block;font:500 12px/1 'Geist Mono';background:#fff;border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:4px 7px;color:var(--text);vertical-align:2px}
+.home .head{display:flex;align-items:end;justify-content:space-between;gap:40px}
+.home .kicker{font:500 13px 'Geist Mono';letter-spacing:.04em;color:var(--blue);text-transform:uppercase}
+.home .head h2{font:800 64px/0.98 Geist;letter-spacing:-.05em;margin-top:12px}
+.home .head p{max-width:400px;color:var(--muted);font-size:18px}
+.home .word-text{font:900 24vw/0.8 Geist;letter-spacing:-.07em;color:#F4F5F7;text-align:center;margin:40px 0 0;overflow:hidden;height:.62em}
+.home .how{position:relative;height:640vh;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-top:120px}
+.home .how-pin{position:sticky;top:0;height:100vh;display:flex;align-items:stretch}
+.home .how-frame{width:100%;max-width:1344px;margin:0 auto;display:grid;grid-template-columns:minmax(420px,0.9fr) 1.1fr;border-left:1px solid var(--line);border-right:1px solid var(--line)}
+.home .how-left{padding:9vh 48px 6vh;display:flex;flex-direction:column;justify-content:center;border-right:1px solid var(--line)}
+.home .how-kicker{font:500 13px 'Geist Mono';letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.home .how-h2{font:800 56px/0.98 Geist;letter-spacing:-.05em;margin-top:14px}
+.home .how-lead{margin-top:14px;color:var(--muted);font-size:16px}
+.home .how-steps{list-style:none;padding:0;margin-top:26px;border-top:1px solid var(--line)}
+.home .how-steps li{position:relative;border-bottom:1px solid var(--line)}
+.home .how-steps button{all:unset;box-sizing:border-box;width:100%;display:flex;align-items:flex-start;gap:16px;padding:14px 4px;cursor:pointer}
+.home .how-steps button:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:8px}
+.home .hn{font:500 12px/22px 'Geist Mono';color:#A0A5AF;min-width:22px;transition:color .3s}
+.home .hb{flex:1;min-width:0}
+.home .ht{display:block;font:650 17px/22px Geist;letter-spacing:-.01em;color:#A0A5AF;transition:color .3s}
+.home .hs{display:block;font-size:14px;line-height:1.45;color:#B5B9C1;margin-top:3px;transition:color .3s}
+.home .hs kbd{font-size:11px;padding:2px 6px;vertical-align:1px}
+.home .how-steps button:hover .ht{color:#5B616E}
+.home .how-steps li.on .hn{color:var(--blue)}
+.home .how-steps li.on .ht{color:var(--text)}
+.home .how-steps li.on .hs{color:var(--muted)}
+.home .how-steps li.done .ht{color:#6E7480}
+.home .hdot{width:8px;height:8px;border-radius:50%;margin-top:7px;opacity:.25;transition:opacity .3s,transform .3s}
+.home .hdot.safe{background:var(--safe)}
+.home .hdot.gold{background:var(--gold)}
+.home .hdot.warn{background:var(--warn)}
+.home .hdot.liq{background:var(--liq)}
+.home .how-steps li.on .hdot{opacity:1;transform:scale(1.4)}
+.home .how-steps li.done .hdot{opacity:.7}
+.home .hbar{position:absolute;left:0;right:0;bottom:-1px;height:2px;overflow:hidden}
+.home .hbar i{display:block;height:100%;width:0;background:var(--blue)}
+.home .how-steps li.done .hbar i{width:100%;background:#C9D6FF}
+.home .how-right{position:relative;display:flex;align-items:center;justify-content:center;padding:6vh 56px;background-color:#FAFBFC;background-image:radial-gradient(rgba(10,11,13,.13) 1px,transparent 1.2px);background-size:18px 18px}
+.home .br{position:absolute;width:18px;height:18px;border:0 solid #B5B9C1}
+.home .br.tl{left:20px;top:20px;border-left-width:1px;border-top-width:1px}
+.home .br.tr{right:20px;top:20px;border-right-width:1px;border-top-width:1px}
+.home .br.bl{left:20px;bottom:20px;border-left-width:1px;border-bottom-width:1px}
+.home .br.brr{right:20px;bottom:20px;border-right-width:1px;border-bottom-width:1px}
+.home .how-count{position:absolute;left:46px;bottom:22px;font:500 12px 'Geist Mono';color:var(--muted)}
+.home .how-card{position:relative;width:100%;max-width:600px;background:#fff;border:1px solid var(--line);border-radius:24px;box-shadow:0 30px 70px rgba(10,11,13,.10),0 2px 6px rgba(10,11,13,.04);padding:16px}
+.home .hc-top{display:flex;align-items:center;gap:12px;font-size:13px;font-weight:600;padding:2px 4px 12px}
+.home .hc-room{display:flex;align-items:center;gap:7px;flex:1}
+.home .hc-room i{width:7px;height:7px;border-radius:50%;background:var(--liq);animation:hm-pulse 1.2s infinite}
+@keyframes hm-pulse{50%{opacity:.3}}
+.home .hc-clock{font:500 13px 'Geist Mono';background:var(--soft);border-radius:999px;padding:3px 10px}
+.home .hc-ex{font:500 11px 'Geist Mono';letter-spacing:.08em;text-transform:uppercase;color:#A0A5AF}
+.home .hc-toast{position:relative;display:flex;align-items:center;gap:12px;height:58px;margin-bottom:10px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:10px 14px;box-shadow:0 8px 22px rgba(10,11,13,.07);transform:translateY(-4px);opacity:0;transition:opacity .35s,transform .35s}
+.home .hc-toast.show{opacity:1;transform:none}
+.home .hc-toast b{display:block;font-size:14px;font-weight:700}
+.home .hc-toast small{display:block;font-size:12.5px;color:var(--muted)}
+.home .hc-toast em{margin-left:auto;font:500 11px 'Geist Mono';font-style:normal;color:#A0A5AF;align-self:flex-start}
+.home .hc-ico{width:30px;height:30px;flex:none;border-radius:9px;display:grid;place-items:center;color:#fff;font-size:14px;background:var(--blue)}
+.home .hc-arena{position:relative;height:290px;border-radius:16px;overflow:hidden;border:1px solid var(--line);background:#F2F7FB}
+.home .hc-arena canvas{position:absolute;inset:0;width:100%;height:100%}
+.home .hc-stamp{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-8deg) scale(1.5);opacity:0;background:var(--liq);color:#fff;font:900 34px Geist;letter-spacing:-.02em;padding:4px 16px;border-radius:8px;transition:opacity .25s,transform .35s cubic-bezier(.2,1.6,.4,1);pointer-events:none}
+.home .how-card.popped .hc-stamp{opacity:1;transform:translate(-50%,-50%) rotate(-8deg) scale(1)}
+.home .hc-rew{position:absolute;left:12px;bottom:12px;font:600 12px 'Geist Mono';background:#0A0B0D;color:#fff;border-radius:999px;padding:5px 11px;opacity:0;transition:opacity .3s}
+.home .how-card.rewind .hc-rew{opacity:1}
+.home .hc-pos{display:grid;grid-template-columns:repeat(4,1fr);margin-top:12px;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.home .hc-pos div{padding:10px 14px;border-right:1px solid var(--line)}
+.home .hc-pos div:last-child{border-right:0}
+.home .hc-pos span{display:block;font:500 10.5px 'Geist Mono';letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.home .hc-pos b{font:700 22px Geist;letter-spacing:-.02em}
+.home .hc-pos .gold{color:#B07A00}
+.home .hc-pos .safe{color:#0B8F4D}
+.home .hc-pos .warn{color:#9A6B00}
+.home .hc-pos .liq{color:var(--liq)}
+.home .hc-hf{display:flex;align-items:center;gap:12px;margin-top:12px;padding:0 4px;font:500 12px 'Geist Mono';color:var(--muted)}
+.home .hc-hf span:last-child{min-width:62px;text-align:right;color:var(--text)}
+.home .hc-track{position:relative;flex:1;height:8px;border-radius:99px;background:var(--soft);overflow:visible}
+.home .hc-track i{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:99px;background:var(--safe);transition:width .25s,background .4s}
+.home .hc-line{position:absolute;left:16.7%;top:-4px;bottom:-4px;width:2px;background:var(--liq);border-radius:2px}
+@media (prefers-reduced-motion:reduce){.home .hc-toast,.home .hc-stamp,.home .hc-track i{transition:none}}
+.home .trust{background:var(--ink);color:#fff;padding:130px 0;border-radius:40px 40px 0 0}
+.home .trust .kicker{color:#7DA2FF}
+.home .trust .head p{color:var(--inkmuted)}
+.home .tgrid{margin-top:56px;display:grid;grid-template-columns:1fr 1.05fr;gap:28px;align-items:start}
+.home .proofs{border-top:1px solid var(--inkline)}
+.home .proof{display:grid;grid-template-columns:44px 1fr auto;gap:16px;padding:24px 0;border-bottom:1px solid var(--inkline);align-items:start}
+.home .proof .n{font:500 13px 'Geist Mono';color:var(--inkmuted);padding-top:4px}
+.home .proof b{display:block;font:700 21px/1.25 Geist;letter-spacing:-.02em}
+.home .proof p{margin-top:6px;color:var(--inkmuted);font-size:15.5px}
+.home .proof a{font:600 14px Geist;color:#fff;border:1px solid var(--inkline);border-radius:999px;padding:8px 14px;white-space:nowrap;margin-top:2px}
+.home .proof a:hover{border-color:#fff}
+.home .log{background:var(--ink2);border:1px solid var(--inkline);border-radius:24px;overflow:hidden}
+.home .log .lh{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--inkline)}
+.home .log .lh b{font-weight:700}
+.home .log .lh span{font:500 12px 'Geist Mono';color:var(--inkmuted)}
+.home .rows{padding:8px 0}
+.home .row{display:grid;grid-template-columns:52px 1fr 92px 112px 22px;gap:12px;align-items:center;padding:9px 20px;font-size:14px;position:relative}
+.home .row .i{font:500 12px 'Geist Mono';color:var(--inkmuted)}
+.home .row .amt{font:500 13px 'Geist Mono';text-align:right}
+.home .row .h{font:500 12px 'Geist Mono';color:var(--inkmuted)}
+.home .row .ok{width:18px;height:18px;border-radius:50%;background:rgba(22,196,107,.16);color:var(--safe);font-size:11px;display:grid;place-items:center}
+.home .row.bad{background:rgba(224,36,63,.12)}
+.home .row.bad .amt{color:#FF6B81}
+.home .row.bad .ok,.home .row.after .ok{background:rgba(224,36,63,.18);color:#FF6B81}
+.home .row.after{opacity:.55}
+.home .log .lf{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 20px;border-top:1px solid var(--inkline)}
+.home .lstat{display:flex;align-items:center;gap:10px;font-weight:700}
+.home .lstat i{width:10px;height:10px;border-radius:50%;background:var(--safe)}
+.home .lstat.bad{color:#FF6B81}
+.home .lstat.bad i{background:var(--liq)}
+.home .tamper{border:0;border-radius:999px;padding:11px 18px;font:700 14px Geist;cursor:pointer;background:#fff;color:var(--ink)}
+.home .tamper.on{background:var(--liq);color:#fff}
+.home .note{margin-top:12px;font-size:13px;color:var(--inkmuted)}
+.home .trust{border-radius:40px 40px 0 0;padding-bottom:110px}
+.home .foot{background:var(--ink);color:#fff;text-align:center;padding:0;overflow:hidden}
+.home .ask{max-width:1248px;margin:0 auto;padding:72px 24px 0;border-top:1px solid var(--inkline);color:var(--inkmuted);font-size:18px}
+.home .ask a{color:#fff;text-decoration:underline;text-underline-offset:4px;text-decoration-color:#7DA2FF}
+.home .ask a:hover{color:#7DA2FF}
+.home .fmid{margin-top:96px;display:flex;flex-direction:column;align-items:center;gap:22px}
+.home .flogo{width:64px;height:64px;border-radius:50%;background:var(--blue);display:grid;place-items:end center;overflow:hidden;box-shadow:0 0 0 6px rgba(0,82,255,.18)}
+.home .flogo img{width:100%;margin-bottom:-4px}
+.home .flinks{display:flex;gap:30px;font-size:16px;color:#B4B9C4}
+.home .flinks a:hover{color:#fff}
+.home .copy{font-size:15px;color:var(--inkmuted)}
+.home .word{display:block;width:100%;margin-top:56px}
