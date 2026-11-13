@@ -110,6 +110,11 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
   const cents = centLines(o.start * k, o.lines.map((l) => l.amount * k), o.end * k);
   const money = (c: number): string => cur + (Math.abs(c) / 100).toFixed(2);
   const rows = o.lines.map((l, i) => line(esc(l.label), (cents[i]! >= 0 ? "+" : "\u2212") + money(cents[i]!), cents[i]! < 0)).join("");
+  // Every cent of the entry: the part seeded into the arena food is the difference, so the two
+  // lines always meet the start exactly.
+  const startC = Math.round(o.start * k * 100);
+  const entryC = Math.round((o.start / R.START_MASS_RATIO) * k * 100);
+  const entry = line("Entry", money(entryC)) + line("Seeded into the arena food", "\u2212" + money(entryC - startC), true);
   const el = shell(
     root,
     `<div class="flex min-h-full flex-col lg:flex-row" style="background:color-mix(in srgb, var(--color-paper) 88%, transparent)">
@@ -133,8 +138,8 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
         ${stats}
         <div class="sticker relative mx-auto mt-10 max-w-xl px-5 pb-5 pt-6 sm:px-7 lg:rotate-[-1deg]" style="background:${CREAM}">
           ${tape("left:-22px;top:-8px;transform:rotate(-30deg)")}${tape("right:-22px;top:-8px;transform:rotate(30deg)")}
-          <h3 class="flex items-baseline justify-between border-b-[3px] border-ink pb-3 font-display text-2xl">RECEIPT <span class="tag text-muted">where your ${paid ? `$${(o.start * k).toFixed(2)}` : o.start.toFixed(0)} went</span></h3>
-          <div class="font-mono text-sm sm:text-base">${line("Start", money(Math.round(o.start * k * 100)))}${rows}</div>
+          <h3 class="flex items-baseline justify-between border-b-[3px] border-ink pb-3 font-display text-2xl">RECEIPT <span class="tag text-muted">where your ${money(entryC)} went</span></h3>
+          <div class="font-mono text-sm sm:text-base">${entry}${rows}</div>
           <div class="sticker mt-4 flex items-center justify-between bg-gold px-4 py-3" style="box-shadow:none">
             <span class="font-display text-2xl">YOU KEEP</span>
             <span class="font-display text-5xl tabular-nums">${money(Math.round(o.end * k * 100))}</span>
