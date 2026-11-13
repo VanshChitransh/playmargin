@@ -42,7 +42,7 @@ export const landing: Screen = (root) => {
         <p class="h-label"><i data-live></i>Real gameplay · 🤖 bots on the real rules</p>
         <p class="h-keys"><span><kbd>Space</kbd>boost</span><span><kbd>R</kbd>repay</span><span><kbd>E</kbd>cash out</span></p>
       </div>
-      <div class="h-stage"><video data-hero class="h-arena" muted loop playsinline autoplay preload="auto" poster="/home/hero-poster.jpg" aria-label="Bots borrow to grow, go red and get popped"><source src="/home/hero-loop.webm" type="video/webm" /><source src="/home/hero-loop.mp4" type="video/mp4" /></video></div>
+      <div class="h-stage"><video data-hero class="h-arena" muted loop playsinline autoplay preload="auto" poster="/home/hero-poster.jpg" aria-label="Bots borrow to grow, go red and get popped"><source src="/home/hero-loop.mp4" type="video/mp4" /></video></div>
     </section>
     <div data-home-story></div><div data-home-proof></div><div data-home-footer></div>
   </div>`;
