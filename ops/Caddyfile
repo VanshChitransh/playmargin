@@ -10,6 +10,14 @@ api.playmargin.fun {
 		resolvers 1.1.1.1
 	}
 	encode gzip
+	# B08: HTTPS only from now on (HSTS), no MIME sniffing, and Express does not announce itself.
+	# defer: applied after the proxy, so it also strips the upstream X-Powered-By.
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		-X-Powered-By
+		defer
+	}
 	# Relayer (S4, services/relayer): https://api.playmargin.fun/relay/<route> -> localhost:3030/<route>.
 	# Client: VITE_RELAYER_URL=https://api.playmargin.fun/relay. It rate-limits by X-Forwarded-For: set it here.
 	handle_path /relay/* {
