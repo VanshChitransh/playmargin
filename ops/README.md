@@ -171,6 +171,24 @@ Flexible zone would loop on. Resolvers held the old Cloudflare answers for about
 **Rollback to orange:** `sudo cp /etc/caddy/Caddyfile.cloudflare.bak /etc/caddy/Caddyfile` (same as
 `ops/Caddyfile.cloudflare`), `systemctl reload caddy`, then PATCH `api` back to `proxied: true`.
 
+## US box (live since 13 Nov: us.api.playmargin.fun, free matches only)
+
+A second game server so players in the Americas are not 200+ ms from Mumbai. Money stays on ONE box.
+
+| | Mumbai `api.playmargin.fun` | US `us.api.playmargin.fun` |
+|---|---|---|
+| AWS | ap-south-1, `15.207.255.76` | us-east-1, t4g.small `i-0f420437b28ae9927`, EIP `54.146.83.204`, SG `margin-us-sg`, key `margin-us-key` (all `margin-us-*`, about 14 USD a month) |
+| Paid, relayer, /stats, /api/team | yes | no: no `SETTLER_PRIVATE_KEY`, no `relayer.env` (deploy.sh skips the relayer), so paid joins get "paid mode is off on this server" |
+| Match ids | Colyseus ids | `MATCH_ID_PREFIX=u-` in `/etc/margin/env`: every id starts with `u-`, and the client routes Verify, logs and reconnects by it |
+| NEAR anchor | hourly Merkle root | none: the contract keeps ONE free-match anchor slot whose seq (the hour) must increase, so a second box anchoring the same hour is refused. Verify shows hash chain + books for `u-` matches |
+| DB | `/var/lib/margin/margin.sqlite` | its own, same path |
+
+Same release and the same files: `DEPLOY_HOST=ubuntu@54.146.83.204 ./ops/deploy.sh`, `ops/Caddyfile` with
+`MARGIN_HOST=us.api.playmargin.fun` in `/etc/caddy/cf.env` (the cert is DNS-01 like Mumbai). DNS: `us.api` A
+record, DNS only. The client (`apps/client`, region picker) pings both `/health` and joins the faster for free
+play; paid always goes to Mumbai; an invite from a US room carries `?s=us`.
+Latency (13 Nov): Bengaluru to Mumbai 35 ms, Bengaluru to US 258 ms, us-east-1 to Mumbai 204 ms.
+
 ## Tunnel mode (no droplet: api.playmargin.fun served from a Mac, testnet)
 
 Live since 12 Nov while there is no droplet. Cloudflare Tunnel carries https://api.playmargin.fun to a local

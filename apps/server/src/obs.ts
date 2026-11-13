@@ -45,19 +45,36 @@ export function diskFree(dbPath = process.env.DB_PATH ?? "margin.sqlite"): { fre
   }
 }
 
-/** Tick durations in ms since boot: count, mean, max and p99 from 0.1 ms buckets up to 100 ms. */
+type TickStats = { count: number; meanMs: number; p99Ms: number; maxMs: number };
+const TICK_WINDOW_MS = 60_000;
+
+/** Tick durations over the last full minute (B06: since boot, a spike hid under hours of calm ticks):
+ *  count, mean, max and p99 from 0.1 ms buckets up to 100 ms. Before the first minute ends: so far. */
 export const ticks = {
   count: 0,
   sumMs: 0,
   maxMs: 0,
   buckets: new Uint32Array(1001),
-  record(ms: number): void {
+  start: Date.now(),
+  last: null as TickStats | null,
+  record(ms: number, now = Date.now()): void {
+    this.rotate(now);
     this.count++;
     this.sumMs += ms;
     if (ms > this.maxMs) this.maxMs = ms;
     this.buckets[Math.min(1000, Math.floor(ms * 10))]!++;
   },
-  summary() {
+  /** A finished window becomes `last`; a whole idle minute reads as 0 ticks, not old numbers. */
+  rotate(now: number): void {
+    if (now - this.start < TICK_WINDOW_MS) return;
+    this.last = now - this.start < 2 * TICK_WINDOW_MS ? this.current() : { count: 0, meanMs: 0, p99Ms: 0, maxMs: 0 };
+    this.start = now;
+    this.count = 0;
+    this.sumMs = 0;
+    this.maxMs = 0;
+    this.buckets.fill(0);
+  },
+  current(): TickStats {
     let seen = 0;
     let p99 = 0;
     for (let i = 0; this.count > 0 && i < this.buckets.length; i++) {
@@ -69,5 +86,9 @@ export const ticks = {
     }
     const r = (x: number) => Math.round(x * 100) / 100;
     return { count: this.count, meanMs: r(this.count ? this.sumMs / this.count : 0), p99Ms: r(p99), maxMs: r(this.maxMs) };
+  },
+  summary(now = Date.now()): TickStats {
+    this.rotate(now);
+    return this.last ?? this.current();
   },
 };
