@@ -92,6 +92,23 @@ export function match(pattern: string, path: string): Params | null {
   return params;
 }
 
+/** Hard reload at most once per minute per tab; false when that already happened (storage off too). */
+export function reloadOnce(store: Pick<Storage, "getItem" | "setItem"> | null = safeSession(), now = Date.now()): boolean {
+  const last = Number(store?.getItem("margin.chunkReload") ?? 0);
+  if (!store || now - last < 60_000) return false;
+  store.setItem("margin.chunkReload", String(now));
+  location.reload();
+  return true;
+}
+
+function safeSession(): Storage | null {
+  try {
+    return sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * A screen whose code loads on first visit, so the home page does not ship the game engine
  * (QA-B-16). Leaving before the code arrives cancels it; otherwise the real cleanup runs.
@@ -100,9 +117,18 @@ export function lazy(load: () => Promise<Screen>): Screen {
   return (root, params) => {
     let left = false;
     let cleanup: Cleanup | void;
-    void load().then((screen) => {
-      if (!left) cleanup = screen(root, params);
-    });
+    void load().then(
+      (screen) => {
+        if (!left) cleanup = screen(root, params);
+      },
+      // A tab opened before a redeploy asks for a chunk that no longer exists (Q01). Reload once to
+      // get the new build; the session flag stops a loop if the chunk is truly missing.
+      (err: unknown) => {
+        if (reloadOnce()) return;
+        console.error(err);
+        root.textContent = "This page failed to load. Refresh to try again.";
+      },
+    );
     return () => {
       left = true;
       cleanup?.();

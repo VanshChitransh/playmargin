@@ -27,6 +27,9 @@ export VITE_NEAR_AUTH="${VITE_NEAR_AUTH:-0}"
 
 echo "building client: network=$NET contract=$CONTRACT server=$VITE_SERVER_URL relayer=$VITE_RELAYER_URL"
 npm run build -w apps/client
+# A 404.html turns off the Pages SPA fallback: a missing /assets file is a real 404 (Q01) and an
+# unknown page answers 404 with the app's own 404 screen. Page routes are listed in public/_redirects.
+cp apps/client/dist/index.html apps/client/dist/404.html
 
 # Wrangler runs from the client app, not the workspace root (wrangler 4 refuses the root). --force on
 # create keeps the classic Pages project type (direct upload) instead of the Workers delegation.
@@ -34,7 +37,7 @@ npm run build -w apps/client
   cd apps/client
   npx -y wrangler@4 pages project list 2>/dev/null | grep -q "playmargin" \
     || npx -y wrangler@4 pages project create playmargin --production-branch main --force
-  npx -y wrangler@4 pages deploy dist --project-name playmargin --branch main --commit-dirty=true
+  npx -y wrangler@4 pages deploy dist --project-name playmargin --branch "${PAGES_BRANCH:-main}" --commit-dirty=true
 )
 
 # Custom domains (idempotent: an already attached domain answers with an error we ignore).

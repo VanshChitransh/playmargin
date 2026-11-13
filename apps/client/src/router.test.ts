@@ -1,6 +1,6 @@
 // Path router: old hash links map to clean paths, and unknown paths fall to the 404 route.
 import { describe, expect, it } from "vitest";
-import { legacyPath, match, pickRoute } from "./router";
+import { legacyPath, match, pickRoute, reloadOnce } from "./router";
 
 describe("router", () => {
   it("rewrites old hash links to clean paths, keeping the query", () => {
@@ -18,5 +18,11 @@ describe("router", () => {
     expect(pickRoute(routes, "/nope").key).toBe("*");
     expect(pickRoute(routes, "/verify/").key).toBe("*");
     expect(match("/", "/")).toEqual({});
+  });
+
+  it("never reloads twice in a minute after a failed chunk, or without storage", () => {
+    const store = { getItem: () => "1000", setItem: () => {} };
+    expect(reloadOnce(store, 30_000)).toBe(false);
+    expect(reloadOnce(null, 1_000_000)).toBe(false);
   });
 });
