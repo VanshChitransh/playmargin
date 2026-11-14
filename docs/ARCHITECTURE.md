@@ -39,7 +39,7 @@ flowchart LR
 The same `packages/core` code runs the match on the server, replays it on the Verify page in the
 browser, and powers `npm run demo` and `npm run sim`.
 
-## Game server and ops (S2)
+## Game server and ops
 
 ### Rooms
 - `match`: public, grouped by `mode` (`free` or `paid`).
@@ -141,7 +141,7 @@ logs are JSON lines, and the steps are in `ops/README.md`. A 50-match local soak
 p99 of 0.3 ms and peak memory of 227 MB. `npm run e2e:local` plays a full match against the real
 server in CI.
 
-## Core rules and agents (S1)
+## Core rules and agents
 
 ### One pure engine (`packages/core`)
 
@@ -188,10 +188,10 @@ Every tick runs the same 13 steps. The order is a rule, not an accident:
 
 - Every money event is appended to a SHA-256 hash-chained log.
 - `settle(log)` replays only the log and checks every rule it can see:
-  - every fee is exactly 1% and every interest split is 80/15/5;
-  - no repayment is larger than the debt;
-  - the vault never lends past its budget;
-  - no agent eats a human early;
+  - every fee is exactly 1% and every interest split is 80/15/5
+  - no repayment is larger than the debt
+  - the vault never lends past its budget
+  - no agent eats a human early
   - nothing happens after the bell.
 - `settleVerified` also checks the chain. A match pays only if the replay equals the live room to the
   Micro (`settle == live`). Otherwise it is refused and nobody is paid.
@@ -212,10 +212,10 @@ sees only what is near it (`AgentView`) and gets no rule a human does not have.
 | Liquidator drone (`drone.ts`), paid rooms, labelled `Drone-N` | Steers by 32-slot context steering toward red blobs and the most leveraged one. Pops a blob only when it is red. Earns the victim-funded 8% bounty, paid on chain to `drone-N.<contract>` | Hold a stake, eat, be eaten, or touch a non-red blob: drones pass through those, and the engine ignores a drone's BOOST, REPAY and cash-out. The contract caps all agent payouts in one match at 12% of its stakes |
 | Commander (`commander.ts`), NEAR AI Cloud | Every 15 s, one LLM call retunes the agents' greed, caution and drone focus. Its one-line rationale is shown to spectators | Move a blob or touch money. It sees only ids and numbers (no usernames, so no prompt injection through names). Its JSON is parsed and clamped, unknown ids are dropped, and a failed call keeps the last plan |
 
-## Client (S3)
+## Client
 Vite, vanilla TypeScript, PixiJS 8 for the arena, Tailwind 4 and daisyUI for HTML screens and the
-HUD. The client only draws what the server sends and sends intent; it holds no money and decides no
-rule.
+HUD. The client draws what the server sends (plus a local prediction of your own blob) and sends intent.
+It holds no money and decides no rule.
 
 ### Rendering (`apps/client/src/render/`)
 - [`arena.ts`](../apps/client/src/render/arena.ts): one Pixi stage with the light agar grid, food,
@@ -238,7 +238,7 @@ server expires a held input after 250 ms. A window blur or a hidden tab sends an
 all-zero command at once, so nothing stays held. Mouse and keyboard only: a finger-only device
 (pointer coarse, no fine pointer, [`device.ts`](../apps/client/src/device.ts)) gets a "MARGIN plays
 on a laptop" card on game routes instead of the arena ([`laptop.ts`](../apps/client/src/screens/laptop.ts)).
-The PWA is retired; [`public/sw.js`](../apps/client/public/sw.js) removes old installs.
+The PWA is retired, and [`public/sw.js`](../apps/client/public/sw.js) removes old installs.
 
 ### Netcode (`apps/client/src/net/`)
 - [`client.ts`](../apps/client/src/net/client.ts): the Colyseus connection. A dropped socket keeps
@@ -263,7 +263,7 @@ The PWA is retired; [`public/sw.js`](../apps/client/public/sw.js) removes old in
   and the chain anchor in the visitor's browser with the same core code the server runs. A Tamper
   button edits one number so the check turns red at that event.
 - Cash ([`screens/cash.ts`](../apps/client/src/screens/cash.ts)): balance, paid seats, and Add funds
-  through 1-Click quotes ([`chain/addfunds.ts`](../apps/client/src/chain/addfunds.ts), S4), dry until
+  through 1-Click quotes ([`chain/addfunds.ts`](../apps/client/src/chain/addfunds.ts)), dry until
   a real deposit is confirmed.
 
 ### What the client never trusts or owns
@@ -274,7 +274,7 @@ The PWA is retired; [`public/sw.js`](../apps/client/public/sw.js) removes old in
 - Text from other players is never trusted as HTML: names are escaped or set with `textContent`, and
   a room code from a link must match `^[A-Z]{4}$` before it is shown.
 
-## Contract, relayer and Intents (S4)
+## Contract, relayer and Intents
 
 Every NEAR feature with a testnet transaction proving it: [`docs/NEAR.md`](NEAR.md).
 

@@ -1,6 +1,6 @@
 // Player input as Commands (never positions). Desktop: mouse steers, Space = BOOST,
 // R = REPAY, E = cash out, the on-screen buttons also work with a mouse. Laptop only for now:
-// phones get a "plays on a laptop" card instead (device.ts, docs/future_feature.md).
+// phones get a "plays on a laptop" card instead (device.ts, docs/MOBILE.md).
 // Sends at most 30/s. BOOST and REPAY are HELD state: true in every command while the key or
 // button is down (hold-to-nitro, hold-to-repay). Cash-out stays an edge tap. Any blur or tab switch sends a zero
 // command at once so nothing stays held (EDGE-CASES: stuck BOOST, plus the 250 ms server expiry).

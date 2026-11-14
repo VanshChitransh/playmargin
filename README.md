@@ -143,7 +143,7 @@ For MARGIN:
 - Shorter and longer matches: 20, 30 and 60 second modes next to the 90 second classic.
 - Leagues: Bronze, Silver, Gold, Platinum, Crown and Ace. Each league changes the rules, like how much you can borrow, how hard spikes hit and how smart the agents are.
 - Free credits stay free. Everyone tops up to 1,000 credits a day already. Next, you can watch an ad for more.
-- A mobile app, built thumb-first.
+- A mobile app, built thumb-first ([what broke on phones and the plan](docs/MOBILE.md)).
 - An open vault. Today the house lends to players. Later, anyone can deposit into the vault and earn from the interest and fees borrowers pay.
 - More servers. Free play already picks the faster of Mumbai and US East.
 
@@ -333,6 +333,16 @@ ops               server deploy files
 - Runtime libraries: Colyseus 0.17 and @colyseus/sdk, PixiJS 8, Express 5, near-kit 0.20, near-api-js 5, @hot-labs/near-connect 0.12, @fast-auth-near browser SDK and provider 1.4, Tailwind 4, daisyUI 5, uqr, @scure/base. Contract: near-sdk 5.30.1, tested with near-sandbox 0.4.
 - Ported ideas: endel/colyseus-pixijs-boilerplate, MultiOgar's BotPlayer, owenashurst/agar.io-clone, vzhou842/example-.io-game, a16z ai-town (pattern only). Every source with its licence: [`docs/CREDITS.md`](docs/CREDITS.md).
 - AI-written code: most of the code in this repo was written by AI coding agents. I directed them, read the code and only then accepted it. The research was AI-assisted too.
+
+## Docs
+
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): how the engine, server, client and contract fit together
+- [`docs/NEAR.md`](docs/NEAR.md): every NEAR feature MARGIN uses, with code and a testnet transaction
+- [`docs/CREDITS.md`](docs/CREDITS.md): every library, ported idea and asset, with its licence
+- [`docs/MOBILE.md`](docs/MOBILE.md): why MARGIN is laptop only for now, and how phones come back
+- [`contracts/margin/README.md`](contracts/margin/README.md): building and testing the contract
+- [`ops/README.md`](ops/README.md): running the game server and relayer
+- [`tools/scripts/MAINNET-RUNBOOK.md`](tools/scripts/MAINNET-RUNBOOK.md): the mainnet deploy, step by step
 
 ## Licence
 

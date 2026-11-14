@@ -1,5 +1,5 @@
 // "MARGIN plays on a laptop": what a phone or tablet sees instead of the game itself (play, $1, Judge
-// Run, a room link; gated in index.ts, docs/future_feature.md has the mobile plan). Every other page
+// Run, a room link; gated in index.ts, docs/MOBILE.md has the mobile plan). Every other page
 // stays readable on a phone under mountPhoneBanner. It shows one real clip and carries the link over.
 import type { Screen } from "../router";
 import { BTN } from "./chrome";

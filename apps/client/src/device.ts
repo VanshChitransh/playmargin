@@ -1,5 +1,5 @@
 // Can this device play MARGIN? The game is laptop only for now (mouse + keyboard), see
-// docs/future_feature.md. Decided by the input hardware, never the user agent: agar's UA check
+// docs/MOBILE.md. Decided by the input hardware, never the user agent: agar's UA check
 // lets a desktop-mode iPad through to a page it cannot play.
 
 /** True when there is a mouse or trackpad (a laptop, a touch laptop, an iPad with a trackpad). */
