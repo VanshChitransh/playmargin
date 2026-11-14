@@ -45,6 +45,9 @@ export const verify: Screen = (root, { id = "" }) => {
   const body = root.querySelector<HTMLElement>("[data-v=body]")!;
 
   const show = async (d: Loaded, note = "", real?: Loaded): Promise<void> => {
+    // A log cut before the bell has no MATCH_END, so settle() refuses it. That is a match still in
+    // play, not tampering: never show a tamper verdict for it (judges open Verify from the death screen).
+    if (!d.log.some((e) => e.type === "MATCH_END")) return running(id === "local" ? "local" : "file");
     // The server's own anchorHead is ignored: the anchor check reads NEAR with the head WE replayed.
     const r = await runChecks(d.log, null, d.claim?.matchId);
     // One hourly anchor slot on the contract belongs to the Mumbai box: US matches are never anchored.
@@ -71,18 +74,54 @@ export const verify: Screen = (root, { id = "" }) => {
     }
   });
 
-  if (id === "local") {
-    if (localLog) void show({ log: localLog }, "Offline practice match: not anchored on NEAR.");
-    else body.innerHTML = `<p>No offline match in this tab yet. Play one, then press Verify on the receipt.</p>`;
-  } else {
+  let retry: ReturnType<typeof setTimeout> | undefined;
+  let left = false;
+  /** Calm state for a match without its final bell yet; the server copy retries until it ends. */
+  const running = (from: "server" | "local" | "file", tries = 0): void => {
+    const why =
+      from === "server"
+        ? "This match is still being played. Its log opens at the final bell, so a player cannot read the seed or rivals' moves mid-match. This page checks again on its own."
+        : from === "local"
+          ? "You left this practice match before the final bell, so its log has no ending to check yet. Finish a match, then press Verify on the receipt."
+          : "This log stops before the final bell, so there is no ending to check yet. Save it again after the match ends.";
+    body.innerHTML = `
+    <div class="sticker flex items-center gap-4 rounded-box bg-cream p-4 text-ink">
+      <span class="grid size-12 shrink-0 place-items-center rounded-full border border-grid bg-card font-display text-2xl">\u23F1</span>
+      <div><p class="font-display text-3xl leading-none">Match still running.</p><p class="mt-1 text-sm">Verify opens at the bell. ${why}</p></div></div>
+    ${from === "server" ? `<button data-v=again class="${BTN.card} text-lg">Check again</button>` : ""}`;
+    if (from !== "server") return;
+    body.querySelector("[data-v=again]")?.addEventListener("click", () => load(0));
+    // A match lasts 90 s plus warm-up: retry every 5 s for about 2 minutes, then leave it to the button.
+    if (tries < 24) retry = setTimeout(() => load(tries + 1), 5000);
+  };
+  const load = (tries = 0): void => {
+    clearTimeout(retry);
+    if (left) return;
     const get = <T,>(what: string) =>
       fetch(`${serverFor(id).url}/api/matches/${encodeURIComponent(id)}/${what}`).then((r) => (r.ok ? (r.json() as Promise<T>) : Promise.reject(new Error(`HTTP ${r.status}`))));
     type Proof = { mode: "free" | "paid"; anchor?: { hour: number; proof: ProofStep[]; tx: string | null } | null };
     Promise.all([get<Loaded>("log"), get<Proof>("proof")])
-      .then(([d, p]) => show({ ...d, claim: { mode: p.mode, matchId: id, anchor: p.anchor ? { hour: p.anchor.hour, proof: p.anchor.proof, tx: p.anchor.tx } : null } }))
-      .catch(() => (body.innerHTML = `<p>Could not load this match from the server. You can still check a log file.</p>`));
-  }
-  return stopFooter;
+      .then(([d, p]) => {
+        if (left) return;
+        if (!d.log.some((e) => e.type === "MATCH_END")) return running("server", tries);
+        return show({ ...d, claim: { mode: p.mode, matchId: id, anchor: p.anchor ? { hour: p.anchor.hour, proof: p.anchor.proof, tx: p.anchor.tx } : null } });
+      })
+      .catch((e: unknown) => {
+        if (left) return;
+        if (e instanceof Error && e.message === "HTTP 409") running("server", tries);
+        else body.innerHTML = `<p>Could not load this match from the server. You can still check a log file.</p>`;
+      });
+  };
+
+  if (id === "local") {
+    if (localLog) void show({ log: localLog }, "Offline practice match: not anchored on NEAR.");
+    else body.innerHTML = `<p>No offline match in this tab yet. Play one, then press Verify on the receipt.</p>`;
+  } else load();
+  return () => {
+    left = true;
+    clearTimeout(retry);
+    stopFooter();
+  };
 };
 
 function render(body: HTMLElement, d: Loaded, r: Report, note: string, tampered: boolean): void {
