@@ -15,7 +15,7 @@ import { anchorVerdict, configVerdict, count, firstCall, droneVerdict, relayVerd
 const RPCS = rpcUrls(NETWORK, ARCHIVAL[NETWORK]);
 
 // Real transactions to check, per network (signers looked up once, every fact re-read live).
-// Mainnet stays empty until those transactions exist: the cards then say "none yet".
+// The build is testnet only (mainnet is future scope); a mainnet build would start with empty cards.
 const FACTS: Partial<Record<string, { settleTx: string; bountyTx: string; drone: string; keyTx: string; player: string; sessionKey: string; relayTx: string }>> = {
   testnet: {
     settleTx: "3Nw3RqiAfPmFYJ5LKxxXioEfppLhdEswXyTHhyZQABwA",
@@ -148,7 +148,7 @@ const claims: Claim[] = [
     code: "apps/server/src/api.ts",
     links: () => [],
     check: async () => {
-      const mainnet = NETWORK === "mainnet" ? "" : " Mainnet: none yet. Outside players paying in on mainnet: none yet.";
+      const mainnet = NETWORK === "mainnet" ? "" : " MARGIN runs on NEAR testnet only: mainnet is future scope, so no one has paid in real money.";
       try {
         const s = (await (await fetch(`${ENDPOINT}/api/stats`, { signal: AbortSignal.timeout(8000) })).json()) as { players: number; matches: number; agentPops: number; multiHumanPct: number };
         const st: State = s.players > 0 ? "ok" : "none";
