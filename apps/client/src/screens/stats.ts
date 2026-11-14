@@ -1,4 +1,4 @@
-// /stats?key=...: the private analytics page. The key is checked by the server (a wrong or missing
+// /stats#key=...: the private analytics page. The key is checked by the server (a wrong or missing
 // key looks like a 404 there too); it is moved out of the address bar at once and kept only for
 // this tab, so a screenshot or a shared screen never shows it. Laptop layout, Arcade Paper.
 import { ENDPOINT } from "../net/client";
@@ -97,7 +97,9 @@ function render(el: HTMLElement, d: Insights): void {
 export const stats: Screen = (root) => {
   // Read the key once, then take it out of the address bar (kept for this tab only).
   const url = new URL(location.href);
-  const fromUrl = url.searchParams.get("key");
+  // #key=... never reaches a server log or a Referer; ?key= still works for old bookmarks.
+  const frag = new URLSearchParams(url.hash.slice(1));
+  const fromUrl = frag.get("key") ?? url.searchParams.get("key");
   if (fromUrl) {
     try {
       sessionStorage.setItem("margin.statsKey", fromUrl);
@@ -105,7 +107,9 @@ export const stats: Screen = (root) => {
       /* private mode: the key lives only in memory for this visit */
     }
     url.searchParams.delete("key");
-    history.replaceState(history.state, "", url.pathname + url.search + url.hash);
+    frag.delete("key");
+    const rest = frag.toString();
+    history.replaceState(history.state, "", url.pathname + url.search + (rest ? `#${rest}` : ""));
   }
   let key = fromUrl;
   try {
@@ -123,7 +127,7 @@ export const stats: Screen = (root) => {
     body.innerHTML = `<p class="font-bold">Nothing here.</p>`;
     return;
   }
-  void fetch(`${ENDPOINT}/api/insights?key=${encodeURIComponent(key)}`, { cache: "no-store" })
+  void fetch(`${ENDPOINT}/api/insights`, { cache: "no-store", headers: { "x-stats-key": key } })
     .then((r) => (r.ok ? (r.json() as Promise<Insights>) : Promise.reject(new Error(String(r.status)))))
     .then((d) => !gone && render(body, d))
     .catch(() => !gone && (body.innerHTML = `<p class="font-bold">Nothing here.</p>`));
