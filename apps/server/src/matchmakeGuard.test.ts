@@ -52,6 +52,20 @@ describe("guardMatchmake", () => {
     expect(seen).toHaveLength(0);
   });
 
+  it("refuses a body that is not application/json with 415, before it counts against the IP (L5-11)", async () => {
+    const base = await start(1);
+    for (const type of ["text/plain", "application/x-www-form-urlencoded", "multipart/form-data; boundary=x", null]) {
+      const headers: Record<string, string> = { "x-real-ip": "1.2.3.4" };
+      if (type) headers["content-type"] = type;
+      const r = await fetch(`${base}/matchmake/joinOrCreate/match`, { method: "POST", headers, body: '{"mode":"free"}' });
+      expect(r.status).toBe(415);
+      expect(await r.json()).toEqual({ code: 415, error: "join options must be sent as application/json" });
+    }
+    expect(seen).toHaveLength(0);
+    const ok = await fetch(`${base}/matchmake/joinOrCreate/match`, { method: "POST", headers: { "content-type": "application/json; charset=utf-8", "x-real-ip": "1.2.3.4" }, body: "{}" });
+    expect(ok.status).toBe(200);
+  });
+
   it("refuses join options over 8 KB with 413", async () => {
     const base = await start();
     const r = await post(base, JSON.stringify({ mode: "free", name: "n".repeat(20_000) }));

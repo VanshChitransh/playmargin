@@ -55,6 +55,10 @@ export function guardMatchmake(
     if (req.method !== "POST" || !req.url?.startsWith("/matchmake/")) return pass(req, res);
     // Colyseus answers a draining server with an EMPTY 503 the SDK cannot parse ("Unexpected end of JSON").
     if (draining()) return reply(res, 503, "server is restarting, try again in a moment");
+    // L5-11: a text/plain POST needs no CORS preflight, so any page could reserve seats from each
+    // visitor's browser and IP. application/json forces the preflight, which foreign origins fail.
+    // @colyseus/sdk always sends it. Checked before the limiter so such a page cannot burn a visitor's quota.
+    if (req.headers["content-type"]?.split(";")[0]?.trim().toLowerCase() !== "application/json") return reply(res, 415, "join options must be sent as application/json");
     if (!limiter.allow(requestIp(req))) return reply(res, 429, "too many joins, slow down");
     let size = 0;
     const chunks: Buffer[] = [];
