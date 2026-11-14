@@ -46,7 +46,7 @@ export const verify: Screen = (root, { id = "" }) => {
 
   const show = async (d: Loaded, note = "", real?: Loaded): Promise<void> => {
     // The server's own anchorHead is ignored: the anchor check reads NEAR with the head WE replayed.
-    const r = await runChecks(d.log, null);
+    const r = await runChecks(d.log, null, d.claim?.matchId);
     // One hourly anchor slot on the contract belongs to the Mumbai box: US matches are never anchored.
     if (d.claim?.matchId.startsWith("u-")) r.anchor = { state: "skip", detail: "Not anchored on NEAR: US server matches are verified here only (hash chain and books)." };
     else if (d.claim && r.result) r.anchor = await anchorOnNear(r.result.head, d.claim, { view: viewOnChain, tx: txFunctionCall });

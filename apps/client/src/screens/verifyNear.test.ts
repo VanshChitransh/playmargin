@@ -11,7 +11,7 @@ const readers = (o: { view?: unknown; tx?: { method: string; args: unknown; stat
   },
   tx: async () => {
     if (o.fail) throw new Error("every RPC unreachable");
-    return { ...o.tx!, block: 277046485, rpc: RPC };
+    return { receiver: "margin.testnet", ...o.tx!, block: 277046485, rpc: RPC };
   },
 });
 
@@ -43,10 +43,17 @@ describe("anchorOnNear, free", async () => {
   });
   it("bad for a forged head, another hour, a failed tx or another method", async () => {
     const forged = await sha256Hex("forged");
-    expect((await anchorOnNear(forged, claim, anchorTx({ room_id: "free", seq: 498416, head: root }), "testnet", "c")).state).toBe("bad");
-    expect((await anchorOnNear(head, claim, anchorTx({ room_id: "free", seq: 498415, head: root }), "testnet", "c")).state).toBe("bad");
-    expect((await anchorOnNear(head, claim, anchorTx({ room_id: "free", seq: 498416, head: root }, "failed"), "testnet", "c")).state).toBe("bad");
-    expect((await anchorOnNear(head, claim, anchorTx({ room_id: "free", seq: 498416, head: root }, "ok", "settle"), "testnet", "c")).state).toBe("bad");
+    expect((await anchorOnNear(forged, claim, anchorTx({ room_id: "free", seq: 498416, head: root }), "testnet", "margin.testnet")).state).toBe("bad");
+    expect((await anchorOnNear(head, claim, anchorTx({ room_id: "free", seq: 498415, head: root }), "testnet", "margin.testnet")).state).toBe("bad");
+    expect((await anchorOnNear(head, claim, anchorTx({ room_id: "free", seq: 498416, head: root }, "failed"), "testnet", "margin.testnet")).state).toBe("bad");
+    expect((await anchorOnNear(head, claim, anchorTx({ room_id: "free", seq: 498416, head: root }, "ok", "settle"), "testnet", "margin.testnet")).state).toBe("bad");
+  });
+  it("bad when the anchor call went to another contract, and reads markers instead of fetching them (L4-06, L4-10)", async () => {
+    expect((await anchorOnNear(head, claim, anchorTx({ room_id: "free", seq: 498416, head: root }), "testnet", "other.testnet")).state).toBe("bad");
+    expect((await anchorOnNear(head, { ...claim, anchor: { ...claim.anchor, tx: "skipped" } }, readers({}), "testnet", "c")).state).toBe("skip");
+    const onchain = { ...claim, anchor: { ...claim.anchor, tx: "onchain" } };
+    expect((await anchorOnNear(head, onchain, readers({ view: { seq: 498416, head: root } }), "testnet", "c")).state).toBe("ok");
+    expect((await anchorOnNear(head, onchain, readers({ view: { seq: 498417, head: root } }), "testnet", "c")).state).toBe("skip");
   });
   it("skip, never ok, before the hour is anchored or when NEAR cannot be reached", async () => {
     expect((await anchorOnNear(head, { ...claim, anchor: null }, readers({}), "testnet", "c")).state).toBe("skip");

@@ -68,4 +68,18 @@ describe("runChecks", () => {
     expect(anchored.books.detail).toMatch(/under rules v[12]/);
     expect((await runChecks(log, null)).books.detail).toMatch(/under rules v3/);
   });
+
+  it("refuses a log of another match and never shows an older rules version as green (L4-05, L4-04)", async () => {
+    const log = await playedLog();
+    const id = (log[0]!.data as { matchId: string }).matchId;
+    expect((await runChecks(log, null, id)).chain.state).toBe("ok");
+    expect((await runChecks(log, null, "someone-else")).chain.state).toBe("bad");
+    const t = structuredClone(log);
+    (t.find((e) => e.type === "MATCH_START")!.data as { rulesVersion?: number }).rulesVersion = 1;
+    for (let k = 0; k < t.length; k++) {
+      if (k > 0) t[k]!.prevHash = t[k - 1]!.hash;
+      t[k]!.hash = await hashEntry(t[k]!);
+    }
+    expect((await runChecks(t, null)).books.state).not.toBe("ok");
+  });
 });

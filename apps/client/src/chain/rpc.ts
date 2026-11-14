@@ -96,7 +96,7 @@ export function viewOnChain<T>(network: Network, contractId: string, method: str
 }
 
 export type TxView = {
-  transaction: { actions: Array<string | { FunctionCall?: { method_name: string; args: string } }> };
+  transaction: { receiver_id?: string; actions: Array<string | { FunctionCall?: { method_name: string; args: string } }> };
   transaction_outcome: { block_hash: string };
   receipts_outcome: Array<{ outcome: { status: unknown } }>;
 };
@@ -113,7 +113,7 @@ export async function txFunctionCall(network: Network, txHash: string, signerId:
   const read = { tx_hash: txHash, sender_account_id: signerId, wait_until: "NONE" };
   const { value: tx, rpc } = await answered(network, (near) => near.rpc.call<TxView>("tx", read), ARCHIVAL[network]);
   const { value: block } = await answered(network, (near) => near.rpc.getBlock({ blockId: tx.transaction_outcome.block_hash }), ARCHIVAL[network]);
-  return { ...firstCall(tx), block: Number(block.header.height), rpc };
+  return { ...firstCall(tx), receiver: tx.transaction.receiver_id, block: Number(block.header.height), rpc };
 }
 
 /** Method, decoded JSON args and ok/failed of a tx's first FunctionCall (pure, for tests). */
