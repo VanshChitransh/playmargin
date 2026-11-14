@@ -5,6 +5,7 @@ import { legacyPath, match, pickRoute, reloadOnce } from "./router";
 describe("router", () => {
   it("rewrites old hash links to clean paths, keeping the query", () => {
     expect(legacyPath("#/verify/abc", "")).toBe("/verify/abc");
+    expect(legacyPath("#//evil.example/x", "")).toBe("/evil.example/x");
     expect(legacyPath("#/stats", "?key=k")).toBe("/stats?key=k");
     expect(legacyPath("#/r/ABCD?x=1", "?y=2")).toBe("/r/ABCD?x=1");
     expect(legacyPath("", "")).toBeNull();

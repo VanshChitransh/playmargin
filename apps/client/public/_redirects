@@ -8,3 +8,10 @@
 /stats / 200
 /verify/* / 200
 /r/* / 200
+/how/ / 200
+/play/ / 200
+/cash/ / 200
+/watch/ / 200
+/judge/ / 200
+/judges/ / 200
+/stats/ / 200

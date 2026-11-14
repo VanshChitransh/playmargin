@@ -23,7 +23,8 @@ export function navigate(to: string, replace = false): void {
 /** The clean path for an old hash link ("#/verify/x" -> "/verify/x"), keeping its query; else null. */
 export function legacyPath(hash: string, search: string): string | null {
   if (!hash.startsWith("#/")) return null;
-  const p = hash.slice(1);
+  // "#//evil.example/x" would be a cross-origin URL that replaceState refuses (blank page, L5-05).
+  const p = hash.slice(1).replace(/^\/+/, "/");
   return p.includes("?") || !search ? p : `${p}${search}`;
 }
 
