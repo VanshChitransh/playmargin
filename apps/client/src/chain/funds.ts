@@ -67,13 +67,40 @@ export async function deposit(accountId: string, amount: bigint): Promise<void> 
   });
 }
 
-/** Sends idle USDC back to the wallet. Needs the full key: 1 yocto keeps session keys out. */
+/**
+ * What a withdraw tx returned: the contract's on_withdraw gives true when USDC arrived and false
+ * when ft_transfer failed and the balance was re-credited. null = the wallet gave no outcome.
+ */
+export function withdrawOk(outcome: unknown): boolean | null {
+  const status = (outcome as { status?: unknown } | null | undefined)?.status;
+  if (!status || typeof status !== "object") return null;
+  if ("Failure" in status) return false;
+  const v = (status as { SuccessValue?: unknown }).SuccessValue;
+  return typeof v === "string" ? atob(v) === "true" : null;
+}
+
+/**
+ * Sends idle USDC back to the wallet. Needs the full key: 1 yocto keeps session keys out.
+ * Throws when the money did not leave: an account not registered on the USDC token makes
+ * ft_transfer fail and the contract quietly re-credits the balance (RT L1-05).
+ */
 export async function withdraw(accountId: string, amount: bigint): Promise<void> {
-  await (await wallet()).signAndSendTransaction({
+  const registered = await reader.view<unknown>(USDC_ID, "storage_balance_of", { account_id: accountId });
+  if (!registered) {
+    throw new Error(
+      "Your NEAR account is not registered on the USDC token yet, so it cannot receive USDC. " +
+        "Register it once (storage_deposit on USDC, about 0.00125 NEAR, most wallets do it when you first receive USDC), then withdraw. Your balance here is safe.",
+    );
+  }
+  const before = await balanceOf(accountId);
+  const out = await (await wallet()).signAndSendTransaction({
     signerId: accountId,
     receiverId: CONTRACT_ID,
     actions: [{ type: "FunctionCall", params: { methodName: "withdraw", args: { amount: amount.toString() }, gas: GAS, deposit: "1" } }],
   });
+  // Some wallets return no outcome: then the balance tells the truth.
+  const ok = withdrawOk(out) ?? (await balanceOf(accountId)) <= before - amount;
+  if (!ok) throw new Error("The withdraw bounced back: USDC could not reach your account, so it is still in your balance here.");
 }
 
 /** Testnet only: mint 10 mock USDC to the wallet (open faucet, capped per call by the token). */
