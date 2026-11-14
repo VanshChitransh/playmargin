@@ -1,7 +1,6 @@
 # MAINNET RUNBOOK
 
-Last updated 14 Nov after the red team (`research/margin/redteam/`, L1, L3, L8). Production is now two
-EC2 boxes plus Cloudflare Pages (step 5), not one droplet.
+Production is two EC2 boxes plus Cloudflare Pages (step 5).
 
 Vansh runs every step by hand. Nothing here runs on mainnet without `CONFIRM_MAINNET=yes`, and
 nothing should be run before Vansh says go. Every transaction he approves is marked **[TX]**.
@@ -26,13 +25,13 @@ export CONTRACT_ID=playmargin.near        # or margin.vanshverse.near
 export ENTRY_STAKE=100000                 # 0.10 USDC (or 1000000 for 1 USDC). Both rehearsed
 ```
 
-`ENTRY_STAKE` has no default any more (RT L1-07). The first deploy and `MIGRATE=1` refuse to run
+`ENTRY_STAKE` has no default any more. The first deploy and `MIGRATE=1` refuse to run
 without it, and `UPGRADE=1` only touches the stake when it is set, so a hotfix from a fresh shell
 can never reset a live 0.10 stake to 1 USDC.
 
 Owner, settler and relayer default to `owner.$CONTRACT_ID`, `settler.$CONTRACT_ID` and
 `relayer.$CONTRACT_ID` (override with `OWNER_ID`, `SETTLER_ID`, `RELAYER_ID`). **The owner is NOT the
-payout wallet** (RT L8-02): `vanshverse.near` gets the prize, so its seed phrase never goes into a
+payout wallet**: `vanshverse.near` gets the prize, so its seed phrase never goes into a
 command, a key file or this laptop's shell history. The deploy script makes `owner.$CONTRACT_ID` with
 its own generated key, like the settler and relayer. The stake is stored in the contract (`config().entry_stake`). The
 client reads it from there, and the owner can change it later with `set_entry_stake` (1 yocto).
@@ -46,7 +45,7 @@ the server (or wait for an empty queue), change it, then restart, so no ticket s
 ## 1. Pre-flight (free, no mainnet tx, about 2 min)
 
 1. Main is green: `npm run typecheck && npm test && (cd contracts/margin && cargo test)`.
-2. Build the exact wasm that ships (204,838 bytes with A7 agents, about 2.05 NEAR of storage):
+2. Build the exact wasm that ships (204,838 bytes with drone agents, about 2.05 NEAR of storage):
    ```
    cd contracts/margin && cargo near build non-reproducible-wasm --no-embed-abi
    ls -l target/near/margin.wasm
@@ -83,7 +82,7 @@ balance row with a 0.1 USDC deposit `{"for": <new id>}`, so the red team (L1-03)
 headroom is about 270 cheap deposits from stopping paid play (every state write fails with
 `LackBalanceForState`). 1 NEAR is about 8,000 rows. Check it any time:
 `near account view-account-summary $CONTRACT_ID network-config mainnet now` (balance minus storage
-must stay above 0.1 NEAR, top up with a plain transfer). Testnet got +9 NEAR on 14 Nov for the same reason.
+must stay above 0.1 NEAR, top up with a plain transfer). Testnet needed a +9 NEAR top-up for the same reason.
 
 ## 3. Deploy, init, register, sub-accounts (one script, about 15 s)
 
@@ -115,10 +114,10 @@ chmod 600 ~/.near-credentials/mainnet/*.json ~/.near-credentials/mainnet/*/*.jso
 before running a tx. The server sends every call at 100 Tgas, so the settler needs more than
 0.101 NEAR free at ALL times or `open_match` is rejected with `NotEnoughBalance` (the rehearsal
 hit exactly this). Real burn is about 0.0004 NEAR per call, about 0.0007 per paid match. Top up
-when it falls under 0.12. The relayer burns about 0.0002 NEAR per ticket, and since 14 Nov it pays
-only for tickets that will succeed (RT L3-01). Email login stays OFF on mainnet (see step 5).
+when it falls under 0.12. The relayer burns about 0.0002 NEAR per ticket, and it pays
+only for tickets that will succeed. Email login stays OFF on mainnet (see step 5).
 
-### 3b. Drone accounts and agents (A7, about 10 s, 3 small txs + 1 owner call)
+### 3b. Drone accounts and agents (about 10 s, 3 small txs + 1 owner call)
 
 `NETWORK=mainnet CONFIRM_MAINNET=yes ../../node_modules/.bin/tsx drones.ts --register` (from
 `tools/scripts`). It creates `drone-1..3.$CONTRACT_ID` (0.05 NEAR each, skipped if they exist, never
@@ -127,7 +126,7 @@ recreated) and, as the owner, calls `set_agents` (1 yocto) so settle may pay dro
 $CONTRACT_ID is_agent json-args '{"account_id":"drone-1.'$CONTRACT_ID'"}' network-config mainnet now`
 prints `true`. Then point the server's paid-room drones at these accounts.
 
-### 3c. near.social profiles for the house and drones (S2 script, about 1 min, 8 txs of 1 Ggas, no deposit)
+### 3c. near.social profiles for the house and drones (script, about 1 min, 8 txs of 1 Ggas, no deposit)
 
 near.social is mainnet only. Each account gets a name, an "Automated account" about line, the
 website and an avatar on FastFS (Agent-3 for drones, the logo for the house). From the repo root,
@@ -145,7 +144,7 @@ FastData writes go to the account `social`, which has no contract, and the index
 args. The script confirms through the indexer and never retries on that error. Cost: gas only,
 about 0.0005 NEAR per tx. Check: open `https://near.social/drone-1.$CONTRACT_ID`.
 
-### 3d. A settler key that can only settle (RT L1-09, 1 tx, gas only)
+### 3d. A settler key that can only settle (1 tx, gas only)
 
 ```
 cd tools/scripts && CONFIRM_MAINNET=yes ../../node_modules/.bin/tsx settler-key.ts
@@ -170,7 +169,7 @@ Expect `owner = owner.$CONTRACT_ID`, `settler = settler.$CONTRACT_ID`, native US
 
 ## 5. Point the services at mainnet (no tx, about 10 min)
 
-Production since 13 Nov (details and rollback in `ops/README.md`, "EC2 mode" and "US box"):
+Production (details and rollback in `ops/README.md`, "EC2 mode" and "US box"):
 
 | Box | Host | Runs | Mainnet role |
 |---|---|---|---|
@@ -204,8 +203,8 @@ jq -r '"SETTLER_PRIVATE_KEY=" + .private_key' ~/.near-credentials/mainnet/settle
 | `RELAYER_LOW_BALANCE` | `0.05` |
 | `ONECLICK_JWT` | already there (same partner key) |
 | `ONECLICK_LIVE` | `1` (live quotes go to `CONTRACT_ID`, step 6 proves it with one real deposit) |
-| `RELAYER_SENDER_DAILY_CAP`, `RELAYER_IP_DAILY_CAP` | leave unset (20 tickets per account and 40 per IP per UTC day, RT L3-01) |
-| `FASTAUTH_ENABLED` | **leave unset.** `/fastauth/create` checks no Auth0 JWT (RT L3-04), so turning it on lets anyone make the relayer fund any account name. Email login stays off until the relayer verifies the JWT |
+| `RELAYER_SENDER_DAILY_CAP`, `RELAYER_IP_DAILY_CAP` | leave unset (20 tickets per account and 40 per IP per UTC day) |
+| `FASTAUTH_ENABLED` | **leave unset.** `/fastauth/create` checks no Auth0 JWT, so turning it on lets anyone make the relayer fund any account name. Email login stays off until the relayer verifies the JWT |
 
 **5c. US box** `/etc/margin/env` on `ubuntu@54.146.83.204`: set `NETWORK=mainnet` and
 `CONTRACT_ID=$CONTRACT_ID` only, keep `MATCH_ID_PREFIX=u-`. Check there is still no
@@ -224,7 +223,7 @@ curl -s https://us.api.playmargin.fun/health     # no settler (free only)
 
 The server log shows `{"event":"up"}` and `{"event":"paid_stake"}` with your stake.
 
-**Known gap, decide with S2 and S3 before the switch:** the `matches` table has no network column, so
+**Known gap, decide before the switch:** the `matches` table has no network column, so
 after the switch the Verify page looks up old testnet settle and anchor hashes on mainnet RPC and
 cannot find them. Either start Mumbai on a fresh DB (move the old one aside with `.backup`, never
 delete it) and keep the README testnet links pointing at testnet nearblocks, or stay on testnet.
@@ -271,7 +270,7 @@ budget), and 3 x B already puts the 3rd room at 13.49%/min.
 | 1 USDC | 2 | 3.00 | **15.00 USDC** |
 | 1 USDC | 12 | 18.00 | 90.00 USDC |
 
-**What a seed can back (RT L1-10).** Paid rooms take up to 12 humans (`ROOM_SIZE`), and one room
+**What a seed can back.** Paid rooms take up to 12 humans (`ROOM_SIZE`), and one room
 needs B = 1.5 x stake x humans of FREE vault at `open_match`. So the biggest room a seed can open,
 with nothing else open, is `seed / (1.5 x stake)` humans:
 
@@ -308,13 +307,13 @@ Then, in the browser on playmargin.fun as a player (all wallet approvals, Vansh 
 - The settle tx is sent by the server (settler). Copy its nearblocks link for the README.
 - **[TX 9]** Withdraw to prove the money comes back. The account must be registered on USDC: the
   cash screen checks `storage_balance_of` first and says so instead of a withdraw that bounces back
-  (RT L1-05). An account that only ever got USDC through 1-Click may need one `storage_deposit`.
+ . An account that only ever got USDC through 1-Click may need one `storage_deposit`.
 
 **6b. Proof post on near.social** (Vansh, about 0.001 NEAR of gas): sign in on playmargin.fun with
 `vanshverse.near`, finish a match, press "Post to near.social" on the results screen and approve
-in the wallet. The page shows the real link `https://near.social/vanshverse.near/post/<id>`. Hand
-it to S2 for README Part 2 and `docs/NEAR.md`. The wallet pays its own gas, so `vanshverse.near`
-must keep at least 0.01 NEAR after funding step 2 (it held 0 on 10 Nov). No storage deposit is
+in the wallet. The page shows the real link `https://near.social/vanshverse.near/post/<id>`. Add
+it to README Part 2 and `docs/NEAR.md`. The wallet pays its own gas, so `vanshverse.near`
+must keep at least 0.01 NEAR after funding step 2. No storage deposit is
 needed on `social`.
 
 ## 7. Rollback and cleanup (how the NEAR comes back, rehearsed)
@@ -347,9 +346,9 @@ Never delete or recreate the accounts (name squatters watch for it). Recover val
 
 ## Wasm size
 
-205 KB (204,838 B, with A7 agents) after `--no-embed-abi` (saves 3 KB). `wasm-opt -Oz` saves 1 KB more, and the rest is
+205 KB (204,838 B, with drone agents) after `--no-embed-abi` (saves 3 KB). `wasm-opt -Oz` saves 1 KB more, and the rest is
 near-sdk's JSON/format machinery that every method needs, so no cheap cut is left. 1 NEAR per
-100 KB means about 2.05 NEAR of refundable storage (1.99 before A7, as in the rehearsal below).
+100 KB means about 2.05 NEAR of refundable storage (1.99 before the drone agents, as in the rehearsal below).
 
 ## Rehearsal (testnet, 9 Nov, about 18 min including two 90 s matches)
 
@@ -383,11 +382,11 @@ Contract `margin.vansh-rehearsal-11091618.testnet`. Testnet gas price is 1e8, th
 
 Gas per match is the same at 0.10 (settler about 0.0007 NEAR, relayer about 0.0002 per ticket).
 
-**Net cost of the whole day: 0.049 NEAR.** Peak NEAR needed at once: 2.7 (now 3.7 with the fixes, A7 drones, the owner account and 1 NEAR of state headroom).
+**Net cost of the whole day: 0.049 NEAR.** Peak NEAR needed at once: 2.7 (now 3.7 with the fixes, the drone accounts, the owner account and 1 NEAR of state headroom).
 
 Mistakes the rehearsal caught (all fixed above):
 1. Settler funded 0.1 NEAR could not send `open_match` (`NotEnoughBalance`, 100 Tgas reserves 0.101 NEAR). Now 0.25.
-2. 2.3 NEAR left 0.038 NEAR of storage headroom, about 25 matches. Now 3.7 (1 NEAR headroom after the 14 Nov red team).
+2. 2.3 NEAR left 0.038 NEAR of storage headroom, about 25 matches. Now 3.7 (1 NEAR headroom).
 3. A 0.5 USDC vault seed cannot back a 1 USDC match (needs 1.5 x stake x players). Formula added.
 4. 0.10 USDC needed the server to read the stake from the contract. Fixed (94a4ec0) and re-run.
 6. Right after `UPGRADE=1` the script's next view hit a node still serving the old code
