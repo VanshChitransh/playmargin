@@ -419,12 +419,12 @@ export const play: Screen = (root, params) => {
       s instanceof LocalMatch
         ? "Offline practice: real rules, local bots, nothing counts"
         : params.judge === "1"
-          ? "Judge Run: a 90 s scenario on a published seed, normal money rules. Here the agents only hunt red blobs, so the lesson is your own loan: hold BOOST, go red, and Drone-1 liquidates you. Will you?"
+          ? "Judge Run: a 90 s scenario on a published seed, normal money rules. Max the loan and a big spike drops in your path. The agents never hunt you, only Drone-1 does, once you are red."
           : "";
     // The Judge Run changes how agents behave, so it is disclosed in a card, not the grey footer.
     if (params.judge === "1" && !(s instanceof LocalMatch)) {
       // Constant text, so innerHTML is safe; "Drone-1" never splits at its hyphen.
-      status.innerHTML = `Judge Run: a 90 s scenario on a published seed, normal money rules. Here the agents only hunt red blobs, so the lesson is your own loan: hold BOOST, go red, and <span class="whitespace-nowrap">Drone-1</span> liquidates you. Will you?`;
+      status.innerHTML = `Judge Run: a 90 s scenario on a published seed, normal money rules. Max the loan and a big spike drops in your path. The agents never hunt you, only <span class="whitespace-nowrap">Drone-1</span> does, once you are red.`;
       status.className = "pop-sm pointer-events-none fixed bottom-3 left-3 z-10 max-w-[min(44rem,calc(100vw-340px))] rounded-xl bg-card px-3 py-2 text-sm font-semibold leading-snug text-ink";
     }
     if (code && !(s instanceof LocalMatch)) chip = roomChip(root, code);
