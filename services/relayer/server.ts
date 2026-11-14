@@ -17,7 +17,9 @@ import { KeyedCap, WindowCap, RateLimit, delegateKey, entryRefusal, keyRefusal, 
 const NETWORK = process.env.NETWORK === "mainnet" ? "mainnet" : "testnet";
 const RELAYER_ID = process.env.RELAYER_ID ?? `relayer.playmargin.${NETWORK === "mainnet" ? "near" : "testnet"}`;
 const PORT = Number(process.env.RELAYER_PORT ?? 3030);
-const ORIGIN = process.env.RELAYER_CORS_ORIGIN ?? "*";
+/** L5-03: the site and its www twin (www users got "Failed to fetch"). RELAYER_CORS_ORIGIN: a comma list. */
+const ORIGINS = (process.env.RELAYER_CORS_ORIGIN ?? "https://playmargin.fun,https://www.playmargin.fun").split(",").map((o) => o.trim());
+const corsOrigin = (o: string | undefined): string => (o && (ORIGINS.includes(o) || ORIGINS.includes("*")) ? o : ORIGINS[0]!);
 /** Below this balance (NEAR) /health reports an alarm: top the relayer up. */
 const LOW_BALANCE = Number(process.env.RELAYER_LOW_BALANCE ?? 0.5);
 
@@ -52,7 +54,6 @@ const ipDay = new KeyedCap(Number(process.env.RELAYER_IP_DAILY_CAP ?? 40), 86_40
 function reply(res: ServerResponse, status: number, body: object): void {
   res.writeHead(status, {
     "content-type": "application/json",
-    "access-control-allow-origin": ORIGIN,
     "access-control-allow-headers": "content-type",
   });
   res.end(JSON.stringify(body));
@@ -211,6 +212,8 @@ async function health(res: ServerResponse): Promise<void> {
 }
 
 createServer((req, res) => {
+  res.setHeader("access-control-allow-origin", corsOrigin(req.headers.origin));
+  res.setHeader("vary", "Origin");
   if (req.method === "OPTIONS") return reply(res, 204, {});
   if (req.method === "POST" && req.url === "/relay") return void relay(req, res).catch((e) => reply(res, 502, { error: String(e) }));
   const err = (e: unknown) => reply(res, 502, { error: e instanceof Error ? e.message : String(e) });

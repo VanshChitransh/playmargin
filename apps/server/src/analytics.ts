@@ -25,6 +25,8 @@ const SEEN = "(SELECT * FROM analytics_seen WHERE guest NOT IN (SELECT id FROM t
 
 /** One batch per few seconds per visitor is normal; this only stops floods. */
 const eventsLimit = new RateLimiter(60, 60_000);
+/** L2-04: /api/insights runs full scans; the private page needs a few a minute. */
+const insightsLimit = new RateLimiter(10, 60_000);
 
 /** Idempotent, so it is safe on a fresh DB and on every boot (no shared migration list touched). */
 export function ensureTables(db: Db): void {
@@ -136,7 +138,10 @@ export function mountAnalytics(app: Application, db: () => Db): void {
   app.get("/api/insights", (req, res) => {
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Cache-Control", "no-store");
-    if (!keyOk(req.query.key)) return void res.status(404).json({ error: "not found" });
+    // L5-04: the key comes as the x-stats-key header (from the URL fragment, never sent or logged).
+    // ?key= stays until the new /stats is live and STATS_KEY is rotated.
+    if (!insightsLimit.allow(requestIp(req))) return void res.status(429).json({ error: "slow down" });
+    if (!keyOk(req.get("x-stats-key") ?? req.query.key)) return void res.status(404).json({ error: "not found" });
     res.json(insights(db()));
   });
 }
