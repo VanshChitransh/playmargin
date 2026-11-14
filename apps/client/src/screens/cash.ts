@@ -75,7 +75,7 @@ export const cash: Screen = (root) => {
     }
     if (!acc) {
       body.innerHTML = `<article class="sticker rounded-box bg-card p-5">
-        <h2 class="font-display text-3xl">Sign in to play for money</h2>
+        <h2 class="font-display text-3xl">Sign in to play a paid test match</h2>
         <p class="mt-1">Winnings land in your own account, not ours. Practice stays free with no sign-in.</p>
         ${NETWORK === "testnet" ? `<p class="mt-2 text-sm text-muted">Paid play runs on NEAR testnet: sign in with a testnet account in <a class="link" href="https://wallet.meteorwallet.app" target="_blank" rel="noopener">Meteor</a> or <a class="link" href="https://wallet.intear.tech" target="_blank" rel="noopener">Intear</a>.</p>` : ""}
         <div class="mt-4 flex flex-wrap gap-3">${EMAIL_LOGIN ? `<button data-c=email class="${BTN.go}">Log in with email</button>` : ""}
