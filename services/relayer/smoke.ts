@@ -33,6 +33,8 @@ const bad = {
   transfer: await signed(tx().transfer(CONTRACT, "0.001 NEAR")),
   receiver: await signed(tx().functionCall("usdc.playmargin.testnet", "enter_arena", {}, { gas: "30 Tgas" })),
   deposit: await signed(tx().functionCall(CONTRACT, "enter_arena", { stake: "1000000" }, { gas: "30 Tgas", attachedDeposit: "1 yocto" })),
+  // RT L3-01: calls the contract would refuse are refused here too, before any gas is paid.
+  "wrong stake": await signed(tx().functionCall(CONTRACT, "enter_arena", { stake: "1" }, { gas: "30 Tgas" })),
 };
 for (const [name, payload] of Object.entries(bad)) {
   const r = await post(payload);
@@ -40,10 +42,16 @@ for (const [name, payload] of Object.entries(bad)) {
   console.log(`refused ${name}: ${r.body.error}`);
 }
 
+const pause = () => new Promise((r) => setTimeout(r, 2_100)); // per-IP and per-key throttles
+await pause();
 const ok = await post(await signed(tx().functionCall(CONTRACT, "enter_arena", { stake: "1000000" }, { gas: "30 Tgas" })));
 assert.equal(ok.status, 200, JSON.stringify(ok.body));
 assert.ok(ok.body.logs?.some((l) => l.includes('"event":"enter"')), "enter event in logs");
 console.log(`relayed enter_arena: https://testnet.nearblocks.io/txns/${ok.body.hash}`);
+await pause();
+const again = await post(await signed(tx().functionCall(CONTRACT, "enter_arena", { stake: "1000000" }, { gas: "30 Tgas" })));
+assert.equal(again.status, 400, "a second ticket must be refused before paying");
+console.log(`refused second ticket: ${again.body.error}`);
 
 await near.call(CONTRACT, "refund_ticket", { account_id: PLAYER }, { signerId: "settler.playmargin.testnet", waitUntil: "FINAL" });
 console.log("RELAYER SMOKE PASS (ticket refunded)");

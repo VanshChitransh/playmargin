@@ -4,7 +4,7 @@
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { DELEGATE_ACTION_PREFIX, decodeSignedDelegateAction, encodeSignedDelegateAction, type SignedDelegateAction } from "near-kit";
 import { describe, expect, it } from "vitest";
-import { RateLimit, WindowCap, delegateKey, keyRefusal, refuseReason, signatureOk, type KeyView, type Policy } from "./validate.ts";
+import { KeyedCap, RateLimit, WindowCap, delegateKey, entryRefusal, keyRefusal, refuseReason, signatureOk, type KeyView, type Policy } from "./validate.ts";
 
 const policy: Policy = { contractId: "playmargin.testnet", methods: ["enter_arena"], maxGas: 30_000_000_000_000n };
 
@@ -95,5 +95,26 @@ describe("relayer allow-list", () => {
     for (let i = 0; i < 10_002; i++) rl.allow(`spoof-${i}`, 0);
     expect(rl.allow("late", 5_000)).toBe(true);
     expect((rl as unknown as { last: Map<string, number> }).last.size).toBeLessThan(100);
+  });
+
+  it("never pays for an enter_arena the contract would refuse (RT L3-01)", () => {
+    const args = (o: unknown) => new TextEncoder().encode(JSON.stringify(o));
+    const stake = "1000000";
+    expect(entryRefusal(args({ stake }), stake, "1000000", null)).toBeNull();
+    expect(entryRefusal(args({ stake: "100000" }), stake, "5000000", null)).toMatch(/entry stake/); // wrong stake
+    expect(entryRefusal(args({ stake: 1000000 }), stake, "5000000", null)).toMatch(/entry stake/); // U128 is a string
+    expect(entryRefusal(args({ stake }), stake, "999999", null)).toMatch(/balance/); // cannot cover it
+    expect(entryRefusal(args({ stake }), stake, "5000000", { stake, match_id: null })).toMatch(/ticket/); // one ticket each
+    expect(entryRefusal(new TextEncoder().encode("not json"), stake, "5000000", null)).toMatch(/JSON/);
+    expect(entryRefusal(args(null), stake, "5000000", null)).toMatch(/JSON/);
+    expect(entryRefusal(args({ stake: "undefined" }), "undefined", "0", null)).toMatch(/cannot read/); // config unread
+  });
+
+  it("caps each sender and each IP per day, apart from the others (RT L3-01)", () => {
+    const day = 86_400_000;
+    const cap = new KeyedCap(2, day);
+    expect([cap.take("ip-a", 0), cap.take("ip-a", 1), cap.take("ip-a", 2)]).toEqual([true, true, false]);
+    expect(cap.take("ip-b", 3)).toBe(true); // a flood from one IP leaves everyone else alone
+    expect(cap.take("ip-a", day)).toBe(true); // next UTC day
   });
 });

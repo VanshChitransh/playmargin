@@ -1,7 +1,8 @@
 // Allow-list for relayed meta-transactions (NEP-366). The relayer pays gas, so it must only ever
 // wrap a gas-bounded, zero-deposit enter_arena call to our contract, signed with an ed25519 key.
 // Checks run BEFORE the relayer pays: shape (refuseReason), a locally verified signature
-// (signatureOk) and the signer's key on chain (keyAllows), so junk costs us nothing (CSO H1).
+// (signatureOk), the signer's key on chain (keyRefusal) and the contract's own enter_arena
+// preconditions (entryRefusal), so junk and certain-to-fail calls cost us nothing (CSO H1, RT L3-01).
 
 import { createHash, createPublicKey, verify } from "node:crypto";
 import { base58 } from "@scure/base";
@@ -77,6 +78,27 @@ export function keyRefusal(sd: SignedDelegate, key: KeyView | null, height: bigi
   return null;
 }
 
+/**
+ * Why enter_arena would panic on chain, or null. Mirrors contracts/margin/src/arena.rs enter_arena
+ * (stake == entry stake, no ticket held, balance covers the stake), read with free view calls, so
+ * the relayer never pays gas for a call that is sure to fail (RT L3-01). `args` = the call's raw
+ * JSON args, `entryStake` and `balance` = U128 strings from config and balance_of.
+ */
+export function entryRefusal(args: Uint8Array, entryStake: string, balance: string, ticket: unknown): string | null {
+  if (!/^\d+$/.test(entryStake) || !/^\d+$/.test(balance)) return "cannot read the contract, try again in a moment";
+  let stake: unknown;
+  try {
+    stake = (JSON.parse(Buffer.from(args).toString("utf8")) as { stake?: unknown }).stake;
+  } catch {
+    return "args must be JSON {stake}";
+  }
+  // "entry stake" in the text makes the client re-read config (session.ts enterArena).
+  if (stake !== entryStake) return "stake must equal the entry stake (see config)";
+  if (ticket != null) return "you already hold a ticket";
+  if (BigInt(balance) < BigInt(entryStake)) return "balance below the entry stake: add funds first";
+  return null;
+}
+
 /** One action per key per window. Old entries are pruned so spoofed keys cannot grow it forever. */
 export class RateLimit {
   private last = new Map<string, number>();
@@ -108,6 +130,26 @@ export class WindowCap {
       return false;
     }
     this.n++;
+    return true;
+  }
+}
+
+/**
+ * At most `cap` actions per key (a sender, an IP) per fixed window (a UTC day), so one player or
+ * one IP can never use up the global caps that every player shares (RT L3-01).
+ */
+export class KeyedCap {
+  private window = -1;
+  private used = new Map<string, number>();
+  constructor(private cap: number, private windowMs: number) {}
+
+  /** True and counts one for `who`, unless its cap for this window is used up. `now` in ms. */
+  take(who: string, now: number): boolean {
+    const w = Math.floor(now / this.windowMs);
+    if (w !== this.window) [this.window, this.used] = [w, new Map()];
+    const n = this.used.get(who) ?? 0;
+    if (n >= this.cap) return false;
+    this.used.set(who, n + 1);
     return true;
   }
 }

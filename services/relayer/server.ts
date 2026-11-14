@@ -12,7 +12,7 @@ import { FileKeyStore } from "near-kit/keys/file";
 import { accessKey, nearClients, withFallback } from "../../apps/client/src/chain/rpc.ts";
 import { createError, signError } from "./fastauth.ts";
 import * as oneclick from "./oneclick.ts";
-import { WindowCap, RateLimit, delegateKey, keyRefusal, refuseReason, signatureOk, type KeyView, type Policy } from "./validate.ts";
+import { KeyedCap, WindowCap, RateLimit, delegateKey, entryRefusal, keyRefusal, refuseReason, signatureOk, type KeyView, type Policy } from "./validate.ts";
 
 const NETWORK = process.env.NETWORK === "mainnet" ? "mainnet" : "testnet";
 const RELAYER_ID = process.env.RELAYER_ID ?? `relayer.playmargin.${NETWORK === "mainnet" ? "near" : "testnet"}`;
@@ -44,6 +44,10 @@ const ipLimiter = new RateLimit(Number(process.env.RELAYER_IP_WINDOW_MS ?? 1_000
 /** Paid relays per minute and per UTC day: at ~0.0002 NEAR each, a day costs at most ~0.4 NEAR. */
 const perMinute = new WindowCap(Number(process.env.RELAYER_MINUTE_CAP ?? 60), 60_000);
 const perDay = new WindowCap(Number(process.env.RELAYER_DAILY_CAP ?? 2_000), 86_400_000);
+/** Per sender and per IP per UTC day, far below the global caps: one account or one IP cannot shut
+ * paid entry for everyone (RT L3-01). A match is ~2 min, so 20 tickets a day is a long session. */
+const senderDay = new KeyedCap(Number(process.env.RELAYER_SENDER_DAILY_CAP ?? 20), 86_400_000);
+const ipDay = new KeyedCap(Number(process.env.RELAYER_IP_DAILY_CAP ?? 40), 86_400_000);
 
 function reply(res: ServerResponse, status: number, body: object): void {
   res.writeHead(status, {
@@ -95,11 +99,28 @@ async function relay(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const pk = delegateKey(sd)!;
   const fc = sd.delegateAction.actions[0]!;
   const method = "functionCall" in fc ? fc.functionCall.methodName : "";
-  const [key, status] = await Promise.all([rpc((n) => accessKey(n, sender, pk)), rpc((n) => n.getStatus())]);
+  const view = <T>(m: string, args: object) => rpc((n) => n.view<T>(policy.contractId, m, args));
+  let checks;
+  try {
+    checks = await Promise.all([
+      rpc((n) => accessKey(n, sender, pk)),
+      rpc((n) => n.getStatus()),
+      view<{ entry_stake: string }>("config", {}),
+      view<string>("balance_of", { account_id: sender }),
+      view<unknown>("ticket_of", { account_id: sender }),
+    ]);
+  } catch {
+    // Fail closed: if we cannot prove the call will succeed, we do not pay for it.
+    return reply(res, 503, { error: "cannot reach NEAR to check your ticket, try again in a moment" });
+  }
+  const [key, status, config, balance, ticket] = checks;
   const height = BigInt(status.sync_info.latest_block_height);
-  const refusal = keyRefusal(sd, key as KeyView | null, height, policy.contractId, method);
+  const refusal =
+    keyRefusal(sd, key as KeyView | null, height, policy.contractId, method) ??
+    ("functionCall" in fc ? entryRefusal(fc.functionCall.args, String(config?.entry_stake), String(balance ?? "0"), ticket) : "only function calls");
   if (refusal) return reply(res, 400, { error: refusal });
   if (!limiter.allow(`${sender}/${pk}`, now)) return reply(res, 429, { error: "slow down" });
+  if (!senderDay.take(sender, now) || !ipDay.take(ip(req), now)) return reply(res, 429, { error: "daily ticket limit reached, try again tomorrow" });
   if (!perMinute.take(now) || !perDay.take(now)) return reply(res, 503, { error: "relayer busy, try again in a minute" });
 
   try {
