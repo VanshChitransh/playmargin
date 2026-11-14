@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BlobView, MatchView } from "@margin/core";
-import { displayName, boostBlocked, outsideZone, boostPreview, cashoutOpen, interestPerS, phaseName, fuelGradient, ranking } from "./logic";
+import { displayName, boostBlocked, boostReason, outsideZone, boostPreview, cashoutOpen, interestPerS, phaseName, fuelGradient, ranking } from "./logic";
 
 const me = (o: Partial<BlobView> = {}): BlobView => ({
   id: "me", kind: "human", label: "me", x: 0, y: 0, radius: 57, ring: "green", pips: 3,
@@ -21,6 +21,15 @@ describe("hud logic", () => {
   });
   it("names phases by elapsed seconds", () => {
     expect([phaseName(0), phaseName(29), phaseName(30), phaseName(60)]).toEqual(["GROW", "GROW", "HUNT", "SQUEEZE"]);
+  });
+  it("says why BOOST is grey, and nothing when it works or in warm-up", () => {
+    expect(boostReason(me({ shielded: true }), live(89))).toBe("BOOST in 4 s");
+    expect(boostReason(me({ shielded: true }), live(70))).toBe("Shield on");
+    expect(boostReason(me({ ring: "red" }), live(60))).toBe("Red: hold R");
+    expect(boostReason(me({ fuel: 0 }), live(60))).toBe("Tank empty");
+    expect(boostReason(me(), live(5))).toBe("Loans closed");
+    expect(boostReason(me(), live(60))).toBeNull();
+    expect(boostReason(me({ shielded: true }), { ...live(90), phase: "WARMUP" })).toBeNull();
   });
   it("blocks BOOST when red, shielded, out of pips, before GO or after 80 s", () => {
     expect(boostBlocked(me(), live(60))).toBe(false);

@@ -25,6 +25,10 @@ export class FxLayer extends Container {
     });
     t.anchor.set(0.5);
     t.position.set(x, y);
+    // Two numbers at once (a spike while eating) printed on top of each other read as "-2+25PIKE":
+    // the new one takes the spot, recent ones nearby move up a line, like a feed.
+    const line = (JUICE.FLOAT_FONT_PX * 1.1) / zoom;
+    for (const i of this.items) if (i.node instanceof Text && i.life < 0.6 && Math.abs(i.node.x - x) < 6 * line && Math.abs(i.node.y - y) < line) i.node.y -= line;
     t.scale.set(1 / zoom);
     this.addChild(t);
     this.items.push({ node: t, life: 0, ttl: JUICE.FLOAT_TTL_S, vx: 0, vy: -JUICE.FLOAT_RISE_PX_S / zoom, spin: 0 });

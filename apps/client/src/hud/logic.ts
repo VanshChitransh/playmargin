@@ -27,6 +27,18 @@ export function boostBlocked(me: BlobView, m: MatchView): boolean {
   );
 }
 
+/** Why BOOST is grey, in a few words (null when it works, or in warm-up where it is free practice). */
+export function boostReason(me: BlobView, m: MatchView): string | null {
+  if (m.phase !== "LIVE" || me.state !== "alive") return null;
+  const e = elapsedS(m);
+  if (e >= R.BOOST_LOCKOUT_S) return "Loans closed";
+  if (me.ring === "red") return "Red: hold R";
+  // The GO shield is the same for everyone; a late joiner's longer one has no countdown to show.
+  if (me.shielded) return e < R.SHIELD_S ? `BOOST in ${Math.ceil(R.SHIELD_S - e)} s` : "Shield on";
+  if (fuelOf(me) <= 0.001) return "Tank empty";
+  return null;
+}
+
 /** Cash-out button shows only inside its window and never while red. */
 export function cashoutOpen(me: BlobView, m: MatchView): boolean {
   const e = elapsedS(m);

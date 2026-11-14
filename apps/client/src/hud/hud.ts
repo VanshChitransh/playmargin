@@ -4,7 +4,7 @@
 import { R, type BlobView } from "@margin/core";
 import type { Frame } from "../game/frame";
 import type { ControlsEls } from "../input/controls";
-import { boostBlocked, cashoutOpen, outsideZone, displayName, elapsedS, interestPerS, phaseName, fuelGradient, fuelOf, ranking } from "./logic";
+import { boostBlocked, boostReason, cashoutOpen, outsideZone, displayName, elapsedS, interestPerS, phaseName, fuelGradient, fuelOf, ranking } from "./logic";
 import "./hud.css";
 import { isMuted, play as sfx, setMuted } from "../audio";
 import { coachMarks, type Coach } from "./coach";
@@ -31,6 +31,7 @@ export class Hud {
   private shownFuel = 1;
   private refill: { from: number; at: number } | null = null;
   private wasDry = false;
+  private why: HTMLElement | null = null;
 
   private coach: Coach;
   /** /watch: a spectator sees who is in the arena and when it starts, never player tips. */
@@ -119,6 +120,7 @@ export class Hud {
     this.coach.update(m.phase, elapsedS(m), (me?.owe ?? 0) > 0, !!me && me.ring !== "green");
     if (!me) return;
     this.fuel(me, boostBlocked(me, m));
+    this.boostWhy(boostReason(me, m));
     // Right after a server-confirmed save the frame snaps off and the heartbeat cuts, even if
     // the next snapshot is a beat late.
     const raw = me.state === "alive" && m.phase === "LIVE" ? me.ring : "green";
@@ -303,6 +305,17 @@ export class Hud {
     const show = myRank >= rows;
     mine.classList.toggle("hidden", !show);
     if (show) mine.innerHTML = row(ranked[myRank]!, myRank + 1);
+  }
+
+  /** A small label over a grey BOOST saying why it refuses (shield countdown, red, empty, closed). */
+  private boostWhy(text: string | null): void {
+    if (!this.why) {
+      this.why = document.createElement("span");
+      this.why.className = "pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-ink px-2.5 py-1 font-sans text-xs font-bold text-white";
+      this.els.boost.appendChild(this.why);
+    }
+    this.why.hidden = !text;
+    if (text && this.why.textContent !== text) this.why.textContent = text;
   }
 
   /** The fuel ring around BOOST: drains while held, refills as REPAY or eating raise equity. */
