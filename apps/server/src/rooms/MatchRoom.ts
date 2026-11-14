@@ -95,6 +95,8 @@ export class MatchRoom extends Room {
   private inputs = new InputQueue();
   /** Agent seats only (humans get null from createBrain and are never stored). */
   private brains = new Map<string, Brain>();
+  /** Set once a tick threw (fail): the room is being closed. */
+  private failed = false;
   /** NEAR AI strategist for this room's agents, only when NEAR_AI_API_KEY is set. Never blocks a tick. */
   private commander = process.env.NEAR_AI_API_KEY ? new Commander(nearAiCall(process.env.NEAR_AI_API_KEY)) : null;
   private lastRationale: string | null = null;
@@ -171,7 +173,11 @@ export class MatchRoom extends Room {
       while (this.owedMs >= TICK_MS) {
         this.owedMs -= TICK_MS;
         const t0 = performance.now();
-        this.tick();
+        try {
+          this.tick();
+        } catch (err) {
+          return this.fail(err); // L2-01: one broken room must never take the whole server down
+        }
         ticks.record(performance.now() - t0);
       }
     }, TICK_MS);
@@ -239,6 +245,13 @@ export class MatchRoom extends Room {
     const p: PlayerSeed = { id, kind: "human", label: uniqueLabel(name ?? `Player ${++this.joined}`, taken), accountId };
     if (this.started) {
       // Late join (free, first 15 s): pay now, then core charges the pot and shields 10 s.
+      // L2-01: a seat reserved just before the window closed can connect after it. Refuse it here,
+      // before any charge, with the same rule core enforces (core would throw after inserting the blob).
+      const late = this.key.mode === "free" && !this.judge && this.world.phase === "LIVE" && this.roomTick - this.world.goTick < LATE_JOIN_TICKS;
+      if (!late) {
+        if (typeof auth === "string") this.guests.delete(auth);
+        return void client.leave(4001, "this match is already running, start a new one");
+      }
       if (typeof auth !== "string") return void client.leave(4001, "not enough credits");
       const charged = this.charge(auth);
       if (charged !== "ok") {
@@ -481,6 +494,21 @@ export class MatchRoom extends Room {
   }
 
   /** open_match failed (vault low, ticket gone): nobody played, so refund every ticket and close. */
+  /**
+   * L2-01: a tick threw. Stop this room only: log once, tell the players, refund paid tickets (abort),
+   * and dispose, so a graceful shutdown never waits on a room that can no longer reach ENDED.
+   * ponytail: free entries charged at GO are not refunded here (credits, rare path); add if it ever fires.
+   */
+  private fail(err: unknown): void {
+    if (this.failed) return;
+    this.failed = true;
+    this.setSimulationInterval(); // no callback: the tick loop stops
+    log.error("room_failed", { matchId: this.roomId, phase: this.phase, err });
+    if (this.key.mode === "paid") return this.abort();
+    this.broadcast("aborted", { reason: "This match hit a server error and was stopped. Start a new one." });
+    void this.disconnect();
+  }
+
   private abort(): void {
     // Tickets bound to an open match only come back by reclaim after the deadline, not by refund.
     const reason = this.bound

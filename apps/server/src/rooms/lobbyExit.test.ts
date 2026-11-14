@@ -96,3 +96,37 @@ describe("paid create (B03)", () => {
     await expect(new Client(url).joinOrCreate("match", { mode: "paid" })).rejects.toThrow(/must be signed/);
   });
 });
+
+describe("late seat after the window (L2-01)", () => {
+  it("a seat reserved before GO+15 s but used after it is refused uncharged, and the room keeps running", async () => {
+    const opts = (k: string) => ({ mode: "free", roomCode: "LATE", guestKey: `lobbyexit-late-${k}-0123456789` });
+    const host = await new Client(url).joinOrCreate("private", opts("host"));
+    const friend = await new Client(url).joinOrCreate("private", opts("friend"));
+    let liveAt = 0;
+    let ticksAfter = 0;
+    for (const r of [host, friend]) r.onMessage("*", () => {});
+    host.onMessage("ev", (e: { type: string; phase?: string }) => {
+      if (e.type === "phase" && e.phase === "LIVE") liveAt = Date.now();
+    });
+    host.onStateChange(() => liveAt && ticksAfter++);
+    await sleep(300);
+    host.send("startNow");
+    expect(await until(() => liveAt > 0)).toBe(true);
+    // SIM_SPEED 10: 15 s of match = 1.5 s. Reserve at about GO+12 s, connect at about GO+20 s.
+    await sleep(1200 - (Date.now() - liveAt));
+    const res = await fetch(`http://localhost:${PORT}/matchmake/joinById/${host.roomId}`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(opts("late")),
+    });
+    expect(res.status).toBe(200);
+    const reservation = (await res.json()) as Parameters<InstanceType<typeof Client>["consumeSeatReservation"]>[0];
+    await sleep(800);
+    await expect(new Client(url).consumeSeatReservation(reservation)).rejects.toThrow(/already running/);
+    const db = sharedDb();
+    const charged = db.prepare("SELECT COUNT(*) AS n FROM credits_ledger l JOIN users u ON u.id = l.user_id WHERE u.guest_key = ? AND l.reason = 'entry'").get("lobbyexit-late-late-0123456789") as { n: number };
+    expect(charged.n).toBe(0); // refused before any charge
+    const before = ticksAfter;
+    await sleep(500);
+    expect(ticksAfter).toBeGreaterThan(before); // the room still ticks: no conservation throw
+    for (const r of [host, friend]) await r.leave(true);
+  }, 15_000);
+});
