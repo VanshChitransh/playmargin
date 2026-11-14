@@ -26,3 +26,4 @@ near-credentials/
 # Research and QA evidence live outside this repo (research/margin/); never copy them in.
 /research/
 /qa/
+.claude/
