@@ -62,3 +62,39 @@ describe("anchorOnNear, free", async () => {
     expect(down.detail).toContain("Could not reach NEAR");
   });
 });
+
+// After the mainnet switch, published links still point at testnet matches (no network column).
+describe("anchorOnNear, match from the other network", async () => {
+  const heads = await Promise.all(["a", "b", "c"].map((x) => sha256Hex(x)));
+  const { root, proofs } = await merkle(heads);
+  const head = heads[0]!;
+  const claim = { mode: "free" as const, matchId: "m3", anchor: { hour: 498416, proof: proofs.get(head)!, tx: "4BJj" } };
+  const testnet = { net: "testnet" as const, contract: "playmargin.testnet" };
+  const mainnet = { net: "mainnet" as const, contract: "playmargin.near" };
+  // Only testnet knows the tx (mainnet RPC says it does not exist), sent to `receiver`.
+  const onlyTestnet = (receiver: string): NearReaders => ({
+    view: async <T,>(net: string) => ({ value: (net === "testnet" ? { status: "Settled", head } : null) as T, rpc: `https://rpc.${net}.x` }),
+    tx: async (net) => {
+      if (net !== "testnet") throw new Error("UNKNOWN_TRANSACTION");
+      return { method: "anchor", args: { room_id: "free", seq: 498416, head: root }, status: "ok", block: 7, rpc: "https://rpc.testnet.x", receiver };
+    },
+  });
+
+  it("a testnet build reads testnet exactly as before: no fallback note, no network field", async () => {
+    const c = await anchorOnNear(head, claim, onlyTestnet("playmargin.testnet"), "testnet", "playmargin.testnet", mainnet);
+    expect(c).toEqual({ state: "ok", detail: "This match is inside the Merkle root the settler anchored for its hour. Read from NEAR via rpc.testnet.x, block 7.", rpc: "https://rpc.testnet.x" });
+  });
+  it("a mainnet build finds an old testnet anchor and says so", async () => {
+    const c = await anchorOnNear(head, claim, onlyTestnet("playmargin.testnet"), "mainnet", "playmargin.near", testnet);
+    expect(c.state).toBe("ok");
+    expect(c.network).toBe("testnet");
+    expect(c.detail).toMatch(/Found on NEAR testnet\.$/);
+  });
+  it("checks the receiver against the other network's own contract", async () => {
+    expect((await anchorOnNear(head, claim, onlyTestnet("evil.testnet"), "mainnet", "playmargin.near", testnet)).state).toBe("bad");
+  });
+  it("a paid match settled on testnet is found from a mainnet build", async () => {
+    const c = await anchorOnNear(head, { mode: "paid", matchId: "p1" }, onlyTestnet("x"), "mainnet", "playmargin.near", testnet);
+    expect([c.state, c.network]).toEqual(["ok", "testnet"]);
+  });
+});

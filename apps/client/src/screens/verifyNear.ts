@@ -5,7 +5,7 @@
 // contract come from this build's own config, never from the server.
 import { rootFromProof, type ProofStep } from "@margin/core";
 import type { Check } from "../verify/checks";
-import { CONTRACT_ID, NETWORK, type Network } from "../chain/config";
+import { CONTRACT_ID, CONTRACT_ON, NETWORK, type Network } from "../chain/config";
 
 export interface NearReaders {
   view<T>(network: Network, contractId: string, method: string, args: object): Promise<{ value: T; rpc: string }>;
@@ -20,46 +20,77 @@ export interface AnchorClaim {
   anchor?: { hour: number; proof: ProofStep[]; tx: string | null } | null;
 }
 
-export type NearCheck = Check & { rpc?: string };
+/** network is set only when the match was found on the other network. */
+export type NearCheck = Check & { rpc?: string; network?: Network };
+
+/** The other network and its contract: published Verify links point at testnet matches after the mainnet switch. */
+const OTHER = ((n: Network) => ({ net: n, contract: CONTRACT_ON[n] }))(NETWORK === "mainnet" ? "testnet" : "mainnet");
+
+/** "NEAR has no record": try the other network before saying so. */
+class Missing extends Error {
+  constructor(readonly check: NearCheck) {
+    super(check.detail);
+  }
+}
 const host = (url: string) => url.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
 
 /** The anchor check for a replayed head, read from NEAR. Skips (never passes) when there is nothing to read yet. */
-export async function anchorOnNear(head: string, claim: AnchorClaim, near: NearReaders, net: Network = NETWORK, contract: string = CONTRACT_ID): Promise<NearCheck> {
+export async function anchorOnNear(
+  head: string,
+  claim: AnchorClaim,
+  near: NearReaders,
+  net: Network = NETWORK,
+  contract: string = CONTRACT_ID,
+  other: { net: Network; contract: string } = OTHER,
+): Promise<NearCheck> {
   try {
-    if (claim.mode === "paid") {
-      const { value, rpc } = await near.view<{ status?: string; head?: string } | null>(net, contract, "match_of", { match_id: claim.matchId });
-      const via = ` Read from NEAR via ${host(rpc)}.`;
-      if (!value) return { state: "skip", detail: `NEAR has no record of this match yet.${via}`, rpc };
-      if (value.head !== head) return { state: "bad", detail: `NEAR holds a different final hash for this match.${via}`, rpc };
-      return value.status === "Settled" // contract MatchStatus: Open | Settled | Cancelled
-        ? { state: "ok", detail: `The final hash matches the one the contract stored when it paid out.${via}`, rpc }
-        : { state: "skip", detail: `Same hash on NEAR, but the contract has not settled it yet (${value.status}).${via}`, rpc };
-    }
-    const a = claim.anchor;
-    if (!a?.tx) return { state: "skip", detail: "Not anchored on NEAR yet (free matches anchor once their hour is over)." };
-    // The server stores markers, not tx hashes, for some hours (L4-10).
-    if (a.tx === "skipped") return { state: "skip", detail: "This hour was never anchored on NEAR." };
-    const root = await rootFromProof(head, a.proof);
-    if (a.tx === "onchain") {
-      // No tx hash kept: anchor_of holds only the latest hour, so this works until the next hour lands.
-      const { value, rpc } = await near.view<{ seq: number; head: string } | null>(net, contract, "anchor_of", { room_id: "free" });
-      const via = ` Read from NEAR via ${host(rpc)}.`;
-      if (value?.seq !== a.hour) return { state: "skip", detail: `No transaction is on record for this hour and NEAR now holds a later hour, so it cannot be checked here.${via}`, rpc };
-      return value.head === root
-        ? { state: "ok", detail: `This match is inside the Merkle root the contract holds for its hour.${via}`, rpc }
-        : { state: "bad", detail: `This match is not in the root anchored for its hour.${via}`, rpc };
-    }
-    const t = await near.tx(net, a.tx, `settler.${contract}`);
-    const via = ` Read from NEAR via ${host(t.rpc)}, block ${t.block}.`;
-    const args = t.args as { room_id?: string; seq?: number; head?: string } | null;
-    // An "anchor" call to some other contract would skip the contract's seq rule (L4-06).
-    if (t.receiver !== contract) return { state: "bad", detail: `That transaction went to ${t.receiver ?? "an unknown account"}, not ${contract}.${via}`, rpc: t.rpc };
-    if (t.status !== "ok" || t.method !== "anchor") return { state: "bad", detail: `That transaction is not a successful anchor.${via}`, rpc: t.rpc };
-    if (args?.room_id !== "free" || args.seq !== a.hour) return { state: "bad", detail: `The anchor transaction is for another hour.${via}`, rpc: t.rpc };
-    if (args.head !== root) return { state: "bad", detail: `This match is not in the root anchored for its hour.${via}`, rpc: t.rpc };
-    return { state: "ok", detail: `This match is inside the Merkle root the settler anchored for its hour.${via}`, rpc: t.rpc };
+    return await onNet(head, claim, near, net, contract);
   } catch (e) {
+    // Not on this network: a match from before the mainnet switch lives on the other one.
+    try {
+      const c = await onNet(head, claim, near, other.net, other.contract);
+      if (c.state !== "skip") return { ...c, detail: `${c.detail} Found on NEAR ${other.net}.`, network: other.net };
+    } catch {
+      /* not there either: report the first answer */
+    }
+    if (e instanceof Missing) return e.check;
     // Every RPC failed: say so plainly, never turn it into a pass or a fake mismatch.
     return { state: "skip", detail: `Could not reach NEAR to check (${(e as Error).message.slice(0, 80)}). Try again in a minute.` };
   }
+}
+
+/** The check on one network. Throws Missing when NEAR has no record, anything else when the tx is not there. */
+async function onNet(head: string, claim: AnchorClaim, near: NearReaders, net: Network, contract: string): Promise<NearCheck> {
+  if (claim.mode === "paid") {
+    const { value, rpc } = await near.view<{ status?: string; head?: string } | null>(net, contract, "match_of", { match_id: claim.matchId });
+    const via = ` Read from NEAR via ${host(rpc)}.`;
+    if (!value) throw new Missing({ state: "skip", detail: `NEAR has no record of this match yet.${via}`, rpc });
+    if (value.head !== head) return { state: "bad", detail: `NEAR holds a different final hash for this match.${via}`, rpc };
+    return value.status === "Settled" // contract MatchStatus: Open | Settled | Cancelled
+      ? { state: "ok", detail: `The final hash matches the one the contract stored when it paid out.${via}`, rpc }
+      : { state: "skip", detail: `Same hash on NEAR, but the contract has not settled it yet (${value.status}).${via}`, rpc };
+  }
+  const a = claim.anchor;
+  if (!a?.tx) return { state: "skip", detail: "Not anchored on NEAR yet (free matches anchor once their hour is over)." };
+  // The server stores markers, not tx hashes, for some hours (L4-10).
+  if (a.tx === "skipped") return { state: "skip", detail: "This hour was never anchored on NEAR." };
+  const root = await rootFromProof(head, a.proof);
+  if (a.tx === "onchain") {
+    // No tx hash kept: anchor_of holds only the latest hour, so this works until the next hour lands.
+    const { value, rpc } = await near.view<{ seq: number; head: string } | null>(net, contract, "anchor_of", { room_id: "free" });
+    const via = ` Read from NEAR via ${host(rpc)}.`;
+    if (value?.seq !== a.hour) return { state: "skip", detail: `No transaction is on record for this hour and NEAR now holds a later hour, so it cannot be checked here.${via}`, rpc };
+    return value.head === root
+      ? { state: "ok", detail: `This match is inside the Merkle root the contract holds for its hour.${via}`, rpc }
+      : { state: "bad", detail: `This match is not in the root anchored for its hour.${via}`, rpc };
+  }
+  const t = await near.tx(net, a.tx, `settler.${contract}`);
+  const via = ` Read from NEAR via ${host(t.rpc)}, block ${t.block}.`;
+  const args = t.args as { room_id?: string; seq?: number; head?: string } | null;
+  // An "anchor" call to some other contract would skip the contract's seq rule (L4-06).
+  if (t.receiver !== contract) return { state: "bad", detail: `That transaction went to ${t.receiver ?? "an unknown account"}, not ${contract}.${via}`, rpc: t.rpc };
+  if (t.status !== "ok" || t.method !== "anchor") return { state: "bad", detail: `That transaction is not a successful anchor.${via}`, rpc: t.rpc };
+  if (args?.room_id !== "free" || args.seq !== a.hour) return { state: "bad", detail: `The anchor transaction is for another hour.${via}`, rpc: t.rpc };
+  if (args.head !== root) return { state: "bad", detail: `This match is not in the root anchored for its hour.${via}`, rpc: t.rpc };
+  return { state: "ok", detail: `This match is inside the Merkle root the settler anchored for its hour.${via}`, rpc: t.rpc };
 }

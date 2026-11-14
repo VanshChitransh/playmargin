@@ -22,6 +22,12 @@ const IDS = {
 export const CONTRACT_ID = env.VITE_CONTRACT_ID ?? IDS.contract;
 export const USDC_ID = IDS.usdc;
 
+/** Each network's margin contract, this build's own (with its override) included: Verify finds matches from before a network switch. */
+export const CONTRACT_ON: Record<Network, string> = { testnet: "playmargin.testnet", mainnet: "playmargin.near", [NETWORK]: CONTRACT_ID };
+
+/** Block explorer for a network. */
+export const explorerOf = (n: Network): string => (n === "mainnet" ? "https://nearblocks.io" : "https://testnet.nearblocks.io");
+
 /** NEP-366 relayer (services/relayer). */
 export const RELAYER_URL: string =
   env.VITE_RELAYER_URL ?? (typeof location === "undefined" ? "http://localhost:3030" : `${location.protocol}//${location.hostname}:3030`);
@@ -29,4 +35,4 @@ export const RELAYER_URL: string =
 /** Extra RPCs tried before FastNEAR and NEAR's own (comma list, e.g. a keyed provider). */
 export const RPC_EXTRA: string = env.VITE_RPC_URLS ?? "";
 
-export const EXPLORER = NETWORK === "mainnet" ? "https://nearblocks.io" : "https://testnet.nearblocks.io";
+export const EXPLORER = explorerOf(NETWORK);

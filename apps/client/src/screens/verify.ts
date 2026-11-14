@@ -6,7 +6,7 @@ import { MICRO, type LogEntry, type ProofStep } from "@margin/core";
 import { serverFor } from "../net/region";
 import type { Screen } from "../router";
 import { runChecks, type Check, type Report } from "../verify/checks";
-import { EXPLORER } from "../chain/config";
+import { NETWORK, explorerOf } from "../chain/config";
 import { txFunctionCall, viewOnChain } from "../chain/rpc";
 import { anchorOnNear, type AnchorClaim } from "./verifyNear";
 import { BTN, footerSlot, header, mountSiteFooter } from "./chrome";
@@ -98,7 +98,7 @@ function render(body: HTMLElement, d: Loaded, r: Report, note: string, tampered:
   const payouts = r.result?.payouts
     .map((p) => `<tr><td>${esc(names.get(p.id) ?? p.id)}</td><td class="num text-right">${(p.amount / MICRO).toFixed(2)}</td></tr>`)
     .join("");
-  const explorer = d.tx ? `${EXPLORER}/txns/${encodeURIComponent(d.tx)}` : null;
+  const explorer = d.tx ? `${explorerOf((r.anchor as { network?: typeof NETWORK }).network ?? NETWORK)}/txns/${encodeURIComponent(d.tx)}` : null;
   // One verdict first, so a judge knows the answer before reading the three checks.
   const bad = [r.chain, r.books, r.anchor].some((c) => c.state === "bad");
   const verdict = bad
