@@ -137,8 +137,8 @@ Server abuse limits:
 
 ### Deploy and operations
 One AWS EC2 box in Mumbai runs Caddy, the game server and the relayer as systemd units (a second box in US East runs free play only). Both restart automatically,
-logs are JSON lines, and the steps are in `ops/README.md`. A 50-match local soak gave a 60 Hz tick
-p99 of 0.3 ms and peak memory of 227 MB. `npm run e2e:local` plays a full match against the real
+logs are JSON lines, and the steps are in `ops/README.md`. On 14 Nov 2026 (08:22 UTC, on a MacBook) a 50-room
+soak measured 0.167 ms of CPU per room tick, every match 90.0 s of wall time. `npm run e2e:local` plays a full match against the real
 server in CI.
 
 ## Core rules and agents
@@ -242,7 +242,7 @@ The PWA is retired, and [`public/sw.js`](../apps/client/public/sw.js) removes ol
 
 ### Netcode (`apps/client/src/net/`)
 - [`client.ts`](../apps/client/src/net/client.ts): the Colyseus connection. A dropped socket keeps
-  the seat (non-consented leave); a reload resumes it with the reconnection token. A watchdog ends the
+  the seat (non-consented leave), and a reload resumes it with the reconnection token. A watchdog ends the
   view with a Retry card if no state arrives for 5 seconds.
 - [`interp.ts`](../apps/client/src/net/interp.ts): snapshot interpolation, drawn 100 ms in the past
   between the two snapshots around that time. Your own blob is predicted locally (`predict.ts`)

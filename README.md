@@ -47,7 +47,7 @@ That's the kind of game I wanted to put onchain first.
 
 ## How I landed on MARGIN
 
-Before building anything, I checked whether other people feel what I felt. With the help of AI, I collected 57 public posts and comments from Reddit, X, YouTube and the wider web about leverage, liquidation and crypto games. Here are a few:
+Before building anything, I checked whether other people feel what I felt. With the help of AI, I collected 57 public posts and comments from Reddit, X, YouTube and the wider web about leverage, liquidation and crypto games, on 7 and 8 Nov 2026. Here are a few, with their numbers from that time:
 
 - "All my savings, 6 years of DCA, got liquidated." A post on r/Bitcoin with 2,589 upvotes, from someone who used to tell others to stay away from leverage ([post](https://www.reddit.com/r/Bitcoin/comments/1o3rrvx/)).
 - "All 8 traders once made huge profits on Hyperliquid, but every one of them ended up getting wiped out." Lookonchain, 1.06M views ([post](https://x.com/lookonchain/status/2017885115859505623)).
@@ -56,9 +56,9 @@ Before building anything, I checked whether other people feel what I felt. With 
 
 Losing money before you understand the game kills it. That's why MARGIN is free first.
 
-People clearly like the genre. slither.io has 500M+ downloads on Google Play and agar.io has 100M+.
+People clearly like the genre. slither.io has 500M+ downloads on Google Play and agar.io has 100M+ (checked 13 Nov 2026).
 
-I also went through past winners: 310 winners of game and DeFi hackathons (52 from Colosseum, 166 from ETHGlobal and Devfolio, 92 from other chains), trait by trait. The ones that died mostly made the token the game, or had slow rounds and empty lobbies. The ones still alive had fast rounds, free play, and losers paying winners instead of a token printing rewards.
+I also went through past winners on 6 Nov 2026: 310 winners of game and DeFi hackathons (52 from Colosseum, 166 from ETHGlobal and Devfolio, 92 from other chains), trait by trait. The ones that died mostly made the token the game, or had slow rounds and empty lobbies. The ones still alive had fast rounds, free play, and losers paying winners instead of a token printing rewards.
 
 I didn't get to MARGIN on the first try. These are the ideas I threw away, in order:
 
@@ -92,7 +92,7 @@ Now play it again, but Riya misses Ajay and runs into a big spike while she's ca
 
 Every match is written to a hash-chained log. After the match you can open a Verify page that replays the whole log in your browser and checks that the money adds up to the millionth of a credit. There's a Tamper button that changes one number and shows you exactly where the log breaks. Verify proves that the log adds up and, once its hour is sealed on NEAR, that nobody changed it afterwards. It can't prove the server played the match fairly before that, and matches on the US server are never sealed.
 
-To check that greed gets punished, I ran simulations on the real engine, not with real players. A scripted player who holds BOOST to the cap every match gets liquidated in 57% to 79% of matches. A scripted newcomer who eats, runs from bigger blobs and boosts only in short bursts survives to the bell in 78% of matches. Commands for both are in Part 2, and anyone can run them.
+To check that greed gets punished, I ran simulations on the real engine, not with real players. A scripted player who holds BOOST to the cap every match gets liquidated in 57% to 79% of matches. A scripted newcomer who eats, runs from bigger blobs and boosts only in short bursts survives to the bell in 78% of matches. I measured both on 14 Nov 2026 at 08:21 UTC. The commands are in Part 2, and anyone can run them.
 
 ## Why NEAR
 
@@ -111,14 +111,16 @@ The full list, with code and a transaction for each, is in [`docs/NEAR.md`](docs
 
 The numbers are small. Growing them is my main job now.
 
-| | As of 13 Nov, 19:50 UTC |
+| | As of 14 Nov 2026, 08:28 UTC |
 |---|---|
-| Matches with at least one guest browser on the public server | 15 (free) |
-| Guest browsers that played (team and QA excluded, not verified people) | 14 |
-| Players liquidated by an AI agent | 1 |
-| Hourly proofs anchored on NEAR testnet | 9 |
+| Matches with at least one guest browser | 28 free on the Mumbai server, 2 free on the US East server |
+| Guest browsers that played (team and QA excluded, not verified people) | 23 on Mumbai, 4 on US East |
+| Players liquidated by an AI agent | 3 |
+| Hourly proofs anchored on NEAR testnet | 15 |
 | Scripted paid matches by my own test accounts, settled on NEAR testnet, with a drone bounty | yes ([settle](https://testnet.nearblocks.io/txns/3Nw3RqiAfPmFYJ5LKxxXioEfppLhdEswXyTHhyZQABwA), [bounty](https://testnet.nearblocks.io/txns/8nDTHu1ZmeW19fSEaa9LoXtrUtdSsEALwVJWdNfpuWwf)) |
 | Network | NEAR testnet only |
+
+These numbers come from `npm run facts` at the time above. A browser that played on both servers counts once on each. [playmargin.fun/judges](https://playmargin.fun/judges) shows the current values.
 
 ## Built in Diwali week
 
@@ -178,11 +180,11 @@ Everything below is a command you can run or a link you can open. No keys or wal
 | Check | What to do | What you should see |
 |---|---|---|
 | Play | Open [playmargin.fun](https://playmargin.fun) on a laptop, press **Play free** | An 8 s warm-up, then a 90 s match against labelled bots (🤖). Hold Space to BOOST: a gold debt shell grows. Hold R: the debt drains to 0 |
-| Judge Run | Open [playmargin.fun/judge](https://playmargin.fun/judge) | A published seed (20261114). Hold BOOST, go red, and 🤖 Drone-1 liquidates you within seconds. Never borrow and you survive. Disclosed on screen: the agents here only hunt red blobs |
+| Judge Run | Open [playmargin.fun/judge](https://playmargin.fun/judge) | A published seed (20261114). Hold BOOST: the moment your loan is maxed, a big spike drops in your path (scripted, and the card on screen says so). You go red, and 🤖 Drone-1 liquidates you about 7 s after GO. Never borrow and you keep about 92 |
 | Judges' desk | Open [playmargin.fun/judges](https://playmargin.fun/judges) | 8 of this README's claims checked live in your browser against NEAR and the game engine: OK, FAIL or NONE YET, each with a link |
 | Verify a match | On the results receipt press **Verify this match**, then **Tamper test** | "Honest so far": the hash chain links and the books balance to the millionth of a credit. Then red at the exact edited event |
 | No browser | `npm install && npm run demo` | A narrated paid match in about 10 s, ending in the three proof lines below |
-| Every on-chain claim | `npm run proofs` (about 20 s) | One `OK` line per cited tx, read from NEAR RPC, ending `N of N cited txs OK on chain` |
+| Every on-chain claim | `npm run proofs` (about 20 s) | One `OK` line per cited tx, read from NEAR RPC, ending `19 of 19 cited txs OK on chain` (14 Nov 2026, 08:17 UTC) |
 
 Servers: free play picks the faster of two game servers, Mumbai (AWS ap-south-1) and US East. Paid rooms and the hourly NEAR anchors run only on Mumbai, and a US match's Verify page says so.
 
@@ -193,7 +195,7 @@ npm install
 npm run demo
 ```
 
-`npm run demo` plays one full paid match headless with the real engine and the real bots (6 bot-driven players and 2 liquidator drones), narrates it, then proves it (seed 109, about 10 s). Drone-2 liquidates Player-5 at 20.6 s. Player-6 goes red at 29.1 s and holds REPAY out of red at 29.5 s, then goes red again and is liquidated by Drone-2 at 54.5 s. These three lines are the same on every run, byte for byte, and change only if the rules change:
+`npm run demo` plays one full paid match headless with the real engine and the real bots (6 bot-driven players and 2 liquidator drones), narrates it, then proves it (seed 109, about 10 s). Drone-2 liquidates Player-5 at 20.6 s. Player-6 goes red at 29.1 s and holds REPAY out of red at 29.5 s, then goes red again and is liquidated by Drone-2 at 54.5 s. These three lines are the same on every run, byte for byte, and change only if the rules change (last checked 14 Nov 2026, 08:17 UTC):
 
 ```
 vault: lent 1035.0, repaid 1035.0, interest 116.0, fees 7.8 · reserve 7.3
@@ -203,7 +205,7 @@ hash chain: 238 events, head 330949a645769918...
 
 To play locally: `npm run dev` (game server on :2567, client on :1234), open http://localhost:1234 and press **Play free**. Ports busy? `PORT=3567 npm run dev -w @margin/server` and `VITE_SERVER_URL=http://localhost:3567 npm run dev -w @margin/client -- --port 3234`.
 
-`npm audit` lists findings with 0 high or critical. They sit in Colyseus modules MARGIN doesn't use (`@colyseus/auth`, `@colyseus/playground`) and in near-js's secp256k1 path (MARGIN keys are ed25519). Every offered fix is a major version change, so none is applied.
+`npm audit` lists 21 findings (18 low, 3 moderate, 0 high or critical, checked 14 Nov 2026). They sit in Colyseus modules MARGIN doesn't use (`@colyseus/auth`, `@colyseus/playground`) and in near-js's secp256k1 path (MARGIN keys are ed25519). Every offered fix is a major version change, so none is applied.
 
 ## Do X, see Y
 
@@ -211,15 +213,15 @@ To play locally: `npm run dev` (game server on :2567, client on :1234), open htt
 |---|---|---|
 | 1 | `npm run demo` | A narrated paid match ending in the three proof lines above |
 | 2 | `npm run e2e:local` | Boots the real server with a fresh database. Two network clients play a full free match, then it checks the settle, the credit ledger for both players and the log replay. Ends `E2E OK` (about 35 s). One expected error line, `you are already in this match`, is the test proving the server refuses a second seat |
-| 3 | `npm run sim -- --matches 500` | 500 full matches, 2,940,000 ticks, the conservation check every tick, `0 micro-units created or destroyed`, `settle == live in 500/500` (1 to 3 minutes) |
-| 4 | `npm test` | The whole TypeScript suite passes (engine, settle, bots, server, client logic) |
+| 3 | `npm run sim -- --matches 500` | 500 full matches, 2,940,000 ticks, the conservation check every tick, `0 micro-units created or destroyed`, `settle == live in 500/500` (36.7 s on 14 Nov 2026, 08:18 UTC, 1 to 3 minutes on a slower laptop) |
+| 4 | `npm test` | The whole TypeScript suite passes: 387 tests in 69 files (14 Nov 2026, 08:22 UTC) |
 | 5 | `cd contracts/margin && cargo test` | Contract unit tests and 3 near-sandbox integration tests pass (about 7 minutes, mostly near-sandbox) |
 | 6 | `npm run dev`, **Play free**, hold Space, then hold R | A gold "owe" shell grows, then drains to 0 in under a second |
 | 7 | Hold BOOST until the fuel ring is empty, then hit a big spike | Your rim turns red. A blob or drone touches you: "LIQUIDATED", and the receipt shows what the vault took back |
-| 8 | Open `/judge` | Judge Run, seed 20261114. Greedy: Drone-1 liquidates you in about 9 s. Still: you keep about 91 (`tools/sim/judge.ts`) |
-| 9 | `npm run sweep -- 900` | The balance table: a greedy player holding BOOST to the cap is liquidated in 57% (practised) to 79% (first-timer) of matches. About 5 minutes |
-| 10 | `npx tsx tools/sim/newcomer.ts 300 base` | A scripted newcomer that boosts only in short bursts survives to the bell in about 78% of 300 matches |
-| 11 | `npm run soak -- --rooms 50` | 50 rooms of 12 on one server, about 0.15 ms of CPU per room tick, every match 90.0 s of wall time |
+| 8 | Open `/judge` | Judge Run, seed 20261114. Hold BOOST and never steer: a big spike drops in your path, and Drone-1 liquidates you at 6.6 s. Sit still: you keep 91.86 (`tools/sim/judge.ts`, 14 Nov 2026, 08:18 UTC) |
+| 9 | `npm run sweep -- 900` | The balance table: a greedy player holding BOOST to the cap is liquidated in 57% (practised) to 79% (first-timer) of matches (14 Nov 2026, 08:21 UTC). About 2 to 5 minutes |
+| 10 | `npx tsx tools/sim/newcomer.ts 300 base` | A scripted newcomer that boosts only in short bursts survives to the bell in 78% of 300 matches (14 Nov 2026, 08:19 UTC) |
+| 11 | `npm run soak -- --rooms 50` | 50 rooms of 12 on one server: 0.167 ms of CPU per room tick, every match 90.0 s of wall time (14 Nov 2026, 08:22 UTC, on a MacBook) |
 | 12 | `npm run proofs` | Every tx cited here and in `docs/NEAR.md` checked from NEAR RPC: signer, receiver, method, key args, event. Exit 0 |
 | 13 | `npm run facts -- --net testnet:https://api.playmargin.fun` | The "What is real today" table, built live from the server and NEAR RPC. Zero prints "none yet" |
 | 14 | `NEAR_AI_API_KEY` in `.env`, then `npm run commander` | One live match with the AI commander on NEAR AI Cloud, each plan printed with its one-line reason. Without a key it says so and exits |
@@ -273,7 +275,7 @@ MARGIN isn't the organizers' example game (a market town), so each line maps to 
 | Named sub-accounts | `settler.`, `relayer.` and the AI drones `drone-1..3.playmargin.testnet`, registered by the owner only | [set_agents tx](https://testnet.nearblocks.io/txns/4eH66oURfLpz9FXafY8Y7QWb3LpRx6kQCwq46yghdgy2) |
 | Hourly Merkle anchors | Free matches cost no gas each: one root per hour on NEAR, a proof per match | [anchor tx](https://testnet.nearblocks.io/txns/B87qTFs8NSDUuAkhD1TUyCnBuKR7Z9abR8j1CVjcgNeY) |
 | NEAR AI Cloud | The agent commander: structured JSON plans, parsed and clamped, never touches money | `apps/server/src/agents/commander.ts` |
-| NEAR Intents (1-Click) | Add funds from any chain as USDC on NEAR | DRY RUN: 2 USDC on Base quoted 1.995 USDC out, about 35 s (9 Nov) |
+| NEAR Intents (1-Click) | Add funds from any chain as USDC on NEAR | DRY RUN: 2 USDC on Base quoted 1.995 USDC out, about 35 s (9 Nov 2026) |
 | near.social | Built, off on this testnet build: wallet players would show their near.social name and avatar, but near.social only exists on mainnet | `apps/server/src/social/profile.ts` |
 | Wallets (near-connect: HOT, Meteor, Intear) | Paid-room sign-in | `apps/client/src/chain/wallet.ts` |
 
@@ -285,7 +287,7 @@ The server runs one pure, deterministic engine (`packages/core`) 60 times a seco
 
 ## What an attack on it found
 
-On 13 Nov I ran an internal, AI-assisted red-team pass against the live testnet build and this repo.
+On 13 Nov 2026 I ran an internal, AI-assisted red-team pass against the live testnet build and this repo.
 
 What held:
 - 19 signed relayer bypass attempts were refused live, and 0 were paid.
