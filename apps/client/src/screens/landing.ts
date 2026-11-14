@@ -19,7 +19,7 @@ export const landing: Screen = (root) => {
       <div class="h-links">
         <a href="/how">How it works</a>
         <a href="${VERIFY_EXAMPLE}" title="A settled test match, checked in your browser">Verify</a>
-        <a href="/cash" class="h-quiet">Play for <span data-stake>$1</span></a>
+        <a href="/cash" class="h-quiet">Paid test match</a>
         <a href="/judges" class="h-judge">Judging? Start here</a>
       </div>
     </nav>

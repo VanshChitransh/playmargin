@@ -119,7 +119,7 @@ export function showResults(root: HTMLElement, o: Outcome, act: (a: "again" | "h
     root,
     `<div class="flex min-h-full flex-col lg:flex-row" style="background:color-mix(in srgb, var(--color-paper) 88%, transparent)">
       <section class="relative flex flex-col px-5 pb-10 pt-7 text-white sm:px-10 lg:w-[540px] lg:shrink-0 lg:pr-20 lg:pt-14 lg:[clip-path:polygon(0_0,100%_0,90%_100%,0_100%)]" style="background:radial-gradient(circle at 2px 2px, rgba(255,255,255,.13) 2px, transparent 0) 0 0/22px 22px, ${COBALT}">
-        <p class="tag flex items-center gap-3 text-warn"><span class="h-[3px] w-8 bg-warn"></span>${paid ? `<span data-stake>$1</span> match` : judge ? "Judge Run" : "Practice match"} &middot; ${o.of} played</p>
+        <p class="tag flex items-center gap-3 text-warn"><span class="h-[3px] w-8 bg-warn"></span>${paid ? `<span data-stake>$1</span> test match` : judge ? "Judge Run" : "Practice match"} &middot; ${o.of} played</p>
         <h2 class="mt-4 font-display text-[84px] leading-[.86] sm:text-[100px]" style="text-shadow:6px 6px 0 ${dead ? "var(--color-liq)" : "var(--color-ink)"}">${title}</h2>
         <p class="mt-5 max-w-sm text-xl text-white/90">${why}</p>
         ${s.clutches ? `<p class="mt-3"><span class="tag inline-block rounded-field bg-ink px-3 py-2 text-paper">\u2713 ${s.clutches} clutch save${s.clutches > 1 ? "s" : ""}</span></p>` : ""}
