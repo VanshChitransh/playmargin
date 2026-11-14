@@ -19,8 +19,10 @@ function hashId(id: string): number {
 /** Brain for an agent or drone blob, or null for humans. */
 export function createBrain(blob: Blob, matchSeed: number): Brain | null {
   const seed = (matchSeed ^ hashId(blob.id)) >>> 0;
-  // The Judge Run room always plays the published JUDGE_SEED: its agents spare the judge (QA-B-07).
-  if (blob.kind === "agent") return new FreeBot(seed, matchSeed === JUDGE_SEED ? { spareHumans: true } : undefined);
-  if (blob.kind === "drone") return new Drone(seed);
+  // The Judge Run room always plays the published JUDGE_SEED: its agents spare the judge (QA-B-07)
+  // and its drone shadows the judge, so the pop is Drone-1's.
+  const judgeRun = matchSeed === JUDGE_SEED;
+  if (blob.kind === "agent") return new FreeBot(seed, judgeRun ? { spareHumans: true } : undefined);
+  if (blob.kind === "drone") return new Drone(seed, judgeRun);
   return null;
 }

@@ -15,8 +15,9 @@ export interface Personality {
   /** 0 to 1. 1 = sharp (200 to 400 ms reactions, exact aim, tight food routing); lower is slower,
    *  noisier, wanders and lets prey go. Free-room agents use AGENT_SKILL so a first-timer can win. */
   skill: number;
-  /** Judge Run: never hunt a human who is not red, and keep a wide berth, so the lesson is greed
-   *  (go red and Drone-1 pops you), never "an agent ate me while I stood still". */
+  /** Judge Run: never hunt the human, red or not, and keep a wide berth, so the lesson is greed
+   *  (go red and Drone-1 pops you), never "an agent ate me while I stood still" or "an agent
+   *  took Drone-1's pop". */
   spareHumans?: boolean;
 }
 
@@ -145,8 +146,8 @@ export class FreeBot implements Brain {
       }
       if (iAmRed) push(o, -theirSize / mySize - 1, edge); // any touch pops a red blob
       else if (tick < o.shieldUntil) continue; // shielded: can't be eaten or popped, ignore
-      else if (o.kind === "human" && this.personality.spareHumans && ring(o) !== "red") {
-        push(o, -3, edge + 120); // Judge Run: a wide berth, food near the judge stays the judge's
+      else if (o.kind === "human" && this.personality.spareHumans) {
+        push(o, -3, edge + 120); // Judge Run: a wide berth, food near the judge stays the judge's, the pop Drone-1's
         continue;
       }
       else if (o.kind === "human" && (!this.huntHumans || (me.kind === "agent" && tick < humanSafeUntil(this.liveSince ?? tick, o.joinedAt))) && !outweighs(o, me)) {

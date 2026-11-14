@@ -13,6 +13,7 @@ import type { Blob, Micro, World } from "./types";
 import { toUnits } from "./units";
 import { refillFood } from "./food";
 import { ranking, respawnSpikes, spikeRadius } from "./world";
+import { judgeTrap } from "./scenario";
 
 const T = C.sToTicks;
 const INPUT_EXPIRE_T = Math.round((C.R.INPUT_EXPIRE_MS * C.R.TICK_HZ) / 1000);
@@ -292,7 +293,8 @@ export function step(w: World, inputs: Map<string, InputCmd>, tick: number): Gam
       keeper(w, b, tick, ev);
     }
   }
-  // 6. spikes, 7. zone
+  // 6. spikes (a Judge Run drops its one cap spike first), 7. zone
+  judgeTrap(w);
   spikes(w, tick, ev);
   zone(w, tick, ev);
   // 8. ring: start or clear the red grace clock (ultra red already popped by the keeper)

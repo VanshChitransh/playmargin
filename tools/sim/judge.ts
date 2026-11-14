@@ -29,6 +29,7 @@ const flee = (v: AgentView): [number, number] => {
 const styles: Record<string, Style> = {
   "passive (never moves)": (v, t) => cmd(t, 0, 0),
   "passive eater (food only, no BOOST)": (v, t) => { const [fx, fy] = flee(v); return fx || fy ? cmd(t, fx, fy) : cmd(t, ...nearestFood(v)); },
+  "holds BOOST, never steers (the README path)": (v, t) => cmd(t, 0, 0, true),
   "greedy (holds BOOST whenever it can)": (v, t) => cmd(t, ...nearestFood(v), true),
   "greedy, REPAYs when red": (v, t) => cmd(t, ...nearestFood(v), ring(v.self) === "green", ring(v.self) === "red"),
   "random (wanders, taps BOOST)": (v, t) => cmd(t, Math.cos(t / 90), Math.sin(t / 70), t % 300 < 40),
