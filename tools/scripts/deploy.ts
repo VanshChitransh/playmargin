@@ -39,6 +39,7 @@ async function deployMargin(): Promise<void> {
     console.log(`${IDS.contract} already has code (UPGRADE=1 to redeploy, MIGRATE=1 for a layout change)`);
     return;
   }
+  if ((!has || migrate) && !ENTRY_STAKE) throw new Error("set ENTRY_STAKE (100000 = 0.10 USDC, 1000000 = 1 USDC) for a first deploy or MIGRATE=1");
   let tx = near.transaction(IDS.contract).deployContract(IDS.contract, code);
   if (!has) {
     const args = { owner: IDS.owner, settler: IDS.settler, usdc: IDS.usdc, entry_stake: ENTRY_STAKE };
@@ -50,30 +51,33 @@ async function deployMargin(): Promise<void> {
   console.log(`margin ${what}: ${txLink(await tx.send({ waitUntil: "FINAL" }))}`);
 }
 
-/** The contract must be registered on USDC to receive ft_transfer_call deposits. */
-async function registerOnUsdc(): Promise<void> {
-  const bal = await near.view(IDS.usdc, "storage_balance_of", { account_id: IDS.contract });
+/** Registers `account` on USDC (the contract to receive deposits, the owner to hold the vault seed). */
+async function registerOnUsdc(account: string): Promise<void> {
+  const bal = await near.view(IDS.usdc, "storage_balance_of", { account_id: account });
   if (bal) return;
   await near.call(
     IDS.usdc,
     "storage_deposit",
-    { account_id: IDS.contract, registration_only: true },
+    { account_id: account, registration_only: true },
     { signerId: IDS.contract, attachedDeposit: "0.00125 NEAR" },
   );
-  console.log(`registered ${IDS.contract} on USDC`);
+  console.log(`registered ${account} on USDC`);
 }
+
+/** Our owner sub-account (default owner.<contract>), key made here: no seed phrase on a command line. */
+const ownOwner = IDS.owner.endsWith(`.${IDS.contract}`);
 
 /** Moves ownership off the contract account (first testnet deploy was initialised that way). */
 async function ensureOwner(): Promise<void> {
   const cfg = await near.view<{ owner: string }>(IDS.contract, "config", {});
   if (cfg?.owner === IDS.owner) return;
-  if (NETWORK === "testnet") await ensureSubAccount(IDS.owner, "0.5 NEAR");
   await near.call(IDS.contract, "set_owner", { owner: IDS.owner }, { signerId: cfg?.owner ?? IDS.contract, attachedDeposit: "1 yocto", waitUntil: "FINAL" });
   console.log(`owner set to ${IDS.owner}`);
 }
 
-/** Applies ENTRY_STAKE if the live contract differs (owner, 1 yocto). */
+/** Applies ENTRY_STAKE if it is set and the live contract differs (owner, 1 yocto). Unset = keep the live stake. */
 async function ensureEntryStake(): Promise<void> {
+  if (!ENTRY_STAKE) return;
   const cfg = await near.view<{ owner: string; entry_stake: string }>(IDS.contract, "config", {});
   if (!cfg || cfg.entry_stake === ENTRY_STAKE) return;
   await near.call(IDS.contract, "set_entry_stake", { entry_stake: ENTRY_STAKE }, { signerId: cfg.owner, attachedDeposit: "1 yocto", waitUntil: "FINAL" });
@@ -84,7 +88,11 @@ guardMainnet();
 console.log(`network ${NETWORK}`, IDS);
 if (NETWORK === "testnet") await deployMockUsdc();
 await deployMargin();
-await registerOnUsdc();
+await registerOnUsdc(IDS.contract);
+if (ownOwner) {
+  await ensureSubAccount(IDS.owner, fund(process.env.OWNER_NEAR, 0.5, 0.05));
+  await registerOnUsdc(IDS.owner);
+}
 await ensureOwner();
 await ensureEntryStake();
 await ensureSubAccount(IDS.settler, fund(process.env.SETTLER_NEAR, 2, 0.25));

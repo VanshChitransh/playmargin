@@ -29,8 +29,9 @@ export const IDS = {
   },
   mainnet: {
     contract: MAINNET_CONTRACT,
-    // Vansh's personal account (payout wallet), never the contract account itself.
-    owner: process.env.OWNER_ID ?? "vanshverse.near",
+    // A dedicated owner made by deploy.ts with a script-generated key, never the payout wallet:
+    // its seed phrase must never touch a command line (RT L8-02). Never the contract account itself.
+    owner: process.env.OWNER_ID ?? `owner.${MAINNET_CONTRACT}`,
     settler: process.env.SETTLER_ID ?? `settler.${MAINNET_CONTRACT}`,
     relayer: process.env.RELAYER_ID ?? `relayer.${MAINNET_CONTRACT}`,
     usdc: "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
@@ -38,8 +39,12 @@ export const IDS = {
   },
 }[NETWORK];
 
-/** Paid entry in USDC base units (1 USDC = 1000000). 0.10 USDC = 100000 for a lean launch. */
-export const ENTRY_STAKE = process.env.ENTRY_STAKE ?? "1000000";
+/**
+ * Paid entry in USDC base units (1 USDC = 1000000, 0.10 USDC = 100000), or undefined when not set.
+ * No default: an UPGRADE=1 hotfix from a fresh shell must never reset a live 0.10 stake to 1 USDC
+ * (RT L1-07). deploy.ts requires it for a first deploy or MIGRATE=1 and applies it only when set.
+ */
+export const ENTRY_STAKE: string | undefined = process.env.ENTRY_STAKE || undefined;
 
 export const EXPLORER = NETWORK === "mainnet" ? "https://nearblocks.io" : "https://testnet.nearblocks.io";
 
