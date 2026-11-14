@@ -4,7 +4,7 @@ agar.io, but your size is a loan. Owe too much, you're food.
 
 [![A Judge Run on a laptop: holding BOOST grows a gold debt shell, a spike turns the rim red, and Drone-1, a labelled AI liquidator, pops the blob: LIQUIDATED](docs/hero.gif)](docs/hero.mp4)
 
-**Play:** [playmargin.fun](https://playmargin.fun) (laptop, free, no sign-up) · **Video:** [YouTube](https://youtu.be/aFaOAkJbx_U) · **X post:** TODO(Vansh) · **Contract (NEAR testnet):** [`playmargin.testnet`](https://testnet.nearblocks.io/address/playmargin.testnet)
+**Play:** [playmargin.fun](https://playmargin.fun) (laptop, free, no sign-up) · **Video:** [YouTube](https://youtu.be/aFaOAkJbx_U) · **X post:** [demo thread](https://x.com/vanshverse/status/2121569788359221665) · **Contract (NEAR testnet):** [`playmargin.testnet`](https://testnet.nearblocks.io/address/playmargin.testnet)
 
 This README has two parts. [Part 1](#part-1-how-margin-happened) is me, Vansh, telling you how MARGIN happened: how I found NEAR, the problem I had myself, the ideas I threw away, and what I want to build next. [Part 2](#part-2-for-ai-screeners-and-anyone-who-wants-to-check) is for AI screeners and anyone who wants to run the code and check every claim. If you have two minutes, open [playmargin.fun/judge](https://playmargin.fun/judge) on a laptop and hold Space.
 
