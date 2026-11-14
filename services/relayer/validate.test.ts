@@ -69,6 +69,14 @@ describe("relayer allow-list", () => {
     expect(signatureOk(encodeSignedDelegateAction(unsigned as unknown as SignedDelegateAction), decoded)).toBe(false); // zero signature
     const swapped = { signedDelegate: { ...good.signedDelegate, delegateAction: { ...good.signedDelegate.delegateAction, senderId: "victim.testnet" } } };
     expect(signatureOk(encodeSignedDelegateAction(swapped as unknown as SignedDelegateAction), decoded)).toBe(false); // sender swapped
+    // RT L3-02: junk embedded signature + a valid signature appended after it. The decoder ignores
+    // the tail, so the chain would see the junk one: refuse anything that is not exactly the encoding.
+    const junk = Buffer.from(encodeSignedDelegateAction(unsigned as unknown as SignedDelegateAction, "bytes"));
+    const tail = sign(null, createHash("sha256").update(Buffer.concat([prefix, junk])).digest(), privateKey);
+    const forged = Buffer.concat([junk, Buffer.from([0]), tail]).toString("base64");
+    const forgedSd = decodeSignedDelegateAction(forged).signedDelegate as unknown as Parameters<typeof signatureOk>[1];
+    expect(signatureOk(forged, forgedSd)).toBe(false);
+    expect(signatureOk(Buffer.concat([Buffer.from(payload, "base64"), Buffer.from([1])]).toString("base64"), decoded)).toBe(false); // any trailing byte
   });
 
   it("needs a live, unexpired, scoped key with a fresh nonce", () => {

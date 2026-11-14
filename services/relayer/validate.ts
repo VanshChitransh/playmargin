@@ -6,7 +6,7 @@
 
 import { createHash, createPublicKey, verify } from "node:crypto";
 import { base58 } from "@scure/base";
-import { DELEGATE_ACTION_PREFIX, type SignedDelegateAction } from "near-kit";
+import { DELEGATE_ACTION_PREFIX, encodeSignedDelegateAction, type SignedDelegateAction } from "near-kit";
 
 type SignedDelegate = SignedDelegateAction["signedDelegate"];
 
@@ -43,13 +43,17 @@ export function delegateKey(sd: SignedDelegate): string | null {
 /**
  * NEP-366: ed25519 over sha256(u32 LE prefix || borsh(DelegateAction)), checked on the raw payload
  * (borsh SignedDelegate = DelegateAction bytes, then 1 key-type byte + 64 signature bytes).
- * `sd` is the decoded payload, used only for its public key. Forged payloads stop here.
+ * `sd` is the decoded payload. Forged payloads stop here. The decoder ignores trailing bytes and the
+ * relayer sends the DECODED delegate, so the raw bytes must be exactly its encoding, or a junk
+ * signature with a valid one appended would pass here and fail (paid) on chain (RT L3-02).
  */
 export function signatureOk(payloadB64: string, sd: SignedDelegate): boolean {
   const k = sd.delegateAction.publicKey;
   const bytes = Buffer.from(payloadB64, "base64");
   if (!("ed25519Key" in k) || bytes.length < 66 || bytes[bytes.length - 65] !== 0) return false;
   try {
+    const canonical = encodeSignedDelegateAction({ signedDelegate: sd } as SignedDelegateAction, "bytes");
+    if (!bytes.equals(Buffer.from(canonical))) return false;
     const key = createPublicKey({ key: Buffer.concat([SPKI_ED25519, Buffer.from(k.ed25519Key.data)]), format: "der", type: "spki" });
     const prefix = Buffer.alloc(4);
     prefix.writeUInt32LE(DELEGATE_ACTION_PREFIX);
