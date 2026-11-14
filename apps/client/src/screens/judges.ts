@@ -131,7 +131,7 @@ const claims: Claim[] = [
     title: "The game cannot create money",
     how: "Plays a full 90 s match on the real rules right here in your browser, then replays its log through the same settle() the server and contract use.",
     code: "packages/core/src/settle.ts",
-    links: () => [["Verify a real match", VERIFY_EXAMPLE], ["Play and verify one yourself", "/play"]],
+    links: () => [["Verify a test match", VERIFY_EXAMPLE], ["Play and verify one yourself", "/play"]],
     check: async () => {
       const m = new LocalMatch({ seed: (Math.random() * 1e9) | 0, withMe: false, bots: 11, warmupS: 0, greedy: true });
       for (let t = 0; m.w.phase !== "ENDED" && t < 120_000; t += 1000 / 60) m.frameAt(t);
@@ -143,7 +143,7 @@ const claims: Claim[] = [
     },
   },
   {
-    title: "Real players, counted honestly",
+    title: "Guest browsers that played",
     how: "Asks the game server for its live counts (humans only: bot rooms, tests and Judge Runs are left out).",
     code: "apps/server/src/api.ts",
     links: () => [],
@@ -152,7 +152,7 @@ const claims: Claim[] = [
       try {
         const s = (await (await fetch(`${ENDPOINT}/api/stats`, { signal: AbortSignal.timeout(8000) })).json()) as { players: number; matches: number; agentPops: number; multiHumanPct: number };
         const st: State = s.players > 0 ? "ok" : "none";
-        return { state: st, detail: `${count(s.players, "player")}, ${count(s.matches, "match", "matches")} with a human, ${s.multiHumanPct}% with two or more humans, ${count(s.agentPops, "liquidation")} by AI agents.${mainnet}` };
+        return { state: st, detail: `${count(s.players, "guest browser")} (anonymous, not verified people), ${count(s.matches, "match", "matches")} with a human, ${s.multiHumanPct}% with two or more humans, ${count(s.agentPops, "liquidation")} by AI agents.${mainnet}` };
       } catch {
         return { state: "unreachable", detail: `The game server did not answer, so there is no live count to show.${mainnet}` };
       }

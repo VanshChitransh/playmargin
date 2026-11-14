@@ -34,7 +34,7 @@ export const verify: Screen = (root, { id = "" }) => {
     <main class="mx-auto max-w-2xl px-4 pb-24 pt-10">
       <span class="sticker inline-block rounded-field bg-warn px-3 py-1 text-sm font-bold">Do not trust us. Check.</span>
       <h1 class="mt-3 font-display text-6xl">Verify</h1>
-      <p class="mt-2 text-muted">Match <span class="num font-bold">${esc(id)}</span>. Every check runs here in your browser, with the same code the server and the NEAR contract use.</p>
+      <p class="mt-2 text-muted">Match <span class="num font-bold">${esc(id)}</span>. Every check runs here in your browser, with the same code the server and the NEAR contract use. It proves the log adds up and, once its hour is anchored on NEAR, that it was not changed afterwards. It cannot prove the server played the match fairly before that.</p>
       <div data-v=body class="mt-6 space-y-4"><p class="tag">Loading the match log</p></div>
       <label class="${BTN.card} mt-8 cursor-pointer text-lg">
         Check a log file<input data-v=file type="file" accept="application/json,.json" class="hidden" /></label>
@@ -55,7 +55,7 @@ export const verify: Screen = (root, { id = "" }) => {
     body.querySelector("[data-v=download]")?.addEventListener("click", () => download(d.log, id));
     body.querySelector("[data-v=tamper]")?.addEventListener("click", () => {
       const t = tamper(d.log);
-      if (t) void show({ ...d, log: t.log }, `Tamper test: changed one number in event #${t.seq}. Watch which check catches it.`, d);
+      if (t) void show({ ...d, log: t.log }, `Tamper test: changed one number in event #${t.seq} and kept the old hash, like an edit made after the log was sealed. Watch which check catches it.`, d);
     });
     body.querySelector("[data-v=restore]")?.addEventListener("click", () => real && void show(real));
   };
@@ -106,10 +106,10 @@ function render(body: HTMLElement, d: Loaded, r: Report, note: string, tampered:
     : r.books.state === "skip"
       ? ["bg-warn text-ink", "?", "Legacy log, rules version unproven.", "It balances under the old rules, but only NEAR holding the same fingerprint can prove it is a real match from before 11 Nov."]
       : r.anchor.state === "ok"
-      ? ["bg-safe text-ink", "\u2713", "Honest match.", "Every hash links, the books balance to the millionth, and NEAR holds the same fingerprint."]
+      ? ["bg-safe text-ink", "\u2713", "Log checks out.", "Every hash links, the books balance to the millionth, and NEAR holds the same fingerprint, so the log was not changed after its hour was sealed."]
       : d.claim?.matchId.startsWith("u-")
-      ? ["bg-safe text-ink", "\u2713", "Honest log.", "Every hash links and the books balance. US server matches are not anchored on NEAR, so this check is the proof."]
-      : ["bg-safe text-ink", "\u2713", "Honest so far.", "Every hash links and the books balance. The NEAR anchor comes with the next hourly batch."];
+      ? ["bg-safe text-ink", "\u2713", "Log is consistent.", "Every hash links and the books balance. US server matches are not anchored on NEAR, so nothing here proves the log was not rewritten."]
+      : ["bg-safe text-ink", "\u2713", "Consistent so far.", "Every hash links and the books balance. Until the next hourly batch puts its fingerprint on NEAR, nothing proves the log was not rewritten."];
   body.innerHTML = `
     <div class="sticker flex items-center gap-4 rounded-box p-4 ${verdict[0]}">
       <span class="grid size-12 shrink-0 place-items-center rounded-full border border-grid ${bad ? "bg-liq text-paper" : "bg-card text-ink"} font-display text-2xl">${verdict[1]}</span>

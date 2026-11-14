@@ -92,7 +92,7 @@ export function mountProof(box: HTMLElement): () => void {
     note.textContent =
       bad === null
         ? intro
-        : `Line #${String(bad).padStart(4, "0")} now says 80, but its hash was made from 8, so it no longer matches. Each hash also seals the one before it, so every line after it fails too. To hide the edit a cheater would have to redo every hash, and the last one is already on NEAR.`;
+        : `Line #${String(bad).padStart(4, "0")} now says 80, but its hash was made from 8, so it no longer matches. Each hash also seals the one before it, so every line after it fails too. A cheater could redo every hash, but once the hour is anchored on NEAR the new last hash no longer matches the one there.`;
     btn.className = `tamper${tampered ? " on" : ""}`;
     btn.textContent = tampered ? "Put it back" : "Fake a payout";
   };

@@ -87,5 +87,5 @@ export function anchorVerdict(a: { seq: number; head: string; at: number } | nul
   if (!a) return { state: "none", detail: "No hourly anchor on this contract yet." };
   const hours = Math.max(0, (nowMs - a.at / 1e6) / 3.6e6);
   const ago = hours < 1 ? `${Math.round(hours * 60)} min ago` : `${hours.toFixed(1)} h ago`;
-  return { state: "ok", detail: `Latest hourly root #${a.seq}, ${a.head.slice(0, 12)}..., written ${ago}. The seq can only grow, so an anchored hour can never be rewritten.` };
+  return { state: "ok", detail: `Latest hourly root #${a.seq}, ${a.head.slice(0, 12)}..., written ${ago}. The seq can only grow, so this root cannot be replaced. It proves those logs were not changed after this hour, not that the matches were played fairly.` };
 }

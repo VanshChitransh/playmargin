@@ -23,7 +23,7 @@ export const header = (): string => `
     </a>
     <div class="flex items-center gap-1 whitespace-nowrap text-[15px] font-semibold">
       <a href="/how" class="${link} max-sm:hidden">How it works</a>
-      <a href="${VERIFY_EXAMPLE}" class="${link} max-sm:hidden" title="A real settled match, checked in your browser">Verify</a>
+      <a href="${VERIFY_EXAMPLE}" class="${link} max-sm:hidden" title="A settled test match, checked in your browser">Verify</a>
       <a href="/cash" class="${link} text-muted max-md:hidden">Play for <span data-stake>$1</span></a>
       <a href="/judges" class="rounded-full bg-ink px-4 py-2.5 text-white! hover:bg-ink/85">Judging? Start here</a>
     </div>

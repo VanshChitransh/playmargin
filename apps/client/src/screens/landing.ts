@@ -18,7 +18,7 @@ export const landing: Screen = (root) => {
       <a href="/" class="h-brand" aria-label="MARGIN home"><i><img src="/brand/margin-cat-cutout.svg" alt="" /></i>MARGIN</a>
       <div class="h-links">
         <a href="/how">How it works</a>
-        <a href="${VERIFY_EXAMPLE}" title="A real settled match, checked in your browser">Verify</a>
+        <a href="${VERIFY_EXAMPLE}" title="A settled test match, checked in your browser">Verify</a>
         <a href="/cash" class="h-quiet">Play for <span data-stake>$1</span></a>
         <a href="/judges" class="h-judge">Judging? Start here</a>
       </div>
