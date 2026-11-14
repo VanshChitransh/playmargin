@@ -1,6 +1,6 @@
 // Server picker: lowest median ping wins, dead servers are skipped, nothing alive means home.
 import { describe, expect, it, vi } from "vitest";
-import { HOME, pickFastest, regionOf } from "./region";
+import { HOME, joinOrder, pickFastest, regionOf, serverDown } from "./region";
 
 const US = { id: "us", label: "US East", url: "https://us.example" };
 
@@ -33,5 +33,19 @@ describe("server picker", () => {
     expect(m.hintFor(m.roomRegion("?s=us"))).toBe("?s=us");
     expect(m.hintFor(m.HOME)).toBe("");
     vi.unstubAllEnvs();
+  });
+});
+
+describe("join fallback", () => {
+  it("tries the picked server twice before any other", () => {
+    expect(joinOrder(HOME).slice(0, 2)).toEqual([HOME, HOME]);
+  });
+
+  it("moves servers only when the server is down, never on a refusal", () => {
+    expect(serverDown(new Error("server is restarting, try again in a moment"))).toBe(true);
+    expect(serverDown(new TypeError("Failed to fetch"))).toBe(true);
+    expect(serverDown(new Error("Unexpected end of JSON input"))).toBe(true);
+    expect(serverDown(new Error("not enough credits"))).toBe(false);
+    expect(serverDown(new Error("already in this match"))).toBe(false);
   });
 });

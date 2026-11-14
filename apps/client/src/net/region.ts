@@ -61,6 +61,16 @@ async function ping(url: string): Promise<number | null> {
   }
 }
 
+/** Where a free or Judge Run join goes: the picked server, the same one once more, then every other. */
+export const joinOrder = (first: Region): Region[] => [first, first, ...REGIONS.filter((r) => r !== first)];
+
+/** The join failed because the server is restarting or unreachable, not because it refused the seat. */
+export function serverDown(e: unknown): boolean {
+  if (e instanceof TypeError) return true; // fetch could not connect
+  const m = e instanceof Error ? e.message : String(e);
+  return /restarting|try again in a moment|failed to fetch|network|unexpected end of json|\b50[234]\b|timed? ?out/i.test(m);
+}
+
 let picked: Promise<Region> | null = null;
 
 /** The free-play server for this page load (pinged once, then cached). One region skips the pings. */

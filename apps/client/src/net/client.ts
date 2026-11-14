@@ -2,13 +2,16 @@
 // patch into a plain Frame snapshot, and exposes my private "owe" and the event stream.
 // The server is the only authority: money, eats and pops are decided there. Only MY blob's
 // position is predicted from my own input (predict.ts), so steering answers this frame.
-import { HOME, freeRegion, roomRegion, serverFor, type Region } from "./region";
+import { HOME, freeRegion, joinOrder, roomRegion, serverDown, serverFor, type Region } from "./region";
 import { seat, type SeatTarget } from "./seat";
 import { Client, type Room } from "@colyseus/sdk";
 import { R, TICK_MS, type BlobView, type GameEventMsg, type InputCmd, type JoinOpts, type MatchView, type Phase, type RateTier, type Ring } from "@margin/core";
 import type { Frame } from "../game/frame";
 import { SnapshotBuffer } from "./interp";
 import { OwnPredictor, canBoost, motionOf, type Input } from "./predict";
+
+/** Pause before the one retry on the same server (a blip, not a restart). */
+const RETRY_SAME_MS = 1000;
 
 const params = typeof location === "undefined" ? new URLSearchParams() : new URLSearchParams(location.search);
 /** ?lag=300: test mode that adds a 300 ms round trip (half each way) to inputs and patches. */
@@ -67,8 +70,26 @@ export class MatchConnection {
     const name = judge ? "judge" : opts.roomCode ? "private" : "match";
     // Paid always runs at home (the only box with a settler); a private room where its link says; free
     // play on whichever server answered fastest.
-    this.server = opts.mode === "paid" ? HOME : opts.roomCode ? roomRegion() : await freeRegion();
-    this.wire(await new Client(this.server.url).joinOrCreate(name, opts), judge ? "judge" : (opts.roomCode ?? "play"));
+    const key: SeatTarget = judge ? "judge" : (opts.roomCode ?? "play");
+    if (opts.mode === "paid" || opts.roomCode) {
+      this.server = opts.mode === "paid" ? HOME : roomRegion();
+      return this.wire(await new Client(this.server.url).joinOrCreate(name, opts), key);
+    }
+    // Free play and the Judge Run: a server that is restarting (503 for about 20 s on a deploy) or
+    // unreachable gets one more try, then the other region takes the match. A refusal (credits,
+    // already playing) is an answer, so it never moves servers.
+    let err: unknown;
+    for (const [i, region] of joinOrder(await freeRegion()).entries()) {
+      if (i === 1) await new Promise((r) => setTimeout(r, RETRY_SAME_MS));
+      try {
+        this.server = region;
+        return this.wire(await new Client(region.url).joinOrCreate(name, opts), key);
+      } catch (e) {
+        err = e;
+        if (!serverDown(e)) throw e;
+      }
+    }
+    throw err;
   }
 
   /** Private room host: start the match now (the server ignores it from anyone else). */
