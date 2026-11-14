@@ -311,8 +311,11 @@ export class Hud {
   private boostWhy(text: string | null): void {
     if (!this.why) {
       this.why = document.createElement("span");
-      this.why.className = "pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-ink px-2.5 py-1 font-sans text-xs font-bold text-white";
-      this.els.boost.appendChild(this.why);
+      // On the dock's top edge, not inside the button: the button's grey filter would fade it too.
+      const dock = this.els.boost.parentElement ?? this.els.boost;
+      dock.classList.add("relative");
+      this.why.className = "pointer-events-none absolute top-0 right-6 z-10 -translate-y-1/2 whitespace-nowrap rounded-full bg-ink px-3 py-1 font-sans text-sm font-bold text-white sm:right-10";
+      dock.appendChild(this.why);
     }
     this.why.hidden = !text;
     if (text && this.why.textContent !== text) this.why.textContent = text;
