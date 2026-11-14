@@ -82,18 +82,22 @@ function clearSpawn(w: World, mass: Micro): [number, number] {
   return best;
 }
 
-/** Join during warm-up (ghost, free to leave) or a late join in the first 15 s of a free match. */
+/**
+ * Join during warm-up (ghost, free to leave) or a late join in the first 15 s of a free match.
+ * Every check runs before w is touched (RNG included): a refused join leaves the world exactly as it
+ * was, so an uncharged blob can never break conservation and hang the room (red team L4-01).
+ */
 export function addPlayer(w: World, p: PlayerSeed, tick = w.tick): Blob {
   if (w.blobs.has(p.id)) throw new Error(`duplicate player ${p.id}`);
+  if (w.phase === "ENDED" || (w.phase === "LIVE" && (w.mode !== "free" || tick - w.goTick >= C.sToTicks(C.R.LATE_JOIN_S)))) {
+    throw new Error("late join is free rooms, first 15 s only");
+  }
   const [x, y] = clearSpawn(w, startMass(w.mode));
   const b = newBlob(p, x, y, p.kind === "drone" ? 0 : startMass(w.mode));
   b.joinedAt = tick;
   w.blobs.set(p.id, b);
   w.pendingLog.push({ type: "JOIN", tick, data: { player: p } });
   if (w.phase === "LIVE") {
-    if (w.mode !== "free" || tick - w.goTick >= C.sToTicks(C.R.LATE_JOIN_S)) {
-      throw new Error("late join is free rooms, first 15 s only");
-    }
     charge(w, b, tick);
     b.shieldUntil = tick + C.sToTicks(C.R.SHIELD_S_LATE_JOIN);
   }
