@@ -7,6 +7,9 @@ target/
 *.sqlite
 *.sqlite-*
 .claude/settings.local.json
+# Agent worktrees and any env file, whatever its name (L8-07).
+.claude/worktrees/
+*.env
 .DS_Store
 playtest-out/
 # Pre-public audit (QA): local state and anything key-shaped never gets committed.
