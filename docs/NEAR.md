@@ -2,7 +2,7 @@
 
 Every NEAR feature MARGIN uses, why it is there, where the code is, and a real testnet transaction
 that proves it runs. Contract: [`playmargin.testnet`](https://testnet.nearblocks.io/address/playmargin.testnet).
-All links are testnet. Mainnet is not deployed yet (runbook: `tools/scripts/MAINNET-RUNBOOK.md`). Testnet USDC is our own mock token (`usdc.playmargin.testnet`) with an open faucet.
+MARGIN runs on NEAR testnet only, and every link here is testnet. A mainnet deploy is future scope (runbook: `tools/scripts/MAINNET-RUNBOOK.md`). Testnet USDC is our own mock token (`usdc.playmargin.testnet`) with an open faucet.
 
 Re-run the proofs yourself: `tools/scripts/e2e.ts` (deposit, ticket, settle, withdraw),
 `tools/scripts/n8-paid.ts` (two players, two real matches, stolen key), `tools/scripts/session-probe.ts`.
@@ -48,7 +48,7 @@ A stolen session key cannot withdraw. It can still buy tickets and sign paid joi
 
 | Feature | Why MARGIN needs it | Code | Proof |
 |---|---|---|---|
-| **NEAR Intents 1-Click (Add funds)** | Players top up from any chain (USDC on Base, ETH, SOL, BTC...). The quote lands as native USDC on NEAR straight into the contract with `customRecipientMsg {"for": player}`, so it is credited to the player in the same flow. Our partner JWT stays on the relayer | relayer `services/relayer/oneclick.ts` (`quoteRequest`), client `apps/client/src/chain/addfunds.ts` (`quoteDeposit`) | dry quotes only until mainnet (Intents has no testnet): 2 USDC on Base quotes 1.995 USDC out, at least 1.975, about 35 s |
+| **NEAR Intents 1-Click (Add funds)** | Players top up from any chain (USDC on Base, ETH, SOL, BTC...). The quote lands as native USDC on NEAR straight into the contract with `customRecipientMsg {"for": player}`, so it is credited to the player in the same flow. Our partner JWT stays on the relayer | relayer `services/relayer/oneclick.ts` (`quoteRequest`), client `apps/client/src/chain/addfunds.ts` (`quoteDeposit`) | DRY RUN quotes only on testnet (Intents has no testnet): 2 USDC on Base quotes 1.995 USDC out, at least 1.975, about 35 s |
 | **NEAR AI Cloud commander** | One LLM call retunes all agents in a free room (greed, caution, drone focus). It never touches money or positions: its output is parsed and clamped | `apps/server/src/agents/commander.ts` (`ORDER_SCHEMA`, `nearAiCall`, `parsePlan`), room `apps/server/src/rooms/MatchRoom.ts` (`commander`) | `apps/server/scripts/smoke-commander.ts` (off-chain inference, no tx) |
 | **NEAR Auth (email login)** | Players without a wallet log in with email. The account key is an MPC key, the relayer creates the account and pays the MPC `sign` calls, and only for txs to our contract, USDC or the account itself | `apps/client/src/chain/email.ts`, relayer `services/relayer/fastauth.ts` (`signError`), `services/relayer/server.ts` (`fastauthCreate`, `fastauthSign`) | behind `VITE_NEAR_AUTH=1`, waiting on NEAR's mainnet approval of our Auth0 app |
 

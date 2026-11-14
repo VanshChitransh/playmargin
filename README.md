@@ -118,20 +118,22 @@ The numbers are small. Growing them is my main job now.
 | Players liquidated by an AI agent | 1 |
 | Hourly proofs anchored on NEAR testnet | 9 |
 | Scripted paid matches by my own test accounts, settled on NEAR testnet, with a drone bounty | yes ([settle](https://testnet.nearblocks.io/txns/3Nw3RqiAfPmFYJ5LKxxXioEfppLhdEswXyTHhyZQABwA), [bounty](https://testnet.nearblocks.io/txns/8nDTHu1ZmeW19fSEaa9LoXtrUtdSsEALwVJWdNfpuWwf)) |
-| Mainnet | not yet |
+| Network | NEAR testnet only |
 
 ## Built in Diwali week
 
 I'm a builder from India. Diwali this year ran from 6 to 10 November, and the main day was 8 November. That's the day I made my first commit, and I spent the festival week building this instead. Most of MARGIN was built in two days, 9 and 10 November. After that I kept playing it, breaking it and fixing it until the deadline.
 
-The Games track asks for a living game economy: player-owned markets, NPC merchants, prices that move on their own. I chose to spend my time on the game loop instead, because a 90-second match has to feel good before anything else matters, and building both properly in one week was too much for one person. So the economy in MARGIN today is the loan itself: BOOST, interest, liquidation and the vault. A bigger economy around it comes later.
+The Games track asks for a living game economy: player-owned markets, NPC merchants, prices that move on their own. I chose to spend my time on the game loop instead, because a 90-second match has to feel good before anything else matters, and building both properly in one week was too much for one person. So the economy in MARGIN today is the loan itself: BOOST, interest, liquidation and the vault.
+
+That trade-off is also the plan for the studio. Games first, because games bring players, and players are what a studio needs before anything else. Then, with every new game and every MARGIN update, the economy grows: an open vault anyone can lend to, leagues with their own rules, and markets between players.
 
 MARGIN works, and it needs a lot of polish. Here's what isn't done:
 
-- It runs on NEAR testnet. Mainnet is planned but not deployed.
+- It runs on NEAR testnet only.
 - No real Intents deposit has gone through yet. The quotes are real, in dry-run mode.
 - Testnet USDC is my own mock token with an open faucet, so money on testnet is play money.
-- Email login is built and switched off until NEAR approves it for mainnet. Today you play as a guest or with a NEAR wallet.
+- Email login is built and switched off until NEAR approves MARGIN for it. Today you play as a guest or with a NEAR wallet.
 - It's laptop only. Phones show a note asking you to open it on a laptop.
 - The vault that lends to players belongs to the house today. Outside lenders come later.
 - There are no player-owned markets yet.
@@ -272,7 +274,7 @@ MARGIN isn't the organizers' example game (a market town), so each line maps to 
 | Hourly Merkle anchors | Free matches cost no gas each: one root per hour on NEAR, a proof per match | [anchor tx](https://testnet.nearblocks.io/txns/B87qTFs8NSDUuAkhD1TUyCnBuKR7Z9abR8j1CVjcgNeY) |
 | NEAR AI Cloud | The agent commander: structured JSON plans, parsed and clamped, never touches money | `apps/server/src/agents/commander.ts` |
 | NEAR Intents (1-Click) | Add funds from any chain as USDC on NEAR | DRY RUN: 2 USDC on Base quoted 1.995 USDC out, about 35 s (9 Nov) |
-| near.social | Planned for mainnet: wallet players show their near.social name and avatar. near.social is mainnet only, so it is off on testnet | `apps/server/src/social/profile.ts` |
+| near.social | Built, off on this testnet build: wallet players would show their near.social name and avatar, but near.social only exists on mainnet | `apps/server/src/social/profile.ts` |
 | Wallets (near-connect: HOT, Meteor, Intear) | Paid-room sign-in | `apps/client/src/chain/wallet.ts` |
 
 nearblocks may show a Cloudflare check to scripts. `npm run proofs` reads the same txs straight from NEAR RPC. Every feature in more detail: [`docs/NEAR.md`](docs/NEAR.md).
@@ -332,6 +334,7 @@ ops               server deploy files
 
 - Runtime libraries: Colyseus 0.17 and @colyseus/sdk, PixiJS 8, Express 5, near-kit 0.20, near-api-js 5, @hot-labs/near-connect 0.12, @fast-auth-near browser SDK and provider 1.4, Tailwind 4, daisyUI 5, uqr, @scure/base. Contract: near-sdk 5.30.1, tested with near-sandbox 0.4.
 - Ported ideas: endel/colyseus-pixijs-boilerplate, MultiOgar's BotPlayer, owenashurst/agar.io-clone, vzhou842/example-.io-game, a16z ai-town (pattern only). Every source with its licence: [`docs/CREDITS.md`](docs/CREDITS.md).
+- Pre-hackathon code: none. GitHub created this repo on 8 Nov 2026 at 07:58 UTC, and the [first commit](https://github.com/VanshChitransh/playmargin/commit/ec0fdd3cd3b8f7489ce3100eba1fe856ba74e8a9) added only the licence and a gitignore. Every commit since is from the hackathon window.
 - AI-written code: most of the code in this repo was written by AI coding agents. I directed them, read the code and only then accepted it. The research was AI-assisted too.
 
 ## Docs

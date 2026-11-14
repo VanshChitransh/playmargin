@@ -1,5 +1,7 @@
 # MAINNET RUNBOOK
 
+Future scope. MARGIN runs on NEAR testnet only for the hackathon. This runbook is the rehearsed plan for a later mainnet deploy, with no date set.
+
 Production is two EC2 boxes plus Cloudflare Pages (step 5).
 
 Vansh runs every step by hand. Nothing here runs on mainnet without `CONFIRM_MAINNET=yes`, and

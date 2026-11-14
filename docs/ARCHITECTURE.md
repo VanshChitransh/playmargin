@@ -344,4 +344,4 @@ sequenceDiagram
 3. Live mode only (`ONECLICK_LIVE=1`, mainnet): the player sends to the quote's deposit address,
    the client polls `GET /status` (waiting, processing, done, refunded, failed). The solver's
    `ft_transfer_call` lands in `ft_on_transfer`, which credits the player from the msg.
-4. Until mainnet, quotes are dry (real prices, no deposit address). Intents has no testnet.
+4. On testnet, quotes are dry (real prices, no deposit address). Intents has no testnet.
