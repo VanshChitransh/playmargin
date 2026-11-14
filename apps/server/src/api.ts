@@ -182,7 +182,11 @@ export function mountApi(app: Application, db: () => Db): void {
   });
   app.get("/api/matches/:id/log", (req, res) => {
     const r = matchLog(db(), req.params.id);
-    return r ? void res.json(r) : void res.status(404).json({ error: "unknown match" });
+    if (!r) return void res.status(404).json({ error: "unknown match" });
+    // L4-07: mid-match the log hands out the seed (pellet and spike spots, agent aim) and every rival's
+    // loans. It opens at MATCH_END: the receipt fetches it while a paid settle tx is still in flight.
+    if (r.status === "live" && r.log.at(-1)?.type !== "MATCH_END") return void res.status(409).json({ error: "match still in play, its log opens when it ends" });
+    res.json(r);
   });
   app.get("/api/matches/:id/proof", (req, res) => {
     const r = matchProof(db(), req.params.id);

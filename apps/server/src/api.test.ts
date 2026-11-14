@@ -140,6 +140,33 @@ describe("stats and facts cost (L2-04)", () => {
   });
 });
 
+describe("live match log (L4-07)", () => {
+  it("refuses the log (seed and loans) while the match is in play, serves it from MATCH_END on", async () => {
+    const { db, srv, base } = await serve();
+    const entry = (seq: number, type: string) => ({ seq, tick: seq, type, data: { seed: 424242 }, prevHash: "", hash: `h${seq}` }) as unknown as LogEntry;
+    try {
+      createMatch(db, { id: "live1", mode: "paid", seed: 424242, pot: 200 * U });
+      saveEvents(db, "live1", [entry(0, "MATCH_START"), entry(1, "BOOST")]);
+      const mid = await fetch(`${base}/api/matches/live1/log`);
+      expect(mid.status).toBe(409);
+      expect(JSON.stringify(await mid.json())).not.toContain("424242");
+      // The bell rang, the paid settle tx is still in flight (status live): the receipt needs it now.
+      saveEvents(db, "live1", [entry(2, "MATCH_END")]);
+      const end = await fetch(`${base}/api/matches/live1/log`);
+      expect(end.status).toBe(200);
+      expect(((await end.json()) as { log: LogEntry[] }).log).toHaveLength(3);
+      // A match that never reached MATCH_END but was closed (refused) is still verifiable.
+      createMatch(db, { id: "r1", mode: "free", seed: 1, pot: 1200 * U });
+      saveEvents(db, "r1", [entry(0, "MATCH_START")]);
+      finishMatch(db, "r1", { status: "refused", head: "h0" });
+      expect((await fetch(`${base}/api/matches/r1/log`)).status).toBe(200);
+      expect((await fetch(`${base}/api/matches/nope/log`)).status).toBe(404);
+    } finally {
+      srv.close();
+    }
+  });
+});
+
 describe("finishMatch payouts", () => {
   it("stores 0, never NULL, for a player who got nothing (QA-D-06)", () => {
     const db = openDb(":memory:");
