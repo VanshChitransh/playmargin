@@ -7,7 +7,7 @@
     "apps/*"
   ],
   "engines": {
-    "node": ">=22.5"
+    "node": ">=22.13"
   },
   "scripts": {
     "dev": "concurrently -k -n server,client -c cyan,magenta \"npm run dev -w @margin/server\" \"npm run dev -w @margin/client\"",

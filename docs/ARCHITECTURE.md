@@ -109,11 +109,11 @@ LIVE matches finish and settle first, and systemd waits up to 120 s.
 | Player (browser) | send inputs (dir, BOOST, REPAY, cash out) | change rules or positions: `parseInput` validates every message, 30 a second per player, and the server is authoritative |
 | Player (paid join) | join a paid room with its own ticket | play someone else's ticket. The NEP-413 signature over `margin-join:paid:<account>` must come from a key of that account scoped to the contract. Nonces are single-use within 60 s. One live room per account (`paidMatch.ts`) |
 | Session key | `enter_arena` only | withdraw: `withdraw` needs 1 yoctoNEAR, which a function-call key cannot attach |
-| Game server (settler key) | `open_match`, `settle`, `refund_ticket`, `anchor` | create money (exact conservation), pay anyone outside the match except owner-registered drone accounts (at most 12% of the stakes), overspend the reserved budget or the 10% bad debt cap, settle twice, roll an anchor back (seq must grow), touch idle balances or the vault (owner only) |
-| Game server (outcomes) | run the simulation | hide what happened: the full hash-chained log is public (`GET /api/matches/:id/log`). Anyone can replay it with core on `/verify` and compare the head with the settle transaction or the Merkle proof (`/api/matches/:id/proof`) |
+| Game server (settler key) | `open_match` (it chooses which tickets form a match), `settle`, `refund_ticket`, `anchor` (any hour's root) | create money (exact conservation), pay anyone outside the match except owner-registered drone accounts (at most 12% of the stakes), overspend the reserved budget or the 10% bad debt cap, settle twice, roll an anchor back (seq must grow), touch idle balances or the vault (owner only) |
+| Game server (outcomes) | run the simulation | change a log after its hour is anchored: the full hash-chained log is public (`GET /api/matches/:id/log`). Anyone can replay it with core on `/verify` and compare the head with the settle transaction or the Merkle proof (`/api/matches/:id/proof`) |
 | Relayer | pay gas for allow-listed calls, fund new email-login accounts (daily cap) | sign for players. It only wraps a gas-capped, zero-deposit `enter_arena` signed by the player (`services/relayer/validate.ts`) |
 | NEAR AI Commander | retune agent personalities (greed, caution, drone focus) | move a blob or touch money: it gets only ids and numbers, and its output is parsed and clamped (`apps/server/src/agents/commander.ts`) |
-| Operator | run the droplet, withdraw from the vault and reserve as owner | block refunds: players `reclaim()` their stake 15 min after a match opens if it never settles |
+| Operator | run the servers, withdraw from the vault and reserve as owner | block refunds: players `reclaim()` their stake 15 min after a match opens if it never settles |
 | Owner key (`vanshverse.near`) | withdraw vault and reserve, rotate settler, change owner or entry stake | act from a dApp login key: every owner method needs 1 yoctoNEAR, which a function-call key cannot attach. Drain the reserve under open matches: `reserve_withdraw` keeps 10% of locked budget |
 | Contract account key | upgrade the code (`UPGRADE=1`, or `MIGRATE=1` with `migrate()`) | lose balances on upgrade: state is kept, layout changes go through a versioned `migrate` |
 | Email login (NEAR Auth) | sign as the player through Auth0 + MPC | make the relayer pay for arbitrary txs: `/fastauth/sign` only relays txs to our contract, USDC or the player's own account (borsh check in `services/relayer/fastauth.ts`), with per-IP and daily limits |
@@ -136,7 +136,7 @@ Server abuse limits:
 | `GET /api/credits?guestKey=` | free credits balance (applies the daily top-up) |
 
 ### Deploy and operations
-One droplet runs Caddy, the game server and the relayer as systemd units. Both restart automatically,
+One AWS EC2 box in Mumbai runs Caddy, the game server and the relayer as systemd units (a second box in US East runs free play only). Both restart automatically,
 logs are JSON lines, and the steps are in `ops/README.md`. A 50-match local soak gave a 60 Hz tick
 p99 of 0.3 ms and peak memory of 227 MB. `npm run e2e:local` plays a full match against the real
 server in CI.
@@ -197,7 +197,9 @@ Every tick runs the same 13 steps. The order is a rule, not an accident:
   Micro (`settle == live`). Otherwise it is refused and nobody is paid.
 - `settleargs.ts` converts the result to USDC base units for the contract's exact equality.
 - Proof: `npm run sim -- --matches 500` shows 0 Micro leaked and `settle == live` in 500 of 500.
-  `settle.test.ts` covers forged logs a live room cannot produce.
+  `settle.test.ts` covers forgeries a live room cannot produce that break the books. A balanced, rehashed
+  forgery still passes: the log proves consistency, and the anchor proves it was not changed afterwards,
+  not that the server played honestly before it. US-server matches are never anchored.
 
 ### Agents (`apps/server/src/agents`)
 
@@ -243,8 +245,8 @@ The PWA is retired; [`public/sw.js`](../apps/client/public/sw.js) removes old in
   the seat (non-consented leave); a reload resumes it with the reconnection token. A watchdog ends the
   view with a Retry card if no state arrives for 5 seconds.
 - [`interp.ts`](../apps/client/src/net/interp.ts): snapshot interpolation, drawn 100 ms in the past
-  between the two snapshots around that time. There is no client prediction: what you see is the
-  server's world, slightly delayed.
+  between the two snapshots around that time. Your own blob is predicted locally (`predict.ts`)
+  so it answers your input this frame. Everyone else is the server's world, slightly delayed.
 - [`room-code.ts`](../apps/client/src/net/room-code.ts): private room codes, validated as exactly four
   capital letters before they touch the page.
 
