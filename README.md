@@ -4,7 +4,7 @@ agar.io, but your size is a loan. Owe too much, you're food.
 
 [![A Judge Run on a laptop: holding BOOST grows a gold debt shell, a spike turns the rim red, and Drone-1, a labelled AI liquidator, pops the blob: LIQUIDATED](docs/hero.gif)](docs/hero.mp4)
 
-**Play:** [playmargin.fun](https://playmargin.fun) (laptop, free, no sign-up) · **Video:** TODO(Vansh) · **X post:** TODO(Vansh) · **Contract (NEAR testnet):** [`playmargin.testnet`](https://testnet.nearblocks.io/address/playmargin.testnet)
+**Play:** [playmargin.fun](https://playmargin.fun) (laptop, free, no sign-up) · **Video:** [YouTube](https://youtu.be/aFaOAkJbx_U) · **X post:** TODO(Vansh) · **Contract (NEAR testnet):** [`playmargin.testnet`](https://testnet.nearblocks.io/address/playmargin.testnet)
 
 This README has two parts. [Part 1](#part-1-how-margin-happened) is me, Vansh, telling you how MARGIN happened: how I found NEAR, the problem I had myself, the ideas I threw away, and what I want to build next. [Part 2](#part-2-for-ai-screeners-and-anyone-who-wants-to-check) is for AI screeners and anyone who wants to run the code and check every claim. If you have two minutes, open [playmargin.fun/judge](https://playmargin.fun/judge) on a laptop and hold Space.
 
@@ -167,7 +167,7 @@ Before I wrote much code, I edited videos and planned content for YouTube channe
 
 On the web3 side, I built Tarani, a compatibility checker for Solana Token-2022 tokens, and Prometheus, a watchtower that sends alerts for Arkiv entities. MARGIN is my first project on NEAR.
 
-[GitHub](https://github.com/VanshChitransh) · X: TODO(Vansh) · LinkedIn: TODO(Vansh)
+[GitHub](https://github.com/VanshChitransh) · X: [@vanshverse](https://x.com/vanshverse) · LinkedIn: [vansh-chitransh](https://www.linkedin.com/in/vansh-chitransh)
 
 ---
 
