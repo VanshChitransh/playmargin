@@ -147,16 +147,23 @@ export function facts(db: Db, network = process.env.NETWORK === "mainnet" ? "mai
   const byMode = (mode: string) =>
     one<{ n: number }>(`SELECT COUNT(*) AS n FROM matches m WHERE m.status = 'settled' AND m.mode = '${mode}' AND m.id IN (SELECT match_id FROM (${REAL_SEATS}))`).n;
   const seated = (cond: string) => one<{ n: number }>(`SELECT COUNT(DISTINCT r.user_id) AS n FROM (${REAL_SEATS}) r JOIN users u ON u.id = r.user_id WHERE ${cond}`).n;
-  const paidSettled = db
-    .prepare("SELECT id, head, tx_hash AS tx FROM matches WHERE mode = 'paid' AND status = 'settled' AND tx_hash IS NOT NULL ORDER BY ended DESC LIMIT 1000")
-    .all() as Array<{ id: string; head: string; tx: string }>;
+  // Every settled paid match, ours included (the README links one): team = no real player had a seat,
+  // which is why it is not in matchesWithRealPlayers.paid.
+  const paidSettled = (
+    db
+      .prepare(
+        `SELECT id, head, tx_hash AS tx, id NOT IN (SELECT match_id FROM (${REAL_SEATS})) AS team FROM matches
+         WHERE mode = 'paid' AND status = 'settled' AND tx_hash IS NOT NULL ORDER BY ended DESC LIMIT 1000`,
+      )
+      .all() as Array<{ id: string; head: string; tx: string; team: number }>
+  ).map((m) => ({ ...m, team: m.team === 1 }));
   const anchors = db.prepare("SELECT hour, tx_hash AS tx FROM anchors WHERE length(tx_hash) > 20 ORDER BY hour DESC LIMIT 2000").all() as Array<{ hour: number; tx: string }>;
   const wallets = (db.prepare(`SELECT DISTINCT u.account_id AS a FROM (${REAL_SEATS}) r JOIN users u ON u.id = r.user_id WHERE u.account_id IS NOT NULL`).all() as Array<{ a: string }>).map((r) => r.a);
   return {
     generatedAt: new Date().toISOString(),
     network,
     contract,
-    matches: { free: byMode("free"), paid: byMode("paid") },
+    matchesWithRealPlayers: { free: byMode("free"), paid: byMode("paid") },
     players: { freeGuests: seated("u.account_id IS NULL"), wallets: seated("u.account_id IS NOT NULL") },
     agentPops: stats(db).agentPops,
     paidSettled,

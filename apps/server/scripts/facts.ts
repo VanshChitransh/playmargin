@@ -10,10 +10,10 @@ type Net = "testnet" | "mainnet";
 interface Facts {
   generatedAt: string;
   contract: string | null;
-  matches: { free: number; paid: number };
+  matchesWithRealPlayers: { free: number; paid: number };
   players: { freeGuests: number; wallets: number };
   agentPops: number;
-  paidSettled: Array<{ id: string; head: string; tx: string }>;
+  paidSettled: Array<{ id: string; head: string; tx: string; team: boolean }>;
   anchors: Array<{ hour: number; tx: string }>;
   wallets: string[];
 }
@@ -90,6 +90,8 @@ async function column(net: Net, src: string): Promise<Column> {
   /** USDC to the base unit, exactly as the chain holds it (6 decimals, no rounding). */
   const exact = (base: bigint) => `${base / 1_000_000n}.${String(base % 1_000_000n).padStart(6, "0")}`;
   const outside = f.wallets.filter((w) => !team.has(w)).length;
+  const real = f.matchesWithRealPlayers;
+  const ours = f.paidSettled.filter((m) => m.team).length;
   const rpcNote = rpc.size ? `NEAR RPC (${[...rpc].join(", ")})` : "NEAR RPC (unreachable)";
   return {
     net,
@@ -97,9 +99,9 @@ async function column(net: Net, src: string): Promise<Column> {
     source: f.source,
     rpc,
     cells: {
-      matches: `${none(f.matches.free + f.matches.paid)} (${f.matches.free} free, ${f.matches.paid} paid)`,
+      matches: `${none(real.free + real.paid)} (${real.free} free, ${real.paid} paid)`,
       players: `${none(f.players.freeGuests + f.players.wallets)} (${f.players.freeGuests} guests, ${f.players.wallets} verified wallets)`,
-      paidOnChain: f.paidSettled.length ? `${settled} of ${f.paidSettled.length} in our records verified` : "none in our records",
+      paidOnChain: f.paidSettled.length ? `${settled} of ${f.paidSettled.length} in our records verified${ours ? ` (${ours} played by our own test accounts)` : ""}` : "none in our records",
       usdc: settled ? usd(stakes) : "none yet",
       agentPops: none(f.agentPops),
       droneUsdc: drones

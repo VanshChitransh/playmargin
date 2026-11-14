@@ -112,15 +112,15 @@ describe("stats and facts cost (L2-04)", () => {
   it("serves a cached scan for 30 s instead of rescanning the tables on every hit", async () => {
     const { db, srv, base } = await serve();
     try {
-      const get = async (path: string) => (await fetch(base + path, { headers: { "x-real-ip": "10.4.0.1" } })).json() as Promise<{ users: number; matches: { free: number } }>;
+      const get = async (path: string) => (await fetch(base + path, { headers: { "x-real-ip": "10.4.0.1" } })).json() as Promise<{ users: number; matchesWithRealPlayers: { free: number } }>;
       expect((await get("/api/stats")).users).toBe(0);
-      expect((await get("/api/facts")).matches.free).toBe(0);
+      expect((await get("/api/facts")).matchesWithRealPlayers.free).toBe(0);
       const u = userForGuestKey(db, "3f2b8c1e-5d4a-4f7b-9c2e-1a6d8e0f4b7c");
       createMatch(db, { id: "c1", mode: "free", seed: 9, pot: 1200 * U });
       addMatchPlayer(db, { matchId: "c1", userId: u, blobId: "g", entry: 100 * U });
       finishMatch(db, "c1", { status: "settled", head: "h", payouts: new Map() });
       expect((await get("/api/stats")).users).toBe(0);
-      expect((await get("/api/facts")).matches.free).toBe(0);
+      expect((await get("/api/facts")).matchesWithRealPlayers.free).toBe(0);
     } finally {
       srv.close();
     }
@@ -197,9 +197,27 @@ describe("facts", () => {
     addMatchPlayer(db, { matchId: "q1", userId: qa, blobId: "q", entry: 100 * U });
     finishMatch(db, "q1", { status: "settled", head: "hq", payouts: new Map() });
     const f = facts(db, "testnet", "margin.testnet");
-    expect(f.matches).toEqual({ free: 1, paid: 1 }); // the qa- match never counts
+    expect(f.matchesWithRealPlayers).toEqual({ free: 1, paid: 1 }); // the qa- match never counts
     expect(f.players).toEqual({ freeGuests: 1, wallets: 1 });
-    expect(f.paidSettled).toEqual([{ id: "p1", head: "hp", tx: "TxHash11111111111111111111" }]);
+    expect(f.paidSettled).toEqual([{ id: "p1", head: "hp", tx: "TxHash11111111111111111111", team: false }]);
     expect(f.wallets).toEqual(["w.testnet"]);
+  });
+});
+
+describe("facts: our own paid match (screener read 'paid: 0' next to one paid tx)", () => {
+  it("lists it in paidSettled marked team: true and keeps it out of matchesWithRealPlayers", () => {
+    const db = openDb(":memory:");
+    const qa1 = userForAccount(db, "qa1.rehearsal.testnet");
+    const qa2 = userForAccount(db, "qa2.rehearsal.testnet");
+    for (const id of ["qa1.rehearsal.testnet", "qa2.rehearsal.testnet"]) db.prepare("INSERT INTO team (kind, id, added) VALUES ('account', ?, 0)").run(id);
+    createMatch(db, { id: "x6f", mode: "paid", seed: 5, pot: 200 * U });
+    addMatchPlayer(db, { matchId: "x6f", userId: qa1, blobId: "a", entry: 100 * U });
+    addMatchPlayer(db, { matchId: "x6f", userId: qa2, blobId: "b", entry: 100 * U });
+    finishMatch(db, "x6f", { status: "settled", head: "hx", txHash: "3XigYdGzVvQ4Mv8qtqkq1VEWHtJyDpuAEW5h", payouts: new Map() });
+    const f = facts(db, "testnet");
+    expect(f).not.toHaveProperty("matches");
+    expect(f.matchesWithRealPlayers.paid).toBe(0);
+    expect(f.paidSettled).toEqual([{ id: "x6f", head: "hx", tx: "3XigYdGzVvQ4Mv8qtqkq1VEWHtJyDpuAEW5h", team: true }]);
+    expect(f.wallets).toEqual([]);
   });
 });
