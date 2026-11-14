@@ -130,3 +130,45 @@ describe("late seat after the window (L2-01)", () => {
     for (const r of [host, friend]) await r.leave(true);
   }, 15_000);
 });
+
+describe("room flood (L2-02, L2-02b)", () => {
+  it("a bare POST /matchmake that never connects closes in warm-up and never plays a match", async () => {
+    const { matchMaker } = await import("colyseus");
+    const res = await fetch(`http://localhost:${PORT}/matchmake/create/match`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: "free" }),
+    });
+    const room = (await res.json()) as { roomId: string };
+    expect((await matchMaker.query({ roomId: room.roomId })).length).toBe(1);
+    // SIM_SPEED 10: the 20 s close is 2 s; a free warm-up would have reached GO at about 1.1 s.
+    let gone = false;
+    for (let i = 0; i < 60 && !gone; i++, await sleep(100)) gone = (await matchMaker.query({ roomId: room.roomId })).length === 0;
+    expect(gone).toBe(true);
+    expect(sharedDb().prepare("SELECT COUNT(*) AS n FROM matches WHERE id = ?").get(room.roomId)).toEqual({ n: 0 });
+  }, 10_000);
+
+  it("one IP holds at most 3 private rooms; closing one frees a slot", async () => {
+    const open = async (code: string) => {
+      const r = await new Client(url).joinOrCreate("private", { mode: "free", roomCode: code, guestKey: `lobbyexit-flood-${code}-0123456789` });
+      r.onMessage("*", () => {});
+      return r;
+    };
+    // Earlier tests may still hold a live private room from this IP: open until refused.
+    const held = [];
+    let refused = "";
+    for (const code of ["FLDA", "FLDB", "FLDC", "FLDD"]) {
+      try {
+        held.push(await open(code));
+      } catch (e) {
+        refused = (e as Error).message;
+        break;
+      }
+    }
+    expect(refused).toMatch(/too many private rooms/);
+    expect(held.length).toBeLessThanOrEqual(3);
+    expect(held.length).toBeGreaterThan(0);
+    await held.pop()!.leave(true);
+    await sleep(300);
+    held.push(await open("FLDE")); // the freed slot works again
+    for (const r of held) await r.leave(true);
+  }, 10_000);
+});

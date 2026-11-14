@@ -48,6 +48,11 @@ import { MatchState, syncState } from "./schema";
 const WARMUP_TICKS = sToTicks(R.WARMUP_S);
 const PAID_WAIT_TICKS = sToTicks(R.PAID_WAIT_S);
 const COUNTDOWN_TICKS = sToTicks(R.COUNTDOWN_S);
+/** L2-02b: an empty warm-up closes after the 15 s seat reservation (plus a little slack). */
+const EMPTY_CLOSE_TICKS = sToTicks(20);
+/** L2-02: live private rooms per opening IP. */
+const PRIVATE_PER_IP = 3;
+const privateByIp = new Map<string, number>();
 const LATE_JOIN_TICKS = sToTicks(R.LATE_JOIN_S);
 /** Results stay on screen this long before the room closes. */
 const ENDED_HOLD_TICKS = sToTicks(5);
@@ -97,6 +102,8 @@ export class MatchRoom extends Room {
   private brains = new Map<string, Brain>();
   /** Set once a tick threw (fail): the room is being closed. */
   private failed = false;
+  /** Private rooms: the IP that opened it (L2-02 per-IP cap), released on dispose. */
+  private ownerIp: string | null = null;
   /** NEAR AI strategist for this room's agents, only when NEAR_AI_API_KEY is set. Never blocks a tick. */
   private commander = process.env.NEAR_AI_API_KEY ? new Commander(nearAiCall(process.env.NEAR_AI_API_KEY)) : null;
   private lastRationale: string | null = null;
@@ -204,6 +211,13 @@ export class MatchRoom extends Room {
 
   private async admit(opts: unknown, ctx?: { ip?: string | string[] }): Promise<string | { accountId: string; name?: string | null } | { spectator: true }> {
     if (!joinLimit.allow(clientIp(ctx))) throw new Error("too many joins, slow down");
+    // L2-02: the first socket of a private room "owns" it, at most PRIVATE_PER_IP live rooms per IP.
+    if (this.key.roomCode && !this.ownerIp && this.clients.length === 0) {
+      const ip = clientIp(ctx);
+      if ((privateByIp.get(ip) ?? 0) >= PRIVATE_PER_IP) throw new Error("too many private rooms open from your network, close one first");
+      privateByIp.set(ip, (privateByIp.get(ip) ?? 0) + 1);
+      this.ownerIp = ip;
+    }
     // Spectators only watch public free rooms: private codes and paid tickets stay private.
     if ((opts as { spectate?: unknown } | null)?.spectate === true) {
       if (this.key.mode !== "free" || this.key.roomCode || this.judge) throw new Error("only public free rooms can be watched");
@@ -221,6 +235,9 @@ export class MatchRoom extends Room {
     }
     const paid = await admitPaid(opts);
     const name = await socialName(paid.accountId); // near.social display name (mainnet), null keeps the account
+    // L2-06: a seat reserved in the last seconds of warm-up must not land after the roster went to
+    // open_match: that player would play unbound and break the settle for everyone. Checked after the awaits.
+    if (this.phase !== "WARMUP") throw new Error("the match is starting, join the next one");
     // Claimed synchronously after the last await, so two parallel joins can't both pass.
     if (seatedAccounts.has(paid.accountId)) throw new Error("this account is already in a match");
     seatedAccounts.add(paid.accountId);
@@ -237,6 +254,12 @@ export class MatchRoom extends Room {
       return;
     }
     const accountId = typeof auth === "object" ? auth.accountId : null;
+    // L2-06, second gate: the phase can change between onAuth and onJoin. The ticket is untouched.
+    if (accountId && this.phase !== "WARMUP") {
+      seatedAccounts.delete(accountId);
+      this.accounts.delete(accountId);
+      return void client.leave(4001, "the match is starting, join the next one");
+    }
     // Paid seats show their near.social name or the real account (both verified); free players pick a
     // name (cleaned: shown to all and to the agents' LLM).
     const name = typeof auth === "object" ? (auth.name ?? auth.accountId) : cleanName((opts as { name?: unknown } | null)?.name);
@@ -315,6 +338,11 @@ export class MatchRoom extends Room {
   }
 
   override onDispose(): void {
+    if (this.ownerIp) {
+      const n = (privateByIp.get(this.ownerIp) ?? 1) - 1;
+      if (n > 0) privateByIp.set(this.ownerIp, n);
+      else privateByIp.delete(this.ownerIp);
+    }
     if (this.counted) rooms.live--;
     for (const a of this.accounts) seatedAccounts.delete(a);
   }
@@ -381,6 +409,12 @@ export class MatchRoom extends Room {
     for (const ev of events) this.broadcast("ev", ev);
     switch (this.phase) {
       case "WARMUP": {
+        // L2-02b: a bare POST /matchmake reserves a seat but never connects. Never start a match with
+        // nobody in it: wait, and once the seat reservation has expired, close the room.
+        if (this.clients.length === 0) {
+          if (this.phaseTick >= EMPTY_CLOSE_TICKS) void this.disconnect();
+          break;
+        }
         const humans = this.state.humans;
         const next = warmupNext({ mode: this.key.mode, private: !!this.key.roomCode, humans, phaseTick: this.phaseTick, startNow: this.startNow });
         if (next === "close") this.noMatch();

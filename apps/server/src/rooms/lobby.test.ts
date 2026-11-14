@@ -1,7 +1,7 @@
 // Matchmaking timing and agent fill (RULES: Matchmaking, Paid rooms).
 import { R, sToTicks } from "@margin/core";
 import { describe, expect, it } from "vitest";
-import { agentFill, droneFill, parseRoomKey, PRIVATE_WAIT_S, warmupNext } from "./lobby";
+import { agentFill, droneFill, parseRoomKey, PRIVATE_SOLO_WAIT_S, PRIVATE_WAIT_S, warmupNext } from "./lobby";
 
 const at = (s: number) => sToTicks(s);
 
@@ -31,7 +31,9 @@ describe("warmupNext", () => {
     expect(warmupNext({ ...p, humans: 1, phaseTick: at(60), startNow: true })).toBe("wait");
     expect(warmupNext({ ...p, humans: 2, phaseTick: at(1), startNow: true })).toBe("countdown");
     expect(warmupNext({ ...p, humans: R.ROOM_SIZE, phaseTick: at(1), startNow: false })).toBe("countdown");
-    expect(warmupNext({ ...p, humans: 1, phaseTick: at(PRIVATE_WAIT_S), startNow: false })).toBe("close");
+    expect(warmupNext({ ...p, humans: 1, phaseTick: at(PRIVATE_SOLO_WAIT_S), startNow: false })).toBe("close"); // L2-02: a lone host waits 2 min
+    expect(warmupNext({ ...p, humans: 2, phaseTick: at(PRIVATE_SOLO_WAIT_S), startNow: false })).toBe("wait");
+    expect(warmupNext({ ...p, humans: 2, phaseTick: at(PRIVATE_WAIT_S), startNow: false })).toBe("close");
   });
 });
 

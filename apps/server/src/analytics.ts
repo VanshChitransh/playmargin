@@ -138,10 +138,10 @@ export function mountAnalytics(app: Application, db: () => Db): void {
   app.get("/api/insights", (req, res) => {
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Cache-Control", "no-store");
-    // L5-04: the key comes as the x-stats-key header (from the URL fragment, never sent or logged).
-    // ?key= stays until the new /stats is live and STATS_KEY is rotated.
+    // L5-04: the key comes only as the x-stats-key header (the page reads it from the URL fragment,
+    // which is never sent or logged). A ?key= in the URL no longer works.
     if (!insightsLimit.allow(requestIp(req))) return void res.status(429).json({ error: "slow down" });
-    if (!keyOk(req.get("x-stats-key") ?? req.query.key)) return void res.status(404).json({ error: "not found" });
+    if (!keyOk(req.get("x-stats-key"))) return void res.status(404).json({ error: "not found" });
     res.json(insights(db()));
   });
 }

@@ -21,6 +21,8 @@ export type WarmupNext = "wait" | "countdown" | "close";
 
 /** A private lobby nobody starts closes after this (nobody is charged before GO). */
 export const PRIVATE_WAIT_S = 600;
+/** L2-02: a private lobby with only its host closes sooner, so one IP can't park rooms for 10 min. */
+export const PRIVATE_SOLO_WAIT_S = 120;
 
 /**
  * When warm-up ends. Free: after WARMUP_S, agents fill the rest. Paid: humans only, needs
@@ -31,7 +33,7 @@ export function warmupNext(s: { mode: Mode; private?: boolean; humans: number; p
   // Private (PUBG custom room): no timer, the host starts once a friend is in, or it starts when full.
   if (s.private) {
     if (s.humans >= R.ROOM_SIZE || (s.startNow && s.humans >= R.PAID_MIN_HUMANS)) return "countdown";
-    return s.phaseTick < sToTicks(PRIVATE_WAIT_S) ? "wait" : "close";
+    return s.phaseTick < sToTicks(s.humans >= 2 ? PRIVATE_WAIT_S : PRIVATE_SOLO_WAIT_S) ? "wait" : "close";
   }
   if (s.mode === "free") return s.phaseTick >= sToTicks(R.WARMUP_S) ? "countdown" : "wait";
   const enough = s.humans >= R.PAID_MIN_HUMANS;
