@@ -6,6 +6,7 @@ import { JUDGE_SEED, toUnits } from "@margin/core";
 import { creditsRepo, isGuestKey, topUpDaily } from "./credits";
 import { userForGuestKey, type Db } from "./db";
 import { loadLog } from "./matches";
+import { requestIp } from "./matchmakeGuard";
 import { RateLimiter, rooms } from "./rooms/guard";
 import { drain } from "./rooms/MatchRoom";
 import { diskFree, settler, ticks } from "./obs";
@@ -16,6 +17,22 @@ const DAY_MS = 86_400_000;
 const creditsLimit = new RateLimiter(30, 60_000);
 /** Each watch reserves a seat and may create a room, so cap it per IP too. */
 const watchLimit = new RateLimiter(12, 60_000);
+/** L2-04: /api/stats and /api/facts scan whole tables on the game thread, so cap them per IP too. */
+const readLimit = new RateLimiter(30, 60_000);
+const READ_CACHE_MS = 30_000;
+
+/** f() at most once per READ_CACHE_MS: a loop of GET /api/facts froze every live arena for seconds (L2-04). */
+function cached<T>(f: () => T): () => T {
+  let at = -Infinity;
+  let v = undefined as T;
+  return () => {
+    if (Date.now() - at >= READ_CACHE_MS) {
+      v = f();
+      at = Date.now();
+    }
+    return v;
+  };
+}
 const PHASE_RANK: Record<string, number> = { LIVE: 3, COUNTDOWN: 2, WARMUP: 1 };
 
 interface Listing {
@@ -193,8 +210,10 @@ export function mountApi(app: Application, db: () => Db): void {
       rooms: rooms.live, uptimeS: Math.round(process.uptime()), rssMB: Math.round(process.memoryUsage().rss / 2 ** 20), ticks: ticks.summary(),
     });
   });
-  app.get("/api/stats", (_req, res) => void res.json(stats(db())));
-  app.get("/api/facts", (_req, res) => void res.json(facts(db(), undefined, sharedChain()?.cfg.contractId ?? null)));
+  const statsNow = cached(() => stats(db()));
+  const factsNow = cached(() => facts(db(), undefined, sharedChain()?.cfg.contractId ?? null));
+  app.get("/api/stats", (req, res) => (readLimit.allow(requestIp(req)) ? void res.json(statsNow()) : void res.status(429).json({ error: "slow down" })));
+  app.get("/api/facts", (req, res) => (readLimit.allow(requestIp(req)) ? void res.json(factsNow()) : void res.status(429).json({ error: "slow down" })));
   // Last: any other /api path or method answers JSON like every route above, never Express's HTML page.
   app.use("/api", (_req, res) => void res.status(404).json({ error: "not found" }));
 }

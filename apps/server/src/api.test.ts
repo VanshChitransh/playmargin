@@ -97,6 +97,49 @@ describe("api errors over HTTP", () => {
   });
 });
 
+/** mountApi on an in-memory DB behind a real HTTP port, for route-level tests. */
+async function serve(db = openDb(":memory:")) {
+  const { default: express } = await import("express");
+  const { mountApi } = await import("./api");
+  const app = express();
+  mountApi(app, () => db);
+  const srv = app.listen(0);
+  await new Promise((r) => srv.once("listening", r));
+  return { db, srv, base: `http://127.0.0.1:${(srv.address() as { port: number }).port}` };
+}
+
+describe("stats and facts cost (L2-04)", () => {
+  it("serves a cached scan for 30 s instead of rescanning the tables on every hit", async () => {
+    const { db, srv, base } = await serve();
+    try {
+      const get = async (path: string) => (await fetch(base + path, { headers: { "x-real-ip": "10.4.0.1" } })).json() as Promise<{ users: number; matches: { free: number } }>;
+      expect((await get("/api/stats")).users).toBe(0);
+      expect((await get("/api/facts")).matches.free).toBe(0);
+      const u = userForGuestKey(db, "3f2b8c1e-5d4a-4f7b-9c2e-1a6d8e0f4b7c");
+      createMatch(db, { id: "c1", mode: "free", seed: 9, pot: 1200 * U });
+      addMatchPlayer(db, { matchId: "c1", userId: u, blobId: "g", entry: 100 * U });
+      finishMatch(db, "c1", { status: "settled", head: "h", payouts: new Map() });
+      expect((await get("/api/stats")).users).toBe(0);
+      expect((await get("/api/facts")).matches.free).toBe(0);
+    } finally {
+      srv.close();
+    }
+  });
+
+  it("limits each IP to 30 reads a minute, other IPs still get through", async () => {
+    const { srv, base } = await serve();
+    try {
+      const hit = (path: string, ip: string) => fetch(base + path, { headers: { "x-real-ip": ip } }).then((r) => r.status);
+      for (let i = 0; i < 15; i++) expect([await hit("/api/stats", "10.4.0.2"), await hit("/api/facts", "10.4.0.2")]).toEqual([200, 200]);
+      expect(await hit("/api/stats", "10.4.0.2")).toBe(429);
+      expect(await hit("/api/facts", "10.4.0.2")).toBe(429);
+      expect(await hit("/api/stats", "10.4.0.3")).toBe(200);
+    } finally {
+      srv.close();
+    }
+  });
+});
+
 describe("finishMatch payouts", () => {
   it("stores 0, never NULL, for a player who got nothing (QA-D-06)", () => {
     const db = openDb(":memory:");
